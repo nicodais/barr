@@ -26,6 +26,7 @@ import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quali
 import { PhotoMode } from './PhotoMode';
 import { PhotoBar } from '../ui/PhotoBar';
 import { ControlPicker } from '../ui/ControlPicker';
+import { JoystickBar } from '../ui/JoystickBar';
 
 const PHYSICS_HZ = 60;
 const FIXED_DT = 1 / PHYSICS_HZ;
@@ -56,6 +57,7 @@ export class Game {
   private photo: PhotoMode;
   private photoBar: PhotoBar;
   private picker: ControlPicker;
+  private joystickBar: JoystickBar;
   private watchdog = new QualityWatchdog();
   private tier: QualityTier;
   private captureNextFrame = false;
@@ -158,10 +160,20 @@ export class Game {
     this.picker = new ControlPicker((scheme, handedness) => {
       this.settings.touchScheme = scheme;
       this.settings.handedness = handedness;
+      // The picker's stick-side choice seeds the joystick position; the top-right
+      // bar then lets the player nudge it (including to the middle) while driving.
+      if (scheme === 'joystick') this.settings.joystickPosition = handedness;
       this.settings.touchPickerSeen = true;
       saveSettings(this.settings);
       this.applyTouchScheme();
       void this.audio.unlock();
+    });
+
+    this.joystickBar = new JoystickBar((pos) => {
+      this.settings.joystickPosition = pos;
+      saveSettings(this.settings);
+      this.input.touch.setJoystickPosition(pos);
+      this.joystickBar.setPosition(pos);
     });
 
     this.tier = this.settings.quality === 'auto' ? detectTier() : this.settings.quality;
@@ -184,6 +196,7 @@ export class Game {
       this.photoBar.element,
       this.panel.element,
       this.picker.element,
+      this.joystickBar.element,
     );
 
     // Browsers only allow audio to start from a real gesture, so the first
@@ -357,6 +370,7 @@ export class Game {
     document.body.classList.add('photo-mode');
     this.hud.element.hidden = true;
     this.input.touch.element.hidden = true;
+    this.updateJoystickBar();
   }
 
   private exitPhotoMode() {
@@ -365,6 +379,7 @@ export class Game {
     document.body.classList.remove('photo-mode');
     this.hud.element.hidden = false;
     if (matchMedia('(pointer: coarse)').matches) this.input.touch.element.hidden = false;
+    this.updateJoystickBar();
     this.chase.reset(this.curPos, this.curQuat);
   }
 
@@ -420,6 +435,22 @@ export class Game {
   private applyTouchScheme() {
     this.input.touch.setScheme(this.settings.touchScheme);
     this.input.touch.setHandedness(this.settings.handedness);
+    this.input.touch.setJoystickPosition(this.settings.joystickPosition);
+    this.updateJoystickBar();
+  }
+
+  /** The stick-position bar only belongs on touch, and only for the joystick. */
+  private updateJoystickBar() {
+    const show =
+      matchMedia('(pointer: coarse)').matches &&
+      this.settings.touchScheme === 'joystick' &&
+      !this.photo.active;
+    if (show) {
+      this.joystickBar.setPosition(this.settings.joystickPosition);
+      this.joystickBar.show();
+    } else {
+      this.joystickBar.hide();
+    }
   }
 
   private syncTransforms(alsoPrevious: boolean) {

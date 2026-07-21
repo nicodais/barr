@@ -184,7 +184,19 @@ export class TuningPanel {
       );
       controls.appendChild(
         this.buildChoice(
-          'Stick side',
+          'Stick position',
+          ['left', 'middle', 'right'],
+          () => this.settings.joystickPosition,
+          (v) => {
+            this.settings.joystickPosition = v as GameSettings['joystickPosition'];
+            saveSettings(this.settings);
+            this.onTouchChange();
+          },
+        ),
+      );
+      controls.appendChild(
+        this.buildChoice(
+          'Pedal side',
           ['left', 'right'],
           () => this.settings.handedness,
           (v) => {

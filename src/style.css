@@ -110,13 +110,26 @@ body.photo-mode #help {
 }
 
 .touch-stick-zone {
-  left: calc(22px + env(safe-area-inset-left));
   bottom: calc(26px + env(safe-area-inset-bottom));
   width: 168px;
   height: 168px;
+  /* Position comes from the joystickPosition classes below; default to left so
+     the zone is never unplaced even before a class is applied. */
+  left: calc(22px + env(safe-area-inset-left));
 }
 
-.touch-right-handed .touch-stick-zone {
+.touch-stick-left .touch-stick-zone {
+  left: calc(22px + env(safe-area-inset-left));
+  right: auto;
+}
+
+.touch-stick-middle .touch-stick-zone {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+
+.touch-stick-right .touch-stick-zone {
   left: auto;
   right: calc(22px + env(safe-area-inset-right));
 }
@@ -444,6 +457,54 @@ body.photo-mode #help {
 }
 
 /* --- debug hud ------------------------------------------------------------ */
+
+/* Top-right stick-position bar, touch + joystick scheme only (shown by Game). */
+.joystick-bar {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: rgba(28, 21, 16, 0.42);
+  border: 1.5px solid var(--panel-line);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  z-index: 15;
+}
+
+.joystick-bar[hidden] {
+  display: none;
+}
+
+.joystick-bar-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  padding-left: 2px;
+}
+
+.joystick-bar button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-content: center;
+  border-radius: 9px;
+  border: 1.5px solid var(--panel-line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.joystick-bar button.joystick-bar-active {
+  border-color: var(--accent);
+  background: rgba(240, 168, 96, 0.16);
+}
 
 .hud {
   position: fixed;

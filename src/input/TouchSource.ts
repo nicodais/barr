@@ -11,6 +11,7 @@ import type { CameraInput, InputSource, VehicleInput } from './types';
  */
 export type TouchScheme = 'joystick' | 'wheel' | 'tilt';
 export type Handedness = 'left' | 'right';
+export type JoystickPosition = 'left' | 'middle' | 'right';
 
 const STICK_RADIUS = 62;
 const WHEEL_MAX_ANGLE = Math.PI * 0.62;
@@ -21,6 +22,7 @@ export class TouchSource implements InputSource {
 
   private scheme: TouchScheme = 'joystick';
   private handedness: Handedness = 'left';
+  private joystickPosition: JoystickPosition = 'left';
 
   private steer = 0;
   private throttle = 0;
@@ -90,6 +92,11 @@ export class TouchSource implements InputSource {
     this.applyScheme();
   }
 
+  setJoystickPosition(pos: JoystickPosition) {
+    this.joystickPosition = pos;
+    this.applyScheme();
+  }
+
   show() {
     this.element.hidden = false;
   }
@@ -115,6 +122,11 @@ export class TouchSource implements InputSource {
     this.pedals.hidden = joystick;
 
     this.element.classList.toggle('touch-right-handed', this.handedness === 'right');
+    // The thumbstick's position is its own setting (left/middle/right), separate
+    // from handedness — which now only decides which side the wheel/tilt pedals sit.
+    this.element.classList.toggle('touch-stick-left', this.joystickPosition === 'left');
+    this.element.classList.toggle('touch-stick-middle', this.joystickPosition === 'middle');
+    this.element.classList.toggle('touch-stick-right', this.joystickPosition === 'right');
     this.wheel.style.transform = 'rotate(0rad)';
   }
 
