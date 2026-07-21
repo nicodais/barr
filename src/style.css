@@ -461,7 +461,11 @@ body.photo-mode #help {
 
 /* --- debug hud ------------------------------------------------------------ */
 
-/* Top-right stick-position bar, touch + joystick scheme only (shown by Game). */
+/*
+ * Top-right stick-position control, touch + joystick scheme only (shown by
+ * Game). Collapsed it's a single puck; expanded its option row would otherwise
+ * reach the top-centre speedometer on a narrow phone, so it folds away.
+ */
 .joystick-bar {
   position: fixed;
   top: calc(12px + env(safe-area-inset-top));
@@ -480,6 +484,17 @@ body.photo-mode #help {
 
 .joystick-bar[hidden] {
   display: none;
+}
+
+/* Collapsed: the puck is the whole control, so drop the option row. */
+.joystick-bar.collapsed .joystick-bar-options {
+  display: none;
+}
+
+.joystick-bar-options {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .joystick-bar-label {

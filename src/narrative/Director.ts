@@ -1,5 +1,5 @@
 import { AHMED_LINES, type LinePool } from '../data/ahmedLines';
-import { POIS } from '../data/pois';
+import { POIS, type Poi } from '../data/pois';
 import type { VehicleTelemetry } from '../vehicle/Vehicle';
 import type { RadioSubtitles } from './RadioSubtitles';
 
@@ -31,6 +31,8 @@ export class Director {
   private visited = new Set<string>();
   /** Lines already used, so a session doesn't repeat itself (§13). */
   private used = new Map<LinePool, Set<number>>();
+  /** Remaining beats of a POI call-in, delivered one at a time as it clears. */
+  private pendingLines: string[] = [];
 
   private cooldown = 12;
   private stuckTimer = 0;
@@ -52,6 +54,16 @@ export class Director {
     if (this.subtitles.busy) {
       // Queue the sign-off to land just after the line clears, not on top of it.
       if (this.pendingSignOff > 0) this.pendingSignOff = 0.9;
+      return;
+    }
+
+    // Deliver the remaining beats of a POI call-in one at a time, as the same
+    // breath — no fresh key-up static between them. The sign-off is armed only
+    // once the last beat is out.
+    if (this.pendingLines.length > 0) {
+      const next = this.pendingLines.shift()!;
+      this.speak(next, false);
+      if (this.pendingLines.length === 0) this.pendingSignOff = 1.2;
       return;
     }
 
@@ -77,7 +89,7 @@ export class Director {
       if (this.visited.has(poi.id)) continue;
       if (Math.hypot(poi.x - x, poi.z - z) > poi.radius) continue;
       this.visited.add(poi.id);
-      this.call(poi.line, true);
+      this.callPoi(poi);
       return;
     }
 
@@ -123,11 +135,22 @@ export class Director {
     this.fastTimer = tel.speedKph > 82 ? this.fastTimer + dt : 0;
   }
 
-  private call(line: string, isPoi = false) {
+  /** Ambient chatter: one key-up, one line, no sign-off. */
+  private call(line: string) {
     this.speak(line, true);
     this.cooldown = COOLDOWN;
-    // He signs off after a POI remark rather than after every stray comment.
-    this.pendingSignOff = isPoi ? 1.2 : 0;
+  }
+
+  /**
+   * A POI call-in: key up once, deliver the first beat now and queue the rest,
+   * then sign off after the last (§13). He only signs off for POIs, not for
+   * every stray ambient comment.
+   */
+  private callPoi(poi: Poi) {
+    this.speak(poi.lines[0], true);
+    this.cooldown = COOLDOWN;
+    this.pendingLines = poi.lines.slice(1);
+    if (this.pendingLines.length === 0) this.pendingSignOff = 1.2;
   }
 
   private speak(line: string, keyUp: boolean) {
