@@ -1,5 +1,5 @@
 import { AudioEngine } from './AudioEngine';
-import { AmbientScore } from './AmbientScore';
+import { TrackScore } from './TrackScore';
 import { DrivingSound } from './DrivingSound';
 import { RadioCue } from './RadioCue';
 import type { VehicleTelemetry } from '../vehicle/Vehicle';
@@ -16,7 +16,7 @@ import type { VehicleTelemetry } from '../vehicle/Vehicle';
 export class GameAudio {
   private engine: AudioEngine | null = null;
   private driving: DrivingSound | null = null;
-  private score: AmbientScore | null = null;
+  private score: TrackScore | null = null;
   private cue: RadioCue | null = null;
   private muted = false;
   private volume = 0.9;
@@ -39,7 +39,7 @@ export class GameAudio {
       if (!ok) return;
       this.engine = engine;
       this.driving = new DrivingSound(engine);
-      this.score = new AmbientScore(engine);
+      this.score = new TrackScore(engine);
       this.cue = new RadioCue(engine);
       this.score.start();
       engine.setMasterVolume(this.muted ? 0 : this.volume);
