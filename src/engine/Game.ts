@@ -19,6 +19,7 @@ import { GameAudio } from '../audio/GameAudio';
 import { Director } from '../narrative/Director';
 import { RadioSubtitles } from '../narrative/RadioSubtitles';
 import { createLandmarks, createLandmarkColliders } from '../world/Landmarks';
+import { WorldBoundary } from './WorldBoundary';
 import { Scatter } from '../world/Scatter';
 import { Birds } from '../world/Birds';
 import { Wildlife } from '../world/Wildlife';
@@ -27,11 +28,16 @@ import { PhotoMode } from './PhotoMode';
 import { PhotoBar } from '../ui/PhotoBar';
 import { ControlPicker } from '../ui/ControlPicker';
 import { JoystickBar } from '../ui/JoystickBar';
+import { Compass } from '../ui/Compass';
+import { loadProgress, saveProgress, type Progress } from '../settings/Progress';
+import { POIS } from '../data/pois';
 
 const PHYSICS_HZ = 60;
 const FIXED_DT = 1 / PHYSICS_HZ;
 /** Cap catch-up work so a background tab doesn't return to a physics avalanche. */
 const MAX_SUBSTEPS = 5;
+/** Where a boundary respawn sets the truck back down, well inside the fade edge. */
+const RESPAWN_RADIUS = 680;
 
 export class Game {
   private rig: SceneRig;
@@ -58,6 +64,10 @@ export class Game {
   private photoBar: PhotoBar;
   private picker: ControlPicker;
   private joystickBar: JoystickBar;
+  private boundary = new WorldBoundary();
+  private compass = new Compass();
+  private progress: Progress;
+  private forward = new THREE.Vector3();
   private watchdog = new QualityWatchdog();
   private tier: QualityTier;
   private captureNextFrame = false;
@@ -125,12 +135,23 @@ export class Game {
     for (let i = 0; i < 24; i++) this.scatter.update(spawn.x, spawn.z);
 
     this.settings = loadSettings();
+    this.progress = loadProgress();
     this.audio.setMuted(this.settings.muted);
     this.audio.setVolume(this.settings.volume);
-    this.director = new Director(this.subtitles, {
-      onKeyUp: () => this.audio.radioKeyUp(),
-      onSignOff: () => this.audio.radioSignOff(),
-    });
+    this.director = new Director(
+      this.subtitles,
+      {
+        onKeyUp: () => this.audio.radioKeyUp(),
+        onSignOff: () => this.audio.radioSignOff(),
+      },
+      (poi) => {
+        // Discovery persists across sessions (§3); the compass stops nudging
+        // toward it and the counter ticks up. Ahmed stays once-per-session.
+        if (this.progress.discovered.has(poi.id)) return;
+        this.progress.discovered.add(poi.id);
+        saveProgress(this.progress);
+      },
+    );
 
     this.chase = new ChaseCamera(window.innerWidth / window.innerHeight);
     this.input = new InputManager(this.settings);
@@ -199,6 +220,8 @@ export class Game {
       this.panel.element,
       this.picker.element,
       this.joystickBar.element,
+      this.boundary.element,
+      this.compass.element,
     );
 
     // Browsers only allow audio to start from a real gesture, so the first
@@ -274,6 +297,13 @@ export class Game {
     }
     if (steps === MAX_SUBSTEPS) this.accumulator = 0;
 
+    // Soft world boundary: fade to haze as the player leaves the region and set
+    // them back down facing the centre once fully faded. Skipped in photo mode,
+    // where the truck is parked and the free camera can roam.
+    if (!this.photo.active && this.boundary.update(this.curPos.x, this.curPos.z, frameDt)) {
+      this.respawnTowardCentre();
+    }
+
     const alpha = Math.min(1, this.accumulator / FIXED_DT);
     this.renderPos.lerpVectors(this.prevPos, this.curPos, alpha);
     this.renderQuat.slerpQuaternions(this.prevQuat, this.curQuat, alpha);
@@ -319,6 +349,22 @@ export class Game {
     // Rear wheels only: on a 4x4 the fronts run the same line, so laying all
     // four would just z-fight two ribbons against each other.
     this.tracks.update(this.vehicle.wheels, [2, 3], frameDt);
+
+    // Heading from the truck's forward vector; the soft nudge points at the
+    // nearest POI this player hasn't found yet, across sessions (§5).
+    this.forward.set(0, 0, 1).applyQuaternion(this.renderQuat);
+    const heading = Math.atan2(this.forward.x, this.forward.z);
+    let targetBearing: number | null = null;
+    let best = Infinity;
+    for (const poi of POIS) {
+      if (this.progress.discovered.has(poi.id)) continue;
+      const d = Math.hypot(poi.x - this.renderPos.x, poi.z - this.renderPos.z);
+      if (d < best) {
+        best = d;
+        targetBearing = Math.atan2(poi.x - this.renderPos.x, poi.z - this.renderPos.z);
+      }
+    }
+    this.compass.update(heading, targetBearing, this.progress.discovered.size, POIS.length);
 
     this.audio.update(this.vehicle.telemetry, controls.throttle, frameDt);
     this.director.update(
@@ -372,6 +418,7 @@ export class Game {
     document.body.classList.add('photo-mode');
     this.hud.element.hidden = true;
     this.input.touch.element.hidden = true;
+    this.compass.hide();
     this.updateJoystickBar();
   }
 
@@ -381,6 +428,7 @@ export class Game {
     document.body.classList.remove('photo-mode');
     this.hud.element.hidden = false;
     if (matchMedia('(pointer: coarse)').matches) this.input.touch.element.hidden = false;
+    this.compass.show();
     this.updateJoystickBar();
     this.chase.reset(this.curPos, this.curQuat);
   }
@@ -453,6 +501,31 @@ export class Game {
     } else {
       this.joystickBar.hide();
     }
+  }
+
+  /**
+   * Set the truck back down inside the region, on the same bearing it left on but
+   * facing the centre, so driving off the edge loops you gently back in. The full
+   * haze is covering the screen at this instant, so the reposition is unseen.
+   */
+  private respawnTowardCentre() {
+    const p = this.curPos;
+    const d = Math.hypot(p.x, p.z) || 1;
+    const dirX = p.x / d;
+    const dirZ = p.z / d;
+    const rx = dirX * RESPAWN_RADIUS;
+    const rz = dirZ * RESPAWN_RADIUS;
+    // Forward is +Z in the truck's local frame; aim it back at the origin.
+    const yaw = Math.atan2(-dirX, -dirZ);
+    this.vehicle.warpTo(rx, rz, yaw);
+    // Ground must exist before the next wheel raycast, and those raycasts read
+    // the query pipeline as of the *last* step — stream the destination's
+    // colliders now and prime the pipeline, exactly like startup does, or the
+    // truck free-falls for the first steps after the warp.
+    this.terrain.update(rx, rz);
+    this.world.queryPipeline.update(this.world.colliders);
+    this.syncTransforms(true);
+    this.chase.reset(this.curPos, this.curQuat);
   }
 
   private syncTransforms(alsoPrevious: boolean) {

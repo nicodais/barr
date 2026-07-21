@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { WORLD_HALF, heightAt } from './height';
+import { heightAt } from './height';
 import { PROFILES, type QualityProfile } from '../engine/Quality';
 import {
   CHUNK_SIZE,
@@ -8,6 +8,7 @@ import {
   PHYSICS_RESOLUTION,
   buildChunkGeometry,
   buildChunkHeightSamples,
+  type EdgeRatios,
 } from './chunkGeometry';
 
 /** Extra slack before eviction, so chunks don't thrash on the boundary. */
@@ -19,13 +20,12 @@ const EVICT_SLACK = 160;
  */
 const PHYSICS_CHUNK_RADIUS = 2;
 
-const CHUNK_MIN = -Math.floor(WORLD_HALF / CHUNK_SIZE);
-const CHUNK_MAX = Math.floor(WORLD_HALF / CHUNK_SIZE) - 1;
-
 interface Chunk {
   cx: number;
   cz: number;
   lod: number;
+  /** Edge-stitching key ("w,e,s,n" ratios) the mesh was built with. */
+  edges: string;
   mesh: THREE.Mesh | null;
   collider: RAPIER.Collider | null;
 }
@@ -141,23 +141,27 @@ export class TerrainStreamer {
 
     this.pending.length = 0;
 
+    // No world bound: chunks stream around the player wherever they go, so the
+    // dune field is procedurally endless. The soft fade-and-respawn boundary
+    // (WorldBoundary) turns players back well before they can drive far out.
     for (let cx = centreCx - reach; cx <= centreCx + reach; cx++) {
-      if (cx < CHUNK_MIN || cx > CHUNK_MAX) continue;
       for (let cz = centreCz - reach; cz <= centreCz + reach; cz++) {
-        if (cz < CHUNK_MIN || cz > CHUNK_MAX) continue;
-
         const dist = this.chunkDistance(cx, cz, x, z);
         if (dist > this.profile.viewDistance) continue;
 
         const key = `${cx},${cz}`;
         let chunk = this.chunks.get(key);
         if (!chunk) {
-          chunk = { cx, cz, lod: -1, mesh: null, collider: null };
+          chunk = { cx, cz, lod: -1, edges: '', mesh: null, collider: null };
           this.chunks.set(key, chunk);
         }
 
+        // A chunk also rebuilds when a neighbour's LOD changes: its stitched
+        // edges are baked against that neighbour's resolution, and a stale
+        // stitch reopens the seam step it exists to remove.
         const wantLod = this.lodForDistance(dist);
-        if (chunk.lod !== wantLod) this.pending.push(chunk);
+        const wantEdges = this.edgeKey(cx, cz, wantLod, x, z);
+        if (chunk.lod !== wantLod || chunk.edges !== wantEdges) this.pending.push(chunk);
 
         // Colliders are driven by chunk-grid distance, not euclidean, so the
         // supported area is a clean square with no corner gaps.
@@ -187,6 +191,7 @@ export class TerrainStreamer {
 
     const dist = this.chunkDistance(chunk.cx, chunk.cz, this.focusX, this.focusZ);
     const lod = this.lodForDistance(dist);
+    const ratios = this.edgeRatios(chunk.cx, chunk.cz, lod, this.focusX, this.focusZ);
 
     if (chunk.mesh) {
       chunk.mesh.geometry.dispose();
@@ -194,9 +199,10 @@ export class TerrainStreamer {
       chunk.mesh = null;
     }
 
-    const geo = buildChunkGeometry(chunk.cx, chunk.cz, LOD_RESOLUTIONS[lod]);
+    const geo = buildChunkGeometry(chunk.cx, chunk.cz, LOD_RESOLUTIONS[lod], ratios);
+    // Positions are world-space and the mesh stays at identity — see
+    // buildChunkGeometry for why this is what makes the seams watertight.
     const mesh = new THREE.Mesh(geo, this.material);
-    mesh.position.set(chunk.cx * CHUNK_SIZE, 0, chunk.cz * CHUNK_SIZE);
     mesh.receiveShadow = true;
     // Dunes have to cast, not just receive: without this a ridge never shadows
     // the sand (or its own back face) behind it, so a low sun reads as shining
@@ -208,7 +214,27 @@ export class TerrainStreamer {
 
     chunk.mesh = mesh;
     chunk.lod = lod;
+    chunk.edges = `${ratios.west},${ratios.east},${ratios.south},${ratios.north}`;
     this.group.add(mesh);
+  }
+
+  /**
+   * Stitching ratios against each neighbour's LOD. LOD is a pure function of
+   * distance-to-focus, so any chunk can compute its neighbours' resolutions
+   * without them being resident, and every pair agrees about their shared edge.
+   */
+  private edgeRatios(cx: number, cz: number, lod: number, x: number, z: number): EdgeRatios {
+    const n = LOD_RESOLUTIONS[lod];
+    const r = (dcx: number, dcz: number) => {
+      const neighbourLod = this.lodForDistance(this.chunkDistance(cx + dcx, cz + dcz, x, z));
+      return Math.max(1, n / LOD_RESOLUTIONS[neighbourLod]);
+    };
+    return { west: r(-1, 0), east: r(1, 0), south: r(0, -1), north: r(0, 1) };
+  }
+
+  private edgeKey(cx: number, cz: number, lod: number, x: number, z: number): string {
+    const e = this.edgeRatios(cx, cz, lod, x, z);
+    return `${e.west},${e.east},${e.south},${e.north}`;
   }
 
   private createCollider(chunk: Chunk) {

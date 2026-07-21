@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { POIS, type Poi, type PoiKind } from '../data/pois';
 import { heightAt } from '../terrain/height';
@@ -31,10 +32,65 @@ export function createLandmarks(): THREE.Group {
   const group = new THREE.Group();
   for (const poi of POIS) {
     const built = buildLandmark(poi);
-    built.position.set(poi.x, heightAt(poi.x, poi.z), poi.z);
-    group.add(built);
+    const baseY = heightAt(poi.x, poi.z);
+    built.position.set(poi.x, baseY, poi.z);
+    drapeToTerrain(built, poi.x, poi.z, baseY);
+    group.add(bake(built));
   }
   return group;
+}
+
+/**
+ * Bakes a built landmark down to one mesh per material. The builders stay
+ * authored as dozens of readable primitives, but ~350 individual meshes across
+ * ten POIs blow the ~150 draw-call budget (§8) on their own — merged, the whole
+ * set costs a few draws per landmark, and each merged mesh still frustum-culls
+ * as a unit via its own bounding sphere. Same trick the truck uses.
+ */
+function bake(built: THREE.Group): THREE.Group {
+  built.updateMatrixWorld(true);
+  const buckets = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  built.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    // World transform baked into the vertices; the baked group sits at identity.
+    const geo = (obj.geometry as THREE.BufferGeometry).clone().applyMatrix4(obj.matrixWorld);
+    const mat = obj.material as THREE.Material;
+    let list = buckets.get(mat);
+    if (!list) buckets.set(mat, list = []);
+    list.push(geo);
+  });
+
+  const baked = new THREE.Group();
+  for (const [mat, geos] of buckets) {
+    const merged = mergeGeometries(geos, false);
+    for (const g of geos) g.dispose();
+    if (!merged) continue;
+    merged.computeBoundingSphere();
+    const mesh = new THREE.Mesh(merged, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    baked.add(mesh);
+  }
+  return baked;
+}
+
+/**
+ * Settles each piece of a landmark onto the terrain at its own footprint. Every
+ * mesh is authored with local Y measured from ground = 0, so shifting it by the
+ * terrain delta at its world position lets extended props — the camel track, the
+ * falaj — follow the dunes instead of floating at the centre's single height.
+ */
+function drapeToTerrain(built: THREE.Group, ox: number, oz: number, baseY: number): void {
+  const ry = built.rotation.y;
+  const c = Math.cos(ry);
+  const s = Math.sin(ry);
+  for (const child of built.children) {
+    const lx = child.position.x;
+    const lz = child.position.z;
+    const wx = ox + lx * c + lz * s;
+    const wz = oz - lx * s + lz * c;
+    child.position.y += heightAt(wx, wz) - baseY;
+  }
 }
 
 function buildLandmark(poi: Poi): THREE.Group {
@@ -433,7 +489,6 @@ function groupRotationY(id: PoiKind): number {
  */
 export function createLandmarkColliders(rapier: typeof RAPIER, world: RAPIER.World): void {
   for (const poi of POIS) {
-    const baseY = heightAt(poi.x, poi.z);
     const gRot = groupRotationY(poi.id);
     const c = Math.cos(gRot);
     const s = Math.sin(gRot);
@@ -441,11 +496,14 @@ export function createLandmarkColliders(rapier: typeof RAPIER, world: RAPIER.Wor
       const desc = spec.kind === 'box'
         ? rapier.ColliderDesc.cuboid(spec.hx!, spec.hy, spec.hz!)
         : rapier.ColliderDesc.cylinder(spec.hy, spec.r!);
-      const wx = poi.x + spec.x * c - spec.z * s;
-      const wz = poi.z + spec.x * s + spec.z * c;
+      // Same Y-rotation convention as three.js, so falaj's angled walls line up.
+      const wx = poi.x + spec.x * c + spec.z * s;
+      const wz = poi.z - spec.x * s + spec.z * c;
       const ry = (gRot + (spec.rotY ?? 0)) / 2;
       desc
-        .setTranslation(wx, baseY + spec.y, wz)
+        // Sample the terrain under each collider, matching the draped visuals so
+        // a post's collider sits on the same dune the post does.
+        .setTranslation(wx, heightAt(wx, wz) + spec.y, wz)
         .setRotation({ x: 0, y: Math.sin(ry), z: 0, w: Math.cos(ry) })
         .setFriction(0.7)
         .setRestitution(0.05);

@@ -43,6 +43,20 @@ body {
   pointer-events: auto;
 }
 
+/*
+ * Children that must stay pointer-transparent despite the re-enable above: the
+ * id selector outweighs their own class rules, so without this the fullscreen
+ * boundary fade silently eats every tap on the UI beneath it (and the radio
+ * frame and HUD intercept whatever they happen to cover).
+ */
+#ui > .touch-controls,
+#ui > .radio,
+#ui > .hud,
+#ui > .compass,
+#ui > .boundary-fade {
+  pointer-events: none;
+}
+
 /* --- loader --------------------------------------------------------------- */
 
 #loader {
@@ -210,11 +224,16 @@ body.photo-mode #help {
 
 /* --- control scheme picker ------------------------------------------------ */
 
+/*
+ * Flex + child margin:auto rather than grid centring: on a landscape phone the
+ * card is taller than the viewport, and this pattern degrades to a scrollable
+ * sheet instead of clipping the "Start driving" button off-screen.
+ */
 .picker {
   position: fixed;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  overflow-y: auto;
   padding: 20px;
   background: rgba(20, 14, 10, 0.72);
   backdrop-filter: blur(4px);
@@ -227,6 +246,7 @@ body.photo-mode #help {
 
 .picker-card {
   width: min(420px, 100%);
+  margin: auto;
   padding: 22px;
   border-radius: 16px;
   background: rgba(30, 22, 17, 0.96);
@@ -446,10 +466,10 @@ body.photo-mode #help {
 }
 
 @media (max-width: 720px) {
-  /* The speedometer moves to the top-centre on mobile; Ahmed's frame tucks in
-     just beneath it, clear of the touch controls that own the bottom edge. */
+  /* The compass and speedometer stack at the top-centre on mobile; Ahmed's
+     frame tucks in beneath them, clear of the touch controls at the bottom. */
   .radio {
-    top: calc(64px + env(safe-area-inset-top));
+    top: calc(90px + env(safe-area-inset-top));
     bottom: auto;
     padding: 9px 13px;
   }
@@ -522,6 +542,108 @@ body.photo-mode #help {
 .joystick-bar button.joystick-bar-active {
   border-color: var(--accent);
   background: rgba(240, 168, 96, 0.16);
+}
+
+/*
+ * The dashboard compass (§5): a slim tick-tape at the top centre. Subtle by
+ * design — it nudges, it never commands.
+ */
+.compass {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(400px, 64vw);
+  height: 22px;
+  overflow: hidden;
+  border-radius: 11px;
+  background: rgba(28, 21, 16, 0.35);
+  border: 1px solid var(--panel-line);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  z-index: 12;
+}
+
+.compass[hidden] {
+  display: none;
+}
+
+/* The tape's x=0 sits at the strip centre; JS slides it by heading. */
+.compass-tape {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 100%;
+}
+
+.compass-tick {
+  position: absolute;
+  top: 14px;
+  width: 1px;
+  height: 5px;
+  background: rgba(255, 224, 190, 0.35);
+}
+
+.compass-cardinal {
+  position: absolute;
+  top: 3px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  color: #f3e6d6;
+  opacity: 0.85;
+}
+
+.compass-centre {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 6px;
+  background: var(--accent);
+  opacity: 0.9;
+}
+
+.compass-marker {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  font-size: 10px;
+  color: var(--accent);
+  transition: opacity 0.3s;
+}
+
+/* Pinned at the strip edge = roughly behind you; dim rather than mislead. */
+.compass-marker-edge {
+  opacity: 0.35;
+}
+
+.compass-count {
+  position: absolute;
+  right: 4px;
+  top: 3px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  padding: 2px 5px;
+  border-radius: 8px;
+  /* Its own little badge, so sliding cardinal letters never collide with it. */
+  background: rgba(28, 21, 16, 0.85);
+  opacity: 0.8;
+}
+
+/*
+ * The world-boundary haze. Opacity is driven per-frame from JS as the player
+ * leaves the region; it fades to a warm sand-light rather than a hard black cut,
+ * so drifting off the edge reads as a whiteout, not a screen wipe.
+ */
+.boundary-fade {
+  position: fixed;
+  inset: 0;
+  background: #ece0cf;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 40;
 }
 
 .hud {
@@ -803,10 +925,16 @@ body.photo-mode #help {
     padding: 6px 10px;
   }
 
+  /* Mobile top stack: compass, then speedometer, then Ahmed's radio frame. */
+  .compass {
+    top: calc(6px + env(safe-area-inset-top));
+    width: min(300px, 60vw);
+  }
+
   .hud {
     left: 50%;
     bottom: auto;
-    top: calc(10px + env(safe-area-inset-top));
+    top: calc(34px + env(safe-area-inset-top));
     transform: translateX(-50%);
     gap: 10px;
     padding: 8px 12px;
@@ -843,6 +971,49 @@ body.photo-mode #help {
   .touch-pedal {
     width: 78px;
     height: 92px;
+  }
+
+  /* Touch devices in any orientation: the joystick owns the bottom corners, so
+     the HUD stacks top-centre like narrow viewports — a landscape phone is
+     wider than the narrow breakpoint but its bottom-left is still a thumb zone. */
+  .compass {
+    top: calc(6px + env(safe-area-inset-top));
+    width: min(300px, 60vw);
+  }
+
+  .hud {
+    left: 50%;
+    bottom: auto;
+    top: calc(34px + env(safe-area-inset-top));
+    transform: translateX(-50%);
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .hud-speed b {
+    font-size: 24px;
+  }
+
+  .hud-speed {
+    min-width: 74px;
+  }
+
+  .hud-stats,
+  .hud-bars {
+    display: none;
+  }
+
+  .hud-flags {
+    top: auto;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .radio {
+    top: calc(90px + env(safe-area-inset-top));
+    bottom: auto;
+    padding: 9px 13px;
   }
 }
 

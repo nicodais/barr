@@ -138,13 +138,41 @@ shadow from the truck; it's now 0.08, with a tighter shadow frustum to match.
 
 ## The world
 
-2048m square (~4.2 km²), one curated region rather than an infinite one (§5, §11).
+A curated region at the heart of a procedurally **endless** dune field.
 [`src/terrain/height.ts`](src/terrain/height.ts) is a pure, deterministic field — the
 physics colliders, the render chunks and the traction model all read the same function.
 It has an asymmetric dune profile (long windward ramp, short slip face capped near sand's
 ~32° angle of repose), a secondary cross-dune train, sabkha flats between dune fields, a
-small firm pan at spawn for baseline testing, four hand-sculpted landmarks, and a rim of
-tall dunes so the region ends in something you can drive at instead of a wall.
+small firm pan at spawn for baseline testing, and four hand-sculpted landmarks. Chunks
+stream around the player with no world bound, so the dunes run to the horizon in every
+direction. The region is instead closed by a soft edge:
+[`WorldBoundary`](src/engine/WorldBoundary.ts) fades the screen to a warm haze once the
+player drives well past the outermost POIs (~760m out on either axis) and, at full fade,
+sets the truck back down inside the region facing the centre — damage-free, never blocking,
+and never a wall or a void.
+
+Every built landmark stands on a **graded pad**: inside its footprint the ground is flat at
+the pad's height, with a blend ring easing back into the dunes (`PAD_FOOTPRINTS` in
+[`height.ts`](src/terrain/height.ts)). This is what fits the POIs to the landscape —
+multi-piece structures need flat ground under their whole footprint, and because the pads
+live in `heightAt` itself, the render chunks, physics heightfields and landmark colliders
+all agree by construction. Scattered dressing outside a pad (survey stakes, tripods) is
+still settled onto the terrain per piece. Landmarks are authored as dozens of readable
+primitives but **baked to one mesh per material** at startup — unbaked they blow the
+draw-call budget (§8) on their own.
+
+Terrain seams are watertight by construction, which took three fixes that all matter:
+chunk positions are **world-space with every mesh at the identity transform** (per-chunk
+transforms make the rasterizer's edge equations disagree sub-pixel and print hairline
+cracks); edges facing a coarser LOD are **stitched onto that neighbour's chord** (and a
+chunk rebuilds when a neighbour's LOD changes); and the crack-insurance skirts hang from a
+**recessed top ring** — a skirt sharing its top vertices with the surface z-fights it and
+draws a dashed line along every chunk boundary.
+
+A slim **dashboard compass** ([`Compass`](src/ui/Compass.ts), §5) shows heading plus one
+soft diamond toward the nearest undiscovered POI — no distance, no name, never an
+objective marker — and a small found-counter. Discovery persists across sessions
+([`Progress`](src/settings/Progress.ts), §3); Ahmed's call-ins stay once-per-session.
 
 Two things worth knowing before editing it:
 

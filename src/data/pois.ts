@@ -6,8 +6,9 @@
  * texture without becoming a checklist. Nothing here is mandatory and nothing
  * gates movement.
  *
- * Coordinates stay inside ±730 so landmarks never end up buried in the rising
- * rim of dunes that closes off the region.
+ * Coordinates stay well inside the soft fade-and-respawn boundary (~760 out, see
+ * WorldBoundary) so landmarks sit in the curated heart of the region, never out
+ * in the endless dune field the player only skims before being turned back.
  *
  * `lines` is an ordered pool, not a random one: Ahmed keys up once and delivers
  * them as consecutive beats — usually "what it is", then "why it matters" — so a
@@ -112,7 +113,7 @@ export const POIS: Poi[] = [
   {
     id: 'cameltrack',
     name: 'The Old Camel Track',
-    x: 210, z: 90, radius: 120,
+    x: -120, z: 525, radius: 120,
     lines: [
       'Camel track. The races are serious business — the Sheikhs breed the winners like royalty.',
       'This stretch got left to the sand when they built the big ovals. Mind the old rails.',
