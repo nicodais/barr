@@ -41,7 +41,10 @@ const HANDEDNESS: Handedness[] = ['left', 'right'];
 const JOYSTICK_POSITIONS: JoystickPosition[] = ['left', 'middle', 'right'];
 const QUALITIES: Array<QualityTier | 'auto'> = ['auto', 'low', 'medium', 'high'];
 
-const STORAGE_KEY = 'dune.settings.v1';
+// Bumped v1 -> v2 so the inverted-steering default reaches returning players:
+// a v1 blob saved before that default flipped would otherwise pin steering to
+// its old, non-inverted value. The bump resets every persisted setting once.
+const STORAGE_KEY = 'dune.settings.v2';
 
 export function loadSettings(): GameSettings {
   const settings = { ...DEFAULT_SETTINGS };

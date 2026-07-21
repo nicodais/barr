@@ -446,8 +446,11 @@ body.photo-mode #help {
 }
 
 @media (max-width: 720px) {
+  /* The speedometer moves to the top-centre on mobile; Ahmed's frame tucks in
+     just beneath it, clear of the touch controls that own the bottom edge. */
   .radio {
-    bottom: calc(52px + env(safe-area-inset-bottom));
+    top: calc(64px + env(safe-area-inset-top));
+    bottom: auto;
     padding: 9px 13px;
   }
 
