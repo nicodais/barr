@@ -29,8 +29,10 @@ import { PhotoBar } from '../ui/PhotoBar';
 import { ControlPicker } from '../ui/ControlPicker';
 import { JoystickBar } from '../ui/JoystickBar';
 import { Compass } from '../ui/Compass';
+import { PoiCard } from '../ui/PoiCard';
 import { loadProgress, saveProgress, type Progress } from '../settings/Progress';
 import { POIS } from '../data/pois';
+import type { PoiKind } from '../data/pois';
 
 const PHYSICS_HZ = 60;
 const FIXED_DT = 1 / PHYSICS_HZ;
@@ -66,6 +68,8 @@ export class Game {
   private joystickBar: JoystickBar;
   private boundary = new WorldBoundary();
   private compass = new Compass();
+  private poiCard = new PoiCard();
+  private activePoi: PoiKind | null = null;
   private progress: Progress;
   private forward = new THREE.Vector3();
   private watchdog = new QualityWatchdog();
@@ -222,6 +226,7 @@ export class Game {
       this.joystickBar.element,
       this.boundary.element,
       this.compass.element,
+      this.poiCard.element,
     );
 
     // Browsers only allow audio to start from a real gesture, so the first
@@ -365,6 +370,26 @@ export class Game {
       }
     }
     this.compass.update(heading, targetBearing, this.progress.discovered.size, POIS.length);
+
+    // The arrival card: fades in inside a POI's radius, fades out on the way
+    // off it. The exit edge is wider than the entry edge so idling right on the
+    // boundary can't flicker the card.
+    if (this.activePoi !== null) {
+      const cur = POIS.find((p) => p.id === this.activePoi)!;
+      const d = Math.hypot(cur.x - this.renderPos.x, cur.z - this.renderPos.z);
+      if (d > cur.radius * 1.35 || this.photo.active) {
+        this.poiCard.hide();
+        this.activePoi = null;
+      }
+    }
+    if (this.activePoi === null && !this.photo.active) {
+      for (const poi of POIS) {
+        if (Math.hypot(poi.x - this.renderPos.x, poi.z - this.renderPos.z) > poi.radius) continue;
+        this.activePoi = poi.id;
+        this.poiCard.show(poi);
+        break;
+      }
+    }
 
     this.audio.update(this.vehicle.telemetry, controls.throttle, frameDt);
     this.director.update(

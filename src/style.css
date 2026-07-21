@@ -633,6 +633,90 @@ body.photo-mode #help {
 }
 
 /*
+ * The POI arrival card: a small plaque with a real-world photo and a few lines
+ * of heritage context. Pointer-transparent and driven purely by proximity.
+ */
+.poi-card {
+  position: fixed;
+  top: 44px;
+  left: 14px;
+  width: min(300px, 62vw);
+  border-radius: 14px;
+  background: rgba(30, 22, 17, 0.92);
+  border: 1px solid var(--panel-line);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  pointer-events: none;
+  z-index: 14;
+}
+
+.poi-card.poi-card-show {
+  opacity: 1;
+  transform: none;
+}
+
+.poi-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.poi-card img[hidden] {
+  display: none;
+}
+
+.poi-card h3 {
+  margin: 10px 13px 5px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.poi-card p {
+  margin: 0 13px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.88;
+}
+
+.poi-card small {
+  display: block;
+  margin: 0 13px 9px;
+  font-size: 8.5px;
+  line-height: 1.3;
+  opacity: 0.42;
+}
+
+.poi-card small[hidden] {
+  display: none;
+}
+
+/* Touch layouts stack the HUD top-centre, so the card sits lower-left, clear
+   of both the compass row and the thumb zone; short viewports drop the photo. */
+@media (pointer: coarse) {
+  .poi-card {
+    top: auto;
+    bottom: calc(230px + env(safe-area-inset-bottom));
+    left: calc(10px + env(safe-area-inset-left));
+    width: min(250px, 56vw);
+  }
+}
+
+@media (pointer: coarse) and (max-height: 480px) {
+  .poi-card {
+    bottom: calc(180px + env(safe-area-inset-bottom));
+  }
+
+  .poi-card img {
+    display: none;
+  }
+}
+
+/*
  * The world-boundary haze. Opacity is driven per-frame from JS as the player
  * leaves the region; it fades to a warm sand-light rather than a hard black cut,
  * so drifting off the edge reads as a whiteout, not a screen wipe.
