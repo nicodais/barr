@@ -1,0 +1,86 @@
+/**
+ * Player settings, persisted to localStorage (§3). Kept separate from
+ * VehicleTuning: tuning is developer-facing numbers that get baked into the
+ * build once they feel right, settings are player choices that must survive it.
+ *
+ * Grows into the phase 5 options menu; for now the tuning panel is the only UI
+ * surface that exists to host it.
+ */
+import type { Handedness, TouchScheme } from '../input/TouchSource';
+import type { QualityTier } from '../engine/Quality';
+
+export interface GameSettings {
+  /** Mirrors steering input for players who prefer it the other way round. */
+  invertSteering: boolean;
+  muted: boolean;
+  /** Master volume, 0..1. */
+  volume: number;
+  touchScheme: TouchScheme;
+  handedness: Handedness;
+  /** False until the one-time scheme picker has been answered (§7). */
+  touchPickerSeen: boolean;
+  /** 'auto' lets the device heuristic and watchdog decide. */
+  quality: QualityTier | 'auto';
+}
+
+export const DEFAULT_SETTINGS: GameSettings = {
+  invertSteering: false,
+  muted: false,
+  volume: 0.9,
+  touchScheme: 'joystick',
+  handedness: 'left',
+  touchPickerSeen: false,
+  quality: 'auto',
+};
+
+const TOUCH_SCHEMES: TouchScheme[] = ['joystick', 'wheel', 'tilt'];
+const HANDEDNESS: Handedness[] = ['left', 'right'];
+const QUALITIES: Array<QualityTier | 'auto'> = ['auto', 'low', 'medium', 'high'];
+
+const STORAGE_KEY = 'dune.settings.v1';
+
+export function loadSettings(): GameSettings {
+  const settings = { ...DEFAULT_SETTINGS };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return settings;
+    const saved = JSON.parse(raw) as Partial<GameSettings>;
+    // Only adopt keys we still recognise, and only at the right type, so an
+    // old or hand-edited blob can't inject junk into the input path.
+    if (typeof saved.invertSteering === 'boolean') {
+      settings.invertSteering = saved.invertSteering;
+    }
+    if (typeof saved.muted === 'boolean') {
+      settings.muted = saved.muted;
+    }
+    if (typeof saved.volume === 'number' && Number.isFinite(saved.volume)) {
+      settings.volume = Math.min(1, Math.max(0, saved.volume));
+    }
+    // Enum-valued settings are checked against the allowed set rather than just
+    // their type, so a stale or hand-edited blob can't put the game into a
+    // scheme that no longer exists.
+    if (saved.touchScheme && TOUCH_SCHEMES.includes(saved.touchScheme)) {
+      settings.touchScheme = saved.touchScheme;
+    }
+    if (saved.handedness && HANDEDNESS.includes(saved.handedness)) {
+      settings.handedness = saved.handedness;
+    }
+    if (typeof saved.touchPickerSeen === 'boolean') {
+      settings.touchPickerSeen = saved.touchPickerSeen;
+    }
+    if (saved.quality && QUALITIES.includes(saved.quality)) {
+      settings.quality = saved.quality;
+    }
+  } catch {
+    // Unavailable or corrupt storage: defaults are already in place.
+  }
+  return settings;
+}
+
+export function saveSettings(settings: GameSettings): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Private-mode storage failures aren't worth interrupting a drive over.
+  }
+}

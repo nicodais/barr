@@ -1,0 +1,787 @@
+:root {
+  --sand: #e8b98a;
+  --ink: #2b211a;
+  --panel: rgba(28, 21, 16, 0.82);
+  --panel-line: rgba(255, 224, 190, 0.16);
+  --text: #f6e7d4;
+  --accent: #f0a860;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--sand);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--text);
+  /* Stops iOS from bouncing the page while a thumb is on the throttle. */
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#viewport {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+#ui > * {
+  pointer-events: auto;
+}
+
+/* --- loader --------------------------------------------------------------- */
+
+#loader {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  background: var(--sand);
+  color: #7a5637;
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+#loader.loader-error {
+  color: #8c2f2f;
+}
+
+/* --- help strip ----------------------------------------------------------- */
+
+#help {
+  position: fixed;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+#help b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Nothing but the photo bar belongs on screen while composing a shot. */
+body.photo-mode #help {
+  display: none;
+}
+
+/* --- touch controls ------------------------------------------------------- */
+
+.touch-controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.touch-controls[hidden] {
+  display: none;
+}
+
+.touch-stick-zone,
+.touch-wheel,
+.touch-pedals {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-stick-zone {
+  left: calc(22px + env(safe-area-inset-left));
+  bottom: calc(26px + env(safe-area-inset-bottom));
+  width: 168px;
+  height: 168px;
+}
+
+.touch-right-handed .touch-stick-zone {
+  left: auto;
+  right: calc(22px + env(safe-area-inset-right));
+}
+
+.touch-stick-base {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(28, 21, 16, 0.3);
+  border: 1.5px solid rgba(255, 224, 190, 0.24);
+}
+
+.touch-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 68px;
+  height: 68px;
+  margin: 0;
+  border-radius: 50%;
+  background: rgba(240, 168, 96, 0.62);
+  border: 1.5px solid rgba(255, 236, 214, 0.5);
+  transform: translate(-50%, -50%);
+}
+
+.touch-wheel {
+  left: calc(18px + env(safe-area-inset-left));
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  width: 172px;
+  height: 172px;
+  color: rgba(240, 168, 96, 0.66);
+}
+
+.touch-wheel svg {
+  width: 100%;
+  height: 100%;
+}
+
+.touch-pedals {
+  right: calc(20px + env(safe-area-inset-right));
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  gap: 12px;
+}
+
+/* Same specificity trap as `.hud[hidden]` — the joystick scheme hides these. */
+.touch-pedals[hidden] {
+  display: none;
+}
+
+.touch-right-handed .touch-pedals {
+  right: auto;
+  left: calc(20px + env(safe-area-inset-left));
+}
+
+.touch-pedal {
+  width: 86px;
+  height: 104px;
+  display: grid;
+  place-content: center;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 224, 190, 0.24);
+  background: rgba(28, 21, 16, 0.42);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+}
+
+.touch-pedal-go {
+  background: rgba(240, 168, 96, 0.26);
+}
+
+.touch-pedal-down {
+  background: rgba(240, 168, 96, 0.55);
+}
+
+/* --- control scheme picker ------------------------------------------------ */
+
+.picker {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(20, 14, 10, 0.72);
+  backdrop-filter: blur(4px);
+  z-index: 20;
+}
+
+.picker[hidden] {
+  display: none;
+}
+
+.picker-card {
+  width: min(420px, 100%);
+  padding: 22px;
+  border-radius: 16px;
+  background: rgba(30, 22, 17, 0.96);
+  border: 1px solid var(--panel-line);
+}
+
+.picker-card h2 {
+  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 650;
+}
+
+.picker-note {
+  margin: 0 0 16px;
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+.picker-options {
+  display: grid;
+  gap: 8px;
+}
+
+.picker-option {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  text-align: left;
+  border-radius: 11px;
+  border: 1.5px solid var(--panel-line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.picker-option strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.picker-option span {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.picker-handed {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.picker-handed[hidden] {
+  display: none;
+}
+
+.picker-handed button {
+  flex: 1;
+  padding: 9px;
+  border-radius: 9px;
+  border: 1.5px solid var(--panel-line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.picker-selected {
+  border-color: var(--accent);
+  background: rgba(240, 168, 96, 0.16);
+}
+
+.picker-go {
+  width: 100%;
+  margin-top: 16px;
+  padding: 13px;
+  border-radius: 11px;
+  border: none;
+  background: var(--accent);
+  color: #2b1c0e;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+/* --- photo mode ----------------------------------------------------------- */
+
+.photobar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(560px, calc(100vw - 28px));
+  padding: 13px 16px;
+  border-radius: 15px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  backdrop-filter: blur(10px);
+}
+
+.photobar[hidden] {
+  display: none;
+}
+
+.photobar-filters,
+.photobar-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.photobar button {
+  padding: 8px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--panel-line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.photobar button.is-active {
+  border-color: var(--accent);
+  background: rgba(240, 168, 96, 0.2);
+}
+
+.photobar-exit {
+  background: rgba(240, 168, 96, 0.28) !important;
+}
+
+.photobar-vignette {
+  width: 100%;
+  max-width: 260px;
+  height: 3px;
+  appearance: none;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+}
+
+.photobar-vignette::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.photobar-vignette::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
+.photobar-status {
+  font-size: 11px;
+  color: var(--accent);
+  min-height: 13px;
+}
+
+/* --- radio subtitles ------------------------------------------------------ */
+
+/*
+ * Ahmed's side of the call, as text (§5/§6). Sits above the help strip, never
+ * dims or blocks the view, and is pointer-transparent so it can't eat input.
+ */
+.radio {
+  position: fixed;
+  left: 50%;
+  bottom: calc(58px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  max-width: min(760px, calc(100vw - 40px));
+  padding: 11px 18px;
+  border-radius: 12px;
+  background: rgba(24, 18, 14, 0.78);
+  border: 1px solid rgba(255, 224, 190, 0.14);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.65s ease;
+}
+
+.radio[hidden] {
+  display: none;
+}
+
+.radio-out {
+  opacity: 0;
+}
+
+.radio-name {
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.radio-line {
+  font-size: 15px;
+  line-height: 1.4;
+  color: #f3e6d6;
+}
+
+@media (max-width: 720px) {
+  .radio {
+    bottom: calc(52px + env(safe-area-inset-bottom));
+    padding: 9px 13px;
+  }
+
+  .radio-line {
+    font-size: 13px;
+  }
+}
+
+/* --- debug hud ------------------------------------------------------------ */
+
+.hud {
+  position: fixed;
+  left: calc(16px + env(safe-area-inset-left));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  backdrop-filter: blur(8px);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/*
+ * Any element that sets `display` needs this explicitly. The UA stylesheet's
+ * `[hidden] { display: none }` loses to a class selector, so without it the
+ * `hidden` property silently does nothing.
+ */
+.hud[hidden] {
+  display: none;
+}
+
+.hud-speed {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 106px;
+}
+
+.hud-speed b {
+  font-size: 38px;
+  line-height: 1;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.hud-speed small {
+  font-size: 11px;
+  opacity: 0.6;
+  letter-spacing: 0.06em;
+}
+
+/* Four bars = four wheels, mirroring the truck seen from above. */
+.hud-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 44px;
+}
+
+.hud-bar {
+  position: relative;
+  width: 9px;
+  height: 100%;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.hud-bar i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  background: var(--accent);
+  transition: height 60ms linear;
+}
+
+.hud-stats {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 1px 14px;
+  font-size: 11px;
+  opacity: 0.82;
+}
+
+.hud-stats span {
+  display: flex;
+  gap: 6px;
+}
+
+.hud-stats i {
+  font-style: normal;
+  opacity: 0.5;
+  min-width: 30px;
+}
+
+.hud-flags {
+  position: absolute;
+  left: 16px;
+  top: -22px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* --- tuning panel --------------------------------------------------------- */
+
+.tuning-panel {
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top));
+  right: calc(14px + env(safe-area-inset-right));
+  width: 288px;
+  max-height: calc(100dvh - 28px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.tuning-panel[hidden] {
+  display: none;
+}
+
+.tuning-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--panel-line);
+  font-size: 12px;
+}
+
+.tuning-panel header span {
+  opacity: 0.45;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.tuning-body {
+  overflow-y: auto;
+  padding: 4px 14px 12px;
+}
+
+.tuning-body h3 {
+  margin: 14px 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.44;
+}
+
+.tuning-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  margin-bottom: 7px;
+  font-size: 11px;
+}
+
+.tuning-name {
+  opacity: 0.78;
+}
+
+.tuning-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.tuning-choice {
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin-bottom: 9px;
+}
+
+.tuning-segments {
+  display: flex;
+  gap: 4px;
+}
+
+.tuning-segments button {
+  flex: 1;
+  padding: 5px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--panel-line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  font-size: 10px;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.tuning-segments button.is-active {
+  border-color: var(--accent);
+  background: rgba(240, 168, 96, 0.2);
+  color: var(--accent);
+}
+
+.tuning-toggle {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  margin-bottom: 9px;
+  cursor: pointer;
+}
+
+.tuning-toggle input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.tuning-row input[type='range'] {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 3px;
+  margin: 2px 0 0;
+  appearance: none;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+}
+
+.tuning-row input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
+.tuning-row input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
+.tuning-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--panel-line);
+}
+
+.tuning-actions button {
+  flex: 1;
+  padding: 7px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--panel-line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tuning-actions button:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+/* --- responsive ------------------------------------------------------------
+ * The touch controls occupy the bottom corners, so on small screens the HUD
+ * moves out of their way and the keyboard hint disappears entirely.
+ */
+@media (max-width: 720px) {
+  .tuning-panel {
+    width: min(288px, calc(100vw - 28px));
+    max-height: calc(100dvh - 100px);
+  }
+
+  #help {
+    font-size: 10px;
+    padding: 6px 10px;
+  }
+
+  .hud {
+    left: 50%;
+    bottom: auto;
+    top: calc(10px + env(safe-area-inset-top));
+    transform: translateX(-50%);
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .hud-speed b {
+    font-size: 24px;
+  }
+
+  .hud-speed {
+    min-width: 74px;
+  }
+
+  /* Streaming and per-wheel diagnostics are for tuning on a desktop. */
+  .hud-stats,
+  .hud-bars {
+    display: none;
+  }
+
+  .hud-flags {
+    top: auto;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+/* Pointer-based hints are meaningless without a keyboard. */
+@media (pointer: coarse) {
+  #help {
+    display: none;
+  }
+
+  .touch-pedal {
+    width: 78px;
+    height: 92px;
+  }
+}
+
+/* Landscape phones are short: shrink the controls so they don't eat the view. */
+@media (pointer: coarse) and (max-height: 460px) {
+  .touch-stick-zone,
+  .touch-wheel {
+    width: 128px;
+    height: 128px;
+  }
+
+  .touch-stick-knob {
+    width: 54px;
+    height: 54px;
+  }
+
+  .touch-pedal {
+    width: 68px;
+    height: 74px;
+  }
+}
