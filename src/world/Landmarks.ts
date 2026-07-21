@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { POIS, type Poi, type PoiKind } from '../data/pois';
 import { heightAt } from '../terrain/height';
@@ -34,9 +35,43 @@ export function createLandmarks(): THREE.Group {
     const baseY = heightAt(poi.x, poi.z);
     built.position.set(poi.x, baseY, poi.z);
     drapeToTerrain(built, poi.x, poi.z, baseY);
-    group.add(built);
+    group.add(bake(built));
   }
   return group;
+}
+
+/**
+ * Bakes a built landmark down to one mesh per material. The builders stay
+ * authored as dozens of readable primitives, but ~350 individual meshes across
+ * ten POIs blow the ~150 draw-call budget (§8) on their own — merged, the whole
+ * set costs a few draws per landmark, and each merged mesh still frustum-culls
+ * as a unit via its own bounding sphere. Same trick the truck uses.
+ */
+function bake(built: THREE.Group): THREE.Group {
+  built.updateMatrixWorld(true);
+  const buckets = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  built.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    // World transform baked into the vertices; the baked group sits at identity.
+    const geo = (obj.geometry as THREE.BufferGeometry).clone().applyMatrix4(obj.matrixWorld);
+    const mat = obj.material as THREE.Material;
+    let list = buckets.get(mat);
+    if (!list) buckets.set(mat, list = []);
+    list.push(geo);
+  });
+
+  const baked = new THREE.Group();
+  for (const [mat, geos] of buckets) {
+    const merged = mergeGeometries(geos, false);
+    for (const g of geos) g.dispose();
+    if (!merged) continue;
+    merged.computeBoundingSphere();
+    const mesh = new THREE.Mesh(merged, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    baked.add(mesh);
+  }
+  return baked;
 }
 
 /**

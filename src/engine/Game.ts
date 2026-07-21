@@ -28,6 +28,9 @@ import { PhotoMode } from './PhotoMode';
 import { PhotoBar } from '../ui/PhotoBar';
 import { ControlPicker } from '../ui/ControlPicker';
 import { JoystickBar } from '../ui/JoystickBar';
+import { Compass } from '../ui/Compass';
+import { loadProgress, saveProgress, type Progress } from '../settings/Progress';
+import { POIS } from '../data/pois';
 
 const PHYSICS_HZ = 60;
 const FIXED_DT = 1 / PHYSICS_HZ;
@@ -62,6 +65,9 @@ export class Game {
   private picker: ControlPicker;
   private joystickBar: JoystickBar;
   private boundary = new WorldBoundary();
+  private compass = new Compass();
+  private progress: Progress;
+  private forward = new THREE.Vector3();
   private watchdog = new QualityWatchdog();
   private tier: QualityTier;
   private captureNextFrame = false;
@@ -129,12 +135,23 @@ export class Game {
     for (let i = 0; i < 24; i++) this.scatter.update(spawn.x, spawn.z);
 
     this.settings = loadSettings();
+    this.progress = loadProgress();
     this.audio.setMuted(this.settings.muted);
     this.audio.setVolume(this.settings.volume);
-    this.director = new Director(this.subtitles, {
-      onKeyUp: () => this.audio.radioKeyUp(),
-      onSignOff: () => this.audio.radioSignOff(),
-    });
+    this.director = new Director(
+      this.subtitles,
+      {
+        onKeyUp: () => this.audio.radioKeyUp(),
+        onSignOff: () => this.audio.radioSignOff(),
+      },
+      (poi) => {
+        // Discovery persists across sessions (§3); the compass stops nudging
+        // toward it and the counter ticks up. Ahmed stays once-per-session.
+        if (this.progress.discovered.has(poi.id)) return;
+        this.progress.discovered.add(poi.id);
+        saveProgress(this.progress);
+      },
+    );
 
     this.chase = new ChaseCamera(window.innerWidth / window.innerHeight);
     this.input = new InputManager(this.settings);
@@ -204,6 +221,7 @@ export class Game {
       this.picker.element,
       this.joystickBar.element,
       this.boundary.element,
+      this.compass.element,
     );
 
     // Browsers only allow audio to start from a real gesture, so the first
@@ -332,6 +350,22 @@ export class Game {
     // four would just z-fight two ribbons against each other.
     this.tracks.update(this.vehicle.wheels, [2, 3], frameDt);
 
+    // Heading from the truck's forward vector; the soft nudge points at the
+    // nearest POI this player hasn't found yet, across sessions (§5).
+    this.forward.set(0, 0, 1).applyQuaternion(this.renderQuat);
+    const heading = Math.atan2(this.forward.x, this.forward.z);
+    let targetBearing: number | null = null;
+    let best = Infinity;
+    for (const poi of POIS) {
+      if (this.progress.discovered.has(poi.id)) continue;
+      const d = Math.hypot(poi.x - this.renderPos.x, poi.z - this.renderPos.z);
+      if (d < best) {
+        best = d;
+        targetBearing = Math.atan2(poi.x - this.renderPos.x, poi.z - this.renderPos.z);
+      }
+    }
+    this.compass.update(heading, targetBearing, this.progress.discovered.size, POIS.length);
+
     this.audio.update(this.vehicle.telemetry, controls.throttle, frameDt);
     this.director.update(
       this.vehicle.telemetry,
@@ -384,6 +418,7 @@ export class Game {
     document.body.classList.add('photo-mode');
     this.hud.element.hidden = true;
     this.input.touch.element.hidden = true;
+    this.compass.hide();
     this.updateJoystickBar();
   }
 
@@ -393,6 +428,7 @@ export class Game {
     document.body.classList.remove('photo-mode');
     this.hud.element.hidden = false;
     if (matchMedia('(pointer: coarse)').matches) this.input.touch.element.hidden = false;
+    this.compass.show();
     this.updateJoystickBar();
     this.chase.reset(this.curPos, this.curQuat);
   }

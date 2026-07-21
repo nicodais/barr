@@ -44,6 +44,8 @@ export class Director {
   constructor(
     private subtitles: RadioSubtitles,
     private radio: RadioCallbacks,
+    /** Fired the first time a POI is reached each session — Game persists it. */
+    private onPoiVisit?: (poi: Poi) => void,
   ) {}
 
   update(tel: VehicleTelemetry, x: number, z: number, dt: number) {
@@ -89,6 +91,7 @@ export class Director {
       if (this.visited.has(poi.id)) continue;
       if (Math.hypot(poi.x - x, poi.z - z) > poi.radius) continue;
       this.visited.add(poi.id);
+      this.onPoiVisit?.(poi);
       this.callPoi(poi);
       return;
     }

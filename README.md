@@ -157,7 +157,22 @@ the pad's height, with a blend ring easing back into the dunes (`PAD_FOOTPRINTS`
 multi-piece structures need flat ground under their whole footprint, and because the pads
 live in `heightAt` itself, the render chunks, physics heightfields and landmark colliders
 all agree by construction. Scattered dressing outside a pad (survey stakes, tripods) is
-still settled onto the terrain per piece.
+still settled onto the terrain per piece. Landmarks are authored as dozens of readable
+primitives but **baked to one mesh per material** at startup — unbaked they blow the
+draw-call budget (§8) on their own.
+
+Terrain seams are watertight by construction, which took three fixes that all matter:
+chunk positions are **world-space with every mesh at the identity transform** (per-chunk
+transforms make the rasterizer's edge equations disagree sub-pixel and print hairline
+cracks); edges facing a coarser LOD are **stitched onto that neighbour's chord** (and a
+chunk rebuilds when a neighbour's LOD changes); and the crack-insurance skirts hang from a
+**recessed top ring** — a skirt sharing its top vertices with the surface z-fights it and
+draws a dashed line along every chunk boundary.
+
+A slim **dashboard compass** ([`Compass`](src/ui/Compass.ts), §5) shows heading plus one
+soft diamond toward the nearest undiscovered POI — no distance, no name, never an
+objective marker — and a small found-counter. Discovery persists across sessions
+([`Progress`](src/settings/Progress.ts), §3); Ahmed's call-ins stay once-per-session.
 
 Two things worth knowing before editing it:
 
