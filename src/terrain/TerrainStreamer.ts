@@ -198,7 +198,11 @@ export class TerrainStreamer {
     const mesh = new THREE.Mesh(geo, this.material);
     mesh.position.set(chunk.cx * CHUNK_SIZE, 0, chunk.cz * CHUNK_SIZE);
     mesh.receiveShadow = true;
-    mesh.castShadow = false;
+    // Dunes have to cast, not just receive: without this a ridge never shadows
+    // the sand (or its own back face) behind it, so a low sun reads as shining
+    // straight through the terrain. The tight shadow frustum (SceneRig) keeps
+    // the self-shadowing crisp enough to avoid acne at these grazing angles.
+    mesh.castShadow = true;
     mesh.updateMatrix();
     mesh.matrixAutoUpdate = false;
 
