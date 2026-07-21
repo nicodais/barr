@@ -31,10 +31,31 @@ export function createLandmarks(): THREE.Group {
   const group = new THREE.Group();
   for (const poi of POIS) {
     const built = buildLandmark(poi);
-    built.position.set(poi.x, heightAt(poi.x, poi.z), poi.z);
+    const baseY = heightAt(poi.x, poi.z);
+    built.position.set(poi.x, baseY, poi.z);
+    drapeToTerrain(built, poi.x, poi.z, baseY);
     group.add(built);
   }
   return group;
+}
+
+/**
+ * Settles each piece of a landmark onto the terrain at its own footprint. Every
+ * mesh is authored with local Y measured from ground = 0, so shifting it by the
+ * terrain delta at its world position lets extended props — the camel track, the
+ * falaj — follow the dunes instead of floating at the centre's single height.
+ */
+function drapeToTerrain(built: THREE.Group, ox: number, oz: number, baseY: number): void {
+  const ry = built.rotation.y;
+  const c = Math.cos(ry);
+  const s = Math.sin(ry);
+  for (const child of built.children) {
+    const lx = child.position.x;
+    const lz = child.position.z;
+    const wx = ox + lx * c + lz * s;
+    const wz = oz - lx * s + lz * c;
+    child.position.y += heightAt(wx, wz) - baseY;
+  }
 }
 
 function buildLandmark(poi: Poi): THREE.Group {
@@ -433,7 +454,6 @@ function groupRotationY(id: PoiKind): number {
  */
 export function createLandmarkColliders(rapier: typeof RAPIER, world: RAPIER.World): void {
   for (const poi of POIS) {
-    const baseY = heightAt(poi.x, poi.z);
     const gRot = groupRotationY(poi.id);
     const c = Math.cos(gRot);
     const s = Math.sin(gRot);
@@ -441,11 +461,14 @@ export function createLandmarkColliders(rapier: typeof RAPIER, world: RAPIER.Wor
       const desc = spec.kind === 'box'
         ? rapier.ColliderDesc.cuboid(spec.hx!, spec.hy, spec.hz!)
         : rapier.ColliderDesc.cylinder(spec.hy, spec.r!);
-      const wx = poi.x + spec.x * c - spec.z * s;
-      const wz = poi.z + spec.x * s + spec.z * c;
+      // Same Y-rotation convention as three.js, so falaj's angled walls line up.
+      const wx = poi.x + spec.x * c + spec.z * s;
+      const wz = poi.z - spec.x * s + spec.z * c;
       const ry = (gRot + (spec.rotY ?? 0)) / 2;
       desc
-        .setTranslation(wx, baseY + spec.y, wz)
+        // Sample the terrain under each collider, matching the draped visuals so
+        // a post's collider sits on the same dune the post does.
+        .setTranslation(wx, heightAt(wx, wz) + spec.y, wz)
         .setRotation({ x: 0, y: Math.sin(ry), z: 0, w: Math.cos(ry) })
         .setFriction(0.7)
         .setRestitution(0.05);
