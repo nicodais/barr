@@ -265,9 +265,12 @@ stays a one-liner. Many lean into the desert heritage of the UAE — the falaj, 
 majlis, the ghaf, falconry, the camel track. Nothing blocks: the subtitle types in over the
 driving, holds, and fades, and you can drive straight past a call-in and miss it.
 
-The ten landmarks in [`Landmarks.ts`](src/world/Landmarks.ts) have **no colliders** on
-purpose — driving through the ghaf tree is a lesser evil than a truck stopping dead on an
-invisible box in a game with no fail states and no damage model (§11).
+The ten landmarks in [`Landmarks.ts`](src/world/Landmarks.ts) are **solid**:
+`createLandmarkColliders` builds static Rapier colliders sized to each one's load-bearing
+masses — the tower, the ghaf trunk, the pylon legs, the camel-track posts — so the truck
+bumps them instead of driving through. Collision stays **damage-free** (§11): it's tactile,
+never a fail state, and small dressing (cups, stakes, canopy, the fallen tripod) is left
+collider-free so nothing snags on an invisible box.
 
 ## Touch, quality and photo mode
 

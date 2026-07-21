@@ -18,7 +18,7 @@ import { loadSettings, saveSettings, type GameSettings } from '../settings/Setti
 import { GameAudio } from '../audio/GameAudio';
 import { Director } from '../narrative/Director';
 import { RadioSubtitles } from '../narrative/RadioSubtitles';
-import { createLandmarks } from '../world/Landmarks';
+import { createLandmarks, createLandmarkColliders } from '../world/Landmarks';
 import { Scatter } from '../world/Scatter';
 import { Birds } from '../world/Birds';
 import { Wildlife } from '../world/Wildlife';
@@ -115,6 +115,8 @@ export class Game {
     this.rig.scene.add(this.dust.points);
 
     this.rig.scene.add(createLandmarks());
+    // Solid, damage-free colliders for those same landmarks (§11).
+    createLandmarkColliders(RAPIER, this.world);
     this.rig.scene.add(this.scatter.group);
     this.rig.scene.add(this.birds.mesh);
     this.rig.scene.add(this.wildlife.group);
