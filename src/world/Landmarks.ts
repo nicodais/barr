@@ -34,10 +34,13 @@ function buildLandmark(poi: Poi): THREE.Group {
     case 'falaj': return buildFalaj();
     case 'ghaf': return buildGhafTree();
     case 'watchtower': return buildWatchtower();
-    case 'campsite': return buildCampsite();
+    case 'majlis': return buildMajlis();
     case 'pylons': return buildPylons();
     case 'teastand': return buildTeaStand();
     case 'famousdune': return buildFamousDune();
+    case 'falconry': return buildFalconry();
+    case 'cameltrack': return buildCamelTrack();
+    case 'coffeehearth': return buildCoffeeHearth();
   }
 }
 
@@ -125,25 +128,40 @@ function buildWatchtower(): THREE.Group {
   return g;
 }
 
-/** Fire-ring stones and flattened ground from a long-abandoned camp. */
-function buildCampsite(): THREE.Group {
+/**
+ * An open-air majlis: the flattened council ground where a ruler once held
+ * court in the sand, edged with low seating, a coffee hearth at its heart and a
+ * lone banner pole. No walls — that was the whole point.
+ */
+function buildMajlis(): THREE.Group {
   const g = new THREE.Group();
-  const stone = new THREE.DodecahedronGeometry(0.42, 0);
-  for (let i = 0; i < 11; i++) {
-    const a = (i / 11) * Math.PI * 2;
-    const m = mesh(stone, i % 2 ? STONE : DARK_STONE,
-      Math.cos(a) * 1.8, 0.2, Math.sin(a) * 1.8);
-    m.rotation.set(i, i * 2, i * 3);
-    m.scale.setScalar(0.8 + (i % 3) * 0.16);
-    g.add(m);
+
+  // Packed-earth council floor, a shade darker than the sand around it.
+  g.add(mesh(new THREE.CylinderGeometry(4.6, 4.7, 0.14, 20), DARK_STONE, 0, 0.07, 0));
+
+  // A ring of low seat blocks — where people sat to be heard.
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const seat = mesh(new THREE.BoxGeometry(0.85, 0.34, 0.55), i % 2 ? WOOD : STONE,
+      Math.cos(a) * 3.7, 0.17, Math.sin(a) * 3.7);
+    seat.rotation.y = a;
+    g.add(seat);
   }
-  // Charred remains in the middle, and the stubs of a shelter frame.
-  g.add(mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.1, 10), DARK_STONE, 0, 0.05, 0));
-  for (const [x, z, r] of [[4.2, 1.1, 0.35], [3.4, -2.4, -0.2], [6.1, -0.9, 0.5]] as const) {
-    const post = mesh(new THREE.CylinderGeometry(0.11, 0.13, 1.5, 5), WOOD, x, 0.6, z);
-    post.rotation.z = r;
-    g.add(post);
-  }
+
+  // Coffee hearth at the centre: a stone ring, charcoal, and a dallah pot.
+  const ring = mesh(new THREE.TorusGeometry(0.62, 0.14, 6, 12), STONE, 0, 0.12, 0);
+  ring.rotation.x = Math.PI / 2;
+  g.add(ring);
+  g.add(mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.08, 12), DARK_STONE, 0, 0.06, 0));
+  g.add(dallah(0, 0));
+
+  // The banner pole — weathered, leaning, but still standing.
+  const pole = mesh(new THREE.CylinderGeometry(0.06, 0.07, 4.6, 6), WOOD, 3.4, 2.3, -3.4);
+  pole.rotation.z = 0.05;
+  g.add(pole);
+  const banner = mesh(new THREE.BoxGeometry(1.0, 0.6, 0.05), CANVAS, 3.9, 3.9, -3.4);
+  banner.rotation.z = 0.05;
+  g.add(banner);
   return g;
 }
 
@@ -230,5 +248,110 @@ function buildFamousDune(): THREE.Group {
   // A discarded cup and a lens cap, because people were definitely here.
   g.add(mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.16, 6), CANVAS, -1.4, 0.08, 2.1));
   g.add(mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.03, 8), DARK_STONE, 2.4, 0.02, -1.6));
+  return g;
+}
+
+/** A dallah — the long-spouted Arabic coffee pot, hospitality in metal form. */
+function dallah(x: number, z: number): THREE.Group {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.CylinderGeometry(0.15, 0.19, 0.4, 8), METAL, 0, 0.2, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.16, 8), METAL, 0, 0.48, 0));
+  g.add(mesh(new THREE.ConeGeometry(0.13, 0.18, 8), METAL, 0, 0.65, 0));
+  // The signature curved spout, faked with a short angled beak.
+  const spout = mesh(new THREE.CylinderGeometry(0.02, 0.05, 0.34, 5), METAL, 0.17, 0.42, 0);
+  spout.rotation.z = -0.7;
+  g.add(spout);
+  const handle = mesh(new THREE.TorusGeometry(0.1, 0.02, 5, 8), METAL, -0.16, 0.34, 0);
+  handle.rotation.y = Math.PI / 2;
+  g.add(handle);
+  g.position.set(x, 0, z);
+  return g;
+}
+
+/**
+ * The falconry ground: a row of block perches (wakir) where birds were flown
+ * from, one still occupied, and a training post. Al Qannas — Sheikh Zayed's
+ * lifelong passion — made concrete in a few worn stands.
+ */
+function buildFalconry(): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < 5; i++) {
+    const x = i * 1.5 - 3;
+    const z = Math.sin(i * 1.3) * 0.5;
+    g.add(mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.0, 6), WOOD, x, 0.5, z));
+    // The padded top the falcon grips.
+    g.add(mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.13, 10), CANVAS, x, 1.06, z));
+  }
+
+  // One bird still on its perch: a compact dark silhouette with a hooked beak.
+  const body = mesh(new THREE.IcosahedronGeometry(0.17, 0), DARK_STONE, -3, 1.32, Math.sin(-1.3) * 0.5);
+  body.scale.set(0.85, 1.25, 0.85);
+  g.add(body);
+  const beak = mesh(new THREE.ConeGeometry(0.05, 0.12, 5), RUST, -2.86, 1.34, Math.sin(-1.3) * 0.5);
+  beak.rotation.z = -Math.PI / 2;
+  g.add(beak);
+
+  // A leaning training post with a lure block on the sand beside it.
+  const post = mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.35, 6), WOOD, 3.6, 0.67, 1.6);
+  post.rotation.z = 0.12;
+  g.add(post);
+  g.add(mesh(new THREE.BoxGeometry(0.4, 0.18, 0.28), WOOD, 4.3, 0.09, 2.2));
+  return g;
+}
+
+/**
+ * A stretch of abandoned camel-race track: two rail lines of leaning posts
+ * running off into the sand, with a weathered starting gate. The Sheikhs' sport,
+ * left behind when the big ovals were built.
+ */
+function buildCamelTrack(): THREE.Group {
+  const g = new THREE.Group();
+  const post = new THREE.CylinderGeometry(0.07, 0.09, 1.25, 5);
+  const railLen = 3.1;
+  for (let i = -11; i <= 11; i++) {
+    const x = i * 3;
+    for (const side of [-3.2, 3.2]) {
+      const p = mesh(post, WOOD, x, 0.6, side);
+      p.rotation.z = Math.sin(i * 1.7 + side) * 0.12;
+      g.add(p);
+      // Top rail segment between this post and the next, thinning with age.
+      if (i < 11) {
+        const rail = mesh(new THREE.BoxGeometry(railLen, 0.09, 0.09), WOOD, x + 1.5, 1.02, side);
+        rail.rotation.z = Math.sin(i * 0.9) * 0.02;
+        g.add(rail);
+      }
+    }
+  }
+  // Starting gate: two taller posts and a crossbar at one end.
+  for (const side of [-3.4, 3.4]) {
+    g.add(mesh(new THREE.CylinderGeometry(0.1, 0.12, 2.6, 6), RUST, -34, 1.3, side));
+  }
+  g.add(mesh(new THREE.BoxGeometry(0.16, 0.16, 7.2), RUST, -34, 2.5, 0));
+  return g;
+}
+
+/**
+ * A lone desert coffee hearth: a fire ring, a dallah left on the coals and a
+ * couple of small cups. The rule out here was that gahwa was never refused —
+ * ruler or lost stranger, same pot.
+ */
+function buildCoffeeHearth(): THREE.Group {
+  const g = new THREE.Group();
+  const stone = new THREE.DodecahedronGeometry(0.19, 0);
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2;
+    const m = mesh(stone, i % 2 ? STONE : DARK_STONE, Math.cos(a) * 0.62, 0.12, Math.sin(a) * 0.62);
+    m.rotation.set(i, i * 2, i);
+    g.add(m);
+  }
+  g.add(mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.07, 12), DARK_STONE, 0, 0.05, 0));
+  g.add(dallah(0.05, 0.02));
+
+  // A low log to sit on, and two finjan cups set out and never cleared away.
+  const log = mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.1, 6), WOOD, -1.1, 0.16, 0.5);
+  log.rotation.x = Math.PI / 2;
+  g.add(log);
+  g.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.08, 6), CANVAS, -0.9, 0.04, -0.2));
+  g.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.08, 6), CANVAS, -0.7, 0.04, 0.05));
   return g;
 }

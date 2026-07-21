@@ -3,7 +3,7 @@
 Relaxing open-world dune-bashing for the browser. See [CLAUDE.md](CLAUDE.md) for the full design brief.
 
 **Current phase: 5 complete, 6 ready to ship.** Driving feel, the streamed world, audio,
-Ahmed's radio and the seven POIs are all in, along with photo mode, touch controls,
+Ahmed's radio and the ten POIs are all in, along with photo mode, touch controls,
 adaptive quality and the responsive pass. The build is configured for Vercel but has
 not been deployed — see [Deploying](#deploying).
 
@@ -256,12 +256,16 @@ rather than triggers — a global cooldown, one-shot POIs, a much longer cooldow
 chatter, and a rule that nothing ever talks over anything else. **Silence is the default
 state**; §5 wants him sparse and ambient, going quiet for long stretches.
 
-Lines live in [`ahmedLines.ts`](src/data/ahmedLines.ts) and are retired once used so a
-session doesn't repeat itself (§13). POI lines are written per-location and never
-interchangeable. Nothing blocks: the subtitle types in over the driving, holds, and fades,
-and you can drive straight past a call-in and miss it.
+Ambient lines live in [`ahmedLines.ts`](src/data/ahmedLines.ts) and are retired once used so
+a session doesn't repeat itself (§13). POI lines live with the POIs in
+[`pois.ts`](src/data/pois.ts): each spot carries an **ordered pool** of beats — usually
+"what it is", then "why it matters" — that Ahmed delivers as one call-in (a single key-up,
+consecutive lines, then a sign-off), so a place can teach its own history while every line
+stays a one-liner. Many lean into the desert heritage of the UAE — the falaj, the ruler's
+majlis, the ghaf, falconry, the camel track. Nothing blocks: the subtitle types in over the
+driving, holds, and fades, and you can drive straight past a call-in and miss it.
 
-The seven landmarks in [`Landmarks.ts`](src/world/Landmarks.ts) have **no colliders** on
+The ten landmarks in [`Landmarks.ts`](src/world/Landmarks.ts) have **no colliders** on
 purpose — driving through the ghaf tree is a lesser evil than a truck stopping dead on an
 invisible box in a game with no fail states and no damage model (§11).
 
