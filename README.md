@@ -33,6 +33,11 @@ steers, triggers are the pedals. Touch schemes are phase 5.
 phase 5 touch schemes without the vehicle controller knowing anything about it (§7).
 Full key remapping is a phase 5 job.
 
+On touch devices the **thumbstick position** (bottom-left / -middle / -right) can be changed
+from a small bar pinned to the top-right, or under `T` → Stick position. It's a persisted
+setting of its own, independent of the wheel/tilt **pedal side** — both live in
+`GameSettings`.
+
 ## Tuning
 
 `T` opens live sliders for every feel parameter. Changes apply immediately and persist to

@@ -6,7 +6,7 @@
  * Grows into the phase 5 options menu; for now the tuning panel is the only UI
  * surface that exists to host it.
  */
-import type { Handedness, TouchScheme } from '../input/TouchSource';
+import type { Handedness, JoystickPosition, TouchScheme } from '../input/TouchSource';
 import type { QualityTier } from '../engine/Quality';
 
 export interface GameSettings {
@@ -17,6 +17,8 @@ export interface GameSettings {
   volume: number;
   touchScheme: TouchScheme;
   handedness: Handedness;
+  /** Where the on-screen thumbstick sits on touch devices. */
+  joystickPosition: JoystickPosition;
   /** False until the one-time scheme picker has been answered (§7). */
   touchPickerSeen: boolean;
   /** 'auto' lets the device heuristic and watchdog decide. */
@@ -29,15 +31,20 @@ export const DEFAULT_SETTINGS: GameSettings = {
   volume: 0.9,
   touchScheme: 'joystick',
   handedness: 'left',
+  joystickPosition: 'left',
   touchPickerSeen: false,
   quality: 'auto',
 };
 
 const TOUCH_SCHEMES: TouchScheme[] = ['joystick', 'wheel', 'tilt'];
 const HANDEDNESS: Handedness[] = ['left', 'right'];
+const JOYSTICK_POSITIONS: JoystickPosition[] = ['left', 'middle', 'right'];
 const QUALITIES: Array<QualityTier | 'auto'> = ['auto', 'low', 'medium', 'high'];
 
-const STORAGE_KEY = 'dune.settings.v1';
+// Bumped v1 -> v2 so the inverted-steering default reaches returning players:
+// a v1 blob saved before that default flipped would otherwise pin steering to
+// its old, non-inverted value. The bump resets every persisted setting once.
+const STORAGE_KEY = 'dune.settings.v2';
 
 export function loadSettings(): GameSettings {
   const settings = { ...DEFAULT_SETTINGS };
@@ -64,6 +71,13 @@ export function loadSettings(): GameSettings {
     }
     if (saved.handedness && HANDEDNESS.includes(saved.handedness)) {
       settings.handedness = saved.handedness;
+    }
+    if (saved.joystickPosition && JOYSTICK_POSITIONS.includes(saved.joystickPosition)) {
+      settings.joystickPosition = saved.joystickPosition;
+    } else if (saved.handedness === 'right') {
+      // Pre-joystickPosition saves only expressed left/right through handedness;
+      // carry a right-handed stick over so those players don't get moved.
+      settings.joystickPosition = 'right';
     }
     if (typeof saved.touchPickerSeen === 'boolean') {
       settings.touchPickerSeen = saved.touchPickerSeen;
