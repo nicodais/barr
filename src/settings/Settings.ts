@@ -24,7 +24,7 @@ export interface GameSettings {
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
-  invertSteering: false,
+  invertSteering: true,
   muted: false,
   volume: 0.9,
   touchScheme: 'joystick',
