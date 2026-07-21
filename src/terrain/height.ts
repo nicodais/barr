@@ -9,7 +9,9 @@
  * you commit). A symmetric sine field would feel like corrugated iron.
  */
 
-/** One curated region, not an infinite world (§5, §11). ~4.2 km². */
+import { POIS, type PoiKind } from '../data/pois';
+
+/** The curated region at the heart of the endless dune field. ~4.2 km². */
 export const WORLD_SIZE = 2048;
 export const WORLD_HALF = WORLD_SIZE / 2;
 
@@ -161,7 +163,8 @@ export function duneFieldMask(x: number, z: number): number {
   return 0.24 + 0.76 * fbmRange(x * 0.0034 + 11, z * 0.0034 - 7, 3, 0.1);
 }
 
-export function heightAt(x: number, z: number): number {
+/** The dune field alone, before POI pads. Pad targets are sampled from this. */
+function rawHeightAt(x: number, z: number): number {
   const field = duneFieldMask(x, z);
 
   // Broad rolling ground everything else sits on, turning over every ~400m.
@@ -208,6 +211,82 @@ export function heightAt(x: number, z: number): number {
   // horizon reads as endless. The curated region is bounded instead by a soft
   // fade-and-respawn once you drive well past the points of interest (see
   // WorldBoundary), which never tells you "no" or drops you into a void.
+  return h;
+}
+
+// --- POI ground pads ----------------------------------------------------------
+
+/**
+ * Each built landmark stands on a graded pad: inside the inner ellipse the
+ * ground *is* the pad height, and a blend ring eases it back into the dunes.
+ * This is what actually fits the POIs to the landscape — structures need flat
+ * ground under their whole footprint, and faking it by bending the props to the
+ * dunes tears multi-piece models apart. Physics heightfields, render chunks and
+ * landmark colliders all read the padded field, so they can't disagree.
+ *
+ * Footprints live here rather than in pois.ts because they're a property of the
+ * built geometry (how wide the majlis ring is), not of the narrative trigger.
+ * The famous dune has no pad on purpose: its tripods are freestanding dressing
+ * on a hand-sculpted dune that should stay a dune.
+ */
+interface Pad {
+  x: number;
+  z: number;
+  ca: number;
+  sa: number;
+  lengthR: number;
+  widthR: number;
+  /** Cheap axis-aligned reject radius covering the whole blend ellipse. */
+  bound: number;
+  /** Grade height, sampled lazily from the raw field at the pad centre. */
+  target: number;
+}
+
+/** The blend ring extends the inner ellipse by this factor. */
+const PAD_BLEND = 1.6;
+
+const PAD_FOOTPRINTS: Partial<Record<PoiKind, { lengthR: number; widthR: number; angle: number }>> = {
+  falaj: { lengthR: 14, widthR: 5, angle: 0.5 },
+  ghaf: { lengthR: 5, widthR: 5, angle: 0 },
+  watchtower: { lengthR: 8, widthR: 8, angle: 0 },
+  majlis: { lengthR: 7, widthR: 7, angle: 0 },
+  pylons: { lengthR: 5, widthR: 5, angle: 0 },
+  teastand: { lengthR: 4.5, widthR: 4.5, angle: 0 },
+  falconry: { lengthR: 7, widthR: 5, angle: 0 },
+  cameltrack: { lengthR: 42, widthR: 8, angle: 0 },
+  coffeehearth: { lengthR: 3, widthR: 3, angle: 0 },
+};
+
+const PADS: Pad[] = POIS.flatMap((poi) => {
+  const spec = PAD_FOOTPRINTS[poi.id];
+  if (!spec) return [];
+  return [{
+    x: poi.x,
+    z: poi.z,
+    ca: Math.cos(spec.angle),
+    sa: Math.sin(spec.angle),
+    lengthR: spec.lengthR,
+    widthR: spec.widthR,
+    bound: Math.max(spec.lengthR, spec.widthR) * PAD_BLEND,
+    target: Number.NaN,
+  }];
+});
+
+export function heightAt(x: number, z: number): number {
+  let h = rawHeightAt(x, z);
+  for (const pad of PADS) {
+    const dx = x - pad.x;
+    if (dx > pad.bound || dx < -pad.bound) continue;
+    const dz = z - pad.z;
+    if (dz > pad.bound || dz < -pad.bound) continue;
+    const u = (dx * pad.ca + dz * pad.sa) / pad.lengthR;
+    const v = (-dx * pad.sa + dz * pad.ca) / pad.widthR;
+    const d = Math.sqrt(u * u + v * v);
+    if (d >= PAD_BLEND) continue;
+    // Lazy: the target needs the raw field, which isn't callable at module init.
+    if (Number.isNaN(pad.target)) pad.target = rawHeightAt(pad.x, pad.z);
+    h += (pad.target - h) * (1 - smoothstep(1, PAD_BLEND, d));
+  }
   return h;
 }
 

@@ -482,6 +482,12 @@ export class Game {
     // Forward is +Z in the truck's local frame; aim it back at the origin.
     const yaw = Math.atan2(-dirX, -dirZ);
     this.vehicle.warpTo(rx, rz, yaw);
+    // Ground must exist before the next wheel raycast, and those raycasts read
+    // the query pipeline as of the *last* step — stream the destination's
+    // colliders now and prime the pipeline, exactly like startup does, or the
+    // truck free-falls for the first steps after the warp.
+    this.terrain.update(rx, rz);
+    this.world.queryPipeline.update(this.world.colliders);
     this.syncTransforms(true);
     this.chase.reset(this.curPos, this.curQuat);
   }

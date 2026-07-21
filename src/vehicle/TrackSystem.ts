@@ -17,6 +17,12 @@ const MAX_SEGMENTS = 240;
 const TRACK_HALF_WIDTH = 0.19;
 /** Minimum travel before a new segment is laid, in metres. */
 const MIN_STEP = 0.5;
+/**
+ * Travel beyond which a frame's movement can't be driving — it's a teleport
+ * (boundary respawn, recovery). Connecting across one would streak a single
+ * segment across the whole world, so the ribbon breaks and restarts instead.
+ */
+const TELEPORT_BREAK = 12;
 /** Seconds before a track has faded completely. */
 const FADE_TIME = 22;
 const LIFT = 0.04;
@@ -99,6 +105,10 @@ export class TrackSystem {
         ? Math.hypot(w.contactX - last.x, w.contactZ - last.z)
         : Infinity;
 
+      if (moved > TELEPORT_BREAK) {
+        this.lastPos[r] = { x: w.contactX, z: w.contactZ };
+        continue;
+      }
       if (moved >= MIN_STEP) {
         if (last) this.pushSegment(r, w, last);
         this.lastPos[r] = { x: w.contactX, z: w.contactZ };

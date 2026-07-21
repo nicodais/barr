@@ -151,6 +151,14 @@ player drives well past the outermost POIs (~760m out on either axis) and, at fu
 sets the truck back down inside the region facing the centre — damage-free, never blocking,
 and never a wall or a void.
 
+Every built landmark stands on a **graded pad**: inside its footprint the ground is flat at
+the pad's height, with a blend ring easing back into the dunes (`PAD_FOOTPRINTS` in
+[`height.ts`](src/terrain/height.ts)). This is what fits the POIs to the landscape —
+multi-piece structures need flat ground under their whole footprint, and because the pads
+live in `heightAt` itself, the render chunks, physics heightfields and landmark colliders
+all agree by construction. Scattered dressing outside a pad (survey stakes, tripods) is
+still settled onto the terrain per piece.
+
 Two things worth knowing before editing it:
 
 - **Noise frequencies are chosen against `WORLD_SIZE`.** The value-noise lattice is on
