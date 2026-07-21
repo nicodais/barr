@@ -524,6 +524,20 @@ body.photo-mode #help {
   background: rgba(240, 168, 96, 0.16);
 }
 
+/*
+ * The world-boundary haze. Opacity is driven per-frame from JS as the player
+ * leaves the region; it fades to a warm sand-light rather than a hard black cut,
+ * so drifting off the edge reads as a whiteout, not a screen wipe.
+ */
+.boundary-fade {
+  position: fixed;
+  inset: 0;
+  background: #ece0cf;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+
 .hud {
   position: fixed;
   left: calc(16px + env(safe-area-inset-left));

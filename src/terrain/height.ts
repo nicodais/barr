@@ -204,12 +204,10 @@ export function heightAt(x: number, z: number): number {
   // a world that's supposed to read as dunes.
   h *= smoothstep(18, 75, Math.hypot(x, z));
 
-  // The region has to end somewhere. A rising wall of big dunes is a far better
-  // boundary than an invisible barrier or a cliff into the void — you can drive
-  // at it, climb part way, and turn back without ever being told "no".
-  const edge = Math.max(Math.abs(x), Math.abs(z)) / WORLD_HALF;
-  h += smoothstep(0.74, 1.0, edge) * 90;
-
+  // No rim wall: the dune field runs on procedurally in every direction so the
+  // horizon reads as endless. The curated region is bounded instead by a soft
+  // fade-and-respawn once you drive well past the points of interest (see
+  // WorldBoundary), which never tells you "no" or drops you into a void.
   return h;
 }
 

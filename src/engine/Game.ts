@@ -19,6 +19,7 @@ import { GameAudio } from '../audio/GameAudio';
 import { Director } from '../narrative/Director';
 import { RadioSubtitles } from '../narrative/RadioSubtitles';
 import { createLandmarks, createLandmarkColliders } from '../world/Landmarks';
+import { WorldBoundary } from './WorldBoundary';
 import { Scatter } from '../world/Scatter';
 import { Birds } from '../world/Birds';
 import { Wildlife } from '../world/Wildlife';
@@ -32,6 +33,8 @@ const PHYSICS_HZ = 60;
 const FIXED_DT = 1 / PHYSICS_HZ;
 /** Cap catch-up work so a background tab doesn't return to a physics avalanche. */
 const MAX_SUBSTEPS = 5;
+/** Where a boundary respawn sets the truck back down, well inside the fade edge. */
+const RESPAWN_RADIUS = 680;
 
 export class Game {
   private rig: SceneRig;
@@ -58,6 +61,7 @@ export class Game {
   private photoBar: PhotoBar;
   private picker: ControlPicker;
   private joystickBar: JoystickBar;
+  private boundary = new WorldBoundary();
   private watchdog = new QualityWatchdog();
   private tier: QualityTier;
   private captureNextFrame = false;
@@ -199,6 +203,7 @@ export class Game {
       this.panel.element,
       this.picker.element,
       this.joystickBar.element,
+      this.boundary.element,
     );
 
     // Browsers only allow audio to start from a real gesture, so the first
@@ -273,6 +278,13 @@ export class Game {
       steps++;
     }
     if (steps === MAX_SUBSTEPS) this.accumulator = 0;
+
+    // Soft world boundary: fade to haze as the player leaves the region and set
+    // them back down facing the centre once fully faded. Skipped in photo mode,
+    // where the truck is parked and the free camera can roam.
+    if (!this.photo.active && this.boundary.update(this.curPos.x, this.curPos.z, frameDt)) {
+      this.respawnTowardCentre();
+    }
 
     const alpha = Math.min(1, this.accumulator / FIXED_DT);
     this.renderPos.lerpVectors(this.prevPos, this.curPos, alpha);
@@ -453,6 +465,25 @@ export class Game {
     } else {
       this.joystickBar.hide();
     }
+  }
+
+  /**
+   * Set the truck back down inside the region, on the same bearing it left on but
+   * facing the centre, so driving off the edge loops you gently back in. The full
+   * haze is covering the screen at this instant, so the reposition is unseen.
+   */
+  private respawnTowardCentre() {
+    const p = this.curPos;
+    const d = Math.hypot(p.x, p.z) || 1;
+    const dirX = p.x / d;
+    const dirZ = p.z / d;
+    const rx = dirX * RESPAWN_RADIUS;
+    const rz = dirZ * RESPAWN_RADIUS;
+    // Forward is +Z in the truck's local frame; aim it back at the origin.
+    const yaw = Math.atan2(-dirX, -dirZ);
+    this.vehicle.warpTo(rx, rz, yaw);
+    this.syncTransforms(true);
+    this.chase.reset(this.curPos, this.curQuat);
   }
 
   private syncTransforms(alsoPrevious: boolean) {

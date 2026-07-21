@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { WORLD_HALF, heightAt } from './height';
+import { heightAt } from './height';
 import { PROFILES, type QualityProfile } from '../engine/Quality';
 import {
   CHUNK_SIZE,
@@ -18,9 +18,6 @@ const EVICT_SLACK = 160;
  * cheaper tier that let the truck fall through would be a bug, not a setting.
  */
 const PHYSICS_CHUNK_RADIUS = 2;
-
-const CHUNK_MIN = -Math.floor(WORLD_HALF / CHUNK_SIZE);
-const CHUNK_MAX = Math.floor(WORLD_HALF / CHUNK_SIZE) - 1;
 
 interface Chunk {
   cx: number;
@@ -141,11 +138,11 @@ export class TerrainStreamer {
 
     this.pending.length = 0;
 
+    // No world bound: chunks stream around the player wherever they go, so the
+    // dune field is procedurally endless. The soft fade-and-respawn boundary
+    // (WorldBoundary) turns players back well before they can drive far out.
     for (let cx = centreCx - reach; cx <= centreCx + reach; cx++) {
-      if (cx < CHUNK_MIN || cx > CHUNK_MAX) continue;
       for (let cz = centreCz - reach; cz <= centreCz + reach; cz++) {
-        if (cz < CHUNK_MIN || cz > CHUNK_MAX) continue;
-
         const dist = this.chunkDistance(cx, cz, x, z);
         if (dist > this.profile.viewDistance) continue;
 

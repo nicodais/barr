@@ -138,13 +138,18 @@ shadow from the truck; it's now 0.08, with a tighter shadow frustum to match.
 
 ## The world
 
-2048m square (~4.2 km²), one curated region rather than an infinite one (§5, §11).
+A curated region at the heart of a procedurally **endless** dune field.
 [`src/terrain/height.ts`](src/terrain/height.ts) is a pure, deterministic field — the
 physics colliders, the render chunks and the traction model all read the same function.
 It has an asymmetric dune profile (long windward ramp, short slip face capped near sand's
 ~32° angle of repose), a secondary cross-dune train, sabkha flats between dune fields, a
-small firm pan at spawn for baseline testing, four hand-sculpted landmarks, and a rim of
-tall dunes so the region ends in something you can drive at instead of a wall.
+small firm pan at spawn for baseline testing, and four hand-sculpted landmarks. Chunks
+stream around the player with no world bound, so the dunes run to the horizon in every
+direction. The region is instead closed by a soft edge:
+[`WorldBoundary`](src/engine/WorldBoundary.ts) fades the screen to a warm haze once the
+player drives well past the outermost POIs (~760m out on either axis) and, at full fade,
+sets the truck back down inside the region facing the centre — damage-free, never blocking,
+and never a wall or a void.
 
 Two things worth knowing before editing it:
 

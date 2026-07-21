@@ -514,6 +514,25 @@ export class Vehicle {
     this.onRecover?.(reason);
   }
 
+  /**
+   * Place the truck at a chosen spot and heading, upright and stopped. Used by
+   * the world boundary to set the player back down inside the region facing the
+   * centre. Like `recover`, it's damage-free and loses nothing but the drive out.
+   */
+  warpTo(x: number, z: number, yaw: number): void {
+    const ground = heightAt(x, z);
+    const y = ground + 1.6;
+    this.body.setTranslation({ x, y, z }, true);
+    const half = yaw / 2;
+    this.body.setRotation({ w: Math.cos(half), x: 0, y: Math.sin(half), z: 0 }, true);
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.steerAngle = 0;
+    this.rolledTimer = 0;
+    this.lastUprightPos = { x, y, z };
+    this.lastUprightYaw = yaw;
+  }
+
   get position(): RAPIER.Vector {
     return this.body.translation();
   }
