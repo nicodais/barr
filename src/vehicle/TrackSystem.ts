@@ -32,6 +32,9 @@ interface Segment {
   ax: number; ay: number; az: number;
   bx: number; by: number; bz: number;
   age: number;
+  /** First segment after a ribbon break (takeoff, teleport) — no quad joins
+      it to its predecessor, or the join renders as a sliver across the gap. */
+  head: boolean;
 }
 
 const VERTEX = /* glsl */ `
@@ -57,6 +60,8 @@ export class TrackSystem {
 
   private segments: Segment[][] = [[], []];
   private lastPos: Array<{ x: number; z: number } | null> = [null, null];
+  /** Set on a break; consumed by the next pushed segment as its head flag. */
+  private headNext: boolean[] = [true, true];
   private positions = new Float32Array(RIBBONS * MAX_SEGMENTS * 2 * 3);
   private alphas = new Float32Array(RIBBONS * MAX_SEGMENTS * 2);
   private indices = new Uint16Array(RIBBONS * (MAX_SEGMENTS - 1) * 6);
@@ -97,6 +102,7 @@ export class TrackSystem {
       if (!w?.contact) {
         // Break the ribbon on takeoff so the track doesn't stretch across a jump.
         this.lastPos[r] = null;
+        this.headNext[r] = true;
         continue;
       }
 
@@ -107,6 +113,7 @@ export class TrackSystem {
 
       if (moved > TELEPORT_BREAK) {
         this.lastPos[r] = { x: w.contactX, z: w.contactZ };
+        this.headNext[r] = true;
         continue;
       }
       if (moved >= MIN_STEP) {
@@ -141,7 +148,10 @@ export class TrackSystem {
     rz /= rl;
 
     const list = this.segments[r];
+    const head = this.headNext[r];
+    this.headNext[r] = false;
     list.push({
+      head,
       ax: w.contactX - rx * TRACK_HALF_WIDTH + nx * LIFT,
       ay: w.contactY - ry * TRACK_HALF_WIDTH + ny * LIFT,
       az: w.contactZ - rz * TRACK_HALF_WIDTH + nz * LIFT,
@@ -162,12 +172,14 @@ export class TrackSystem {
       const list = this.segments[r];
       const base = r * MAX_SEGMENTS * 2;
       let kept = 0;
+      const keptSegs: Segment[] = [];
 
       for (let i = 0; i < list.length; i++) {
         const s = list[i];
         s.age += dt;
         if (s.age >= FADE_TIME) continue;
         anyAlive = true;
+        keptSegs.push(s);
 
         const v = base + kept * 2;
         this.positions[v * 3] = s.ax;
@@ -189,6 +201,9 @@ export class TrackSystem {
       if (kept < list.length) list.splice(0, list.length - kept);
 
       for (let i = 0; i + 1 < kept; i++) {
+        // Never join across a ribbon break: the segment after a jump or a
+        // teleport starts a fresh strip.
+        if (keptSegs[i + 1].head) continue;
         const a = base + i * 2;
         this.indices[idx++] = a;
         this.indices[idx++] = a + 1;
@@ -216,6 +231,7 @@ export class TrackSystem {
   clear() {
     this.segments = [[], []];
     this.lastPos = [null, null];
+    this.headNext = [true, true];
     this.geometry.setDrawRange(0, 0);
   }
 }
