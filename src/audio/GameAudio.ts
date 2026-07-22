@@ -27,10 +27,13 @@ export class GameAudio {
     return this.engine?.running ?? false;
   }
 
-  /** Safe to call repeatedly; only the first gesture does any work. */
+  /** Safe to call repeatedly; later gestures just retry resume and playback. */
   async unlock(): Promise<void> {
     if (this.engine) {
       await this.engine.resume();
+      // Mobile browsers can reject the first play() and allow a later one, so
+      // every gesture re-offers the track until it actually starts.
+      this.score?.start();
       return;
     }
     try {

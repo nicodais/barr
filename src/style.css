@@ -53,6 +53,7 @@ body {
 #ui > .radio,
 #ui > .hud,
 #ui > .compass,
+#ui > .poi-card,
 #ui > .boundary-fade {
   pointer-events: none;
 }
@@ -702,13 +703,30 @@ body.photo-mode #help {
     top: auto;
     bottom: calc(230px + env(safe-area-inset-bottom));
     left: calc(10px + env(safe-area-inset-left));
-    width: min(250px, 56vw);
+    width: min(240px, 58vw);
+  }
+
+  /* Compact type so the card and Ahmed's frame can coexist on a phone. */
+  .poi-card img {
+    aspect-ratio: 2.2 / 1;
+  }
+
+  .poi-card h3 {
+    font-size: 13px;
+  }
+
+  .poi-card p {
+    font-size: 11px;
+    line-height: 1.4;
   }
 }
 
+/* Landscape phones: bottom-right, clear of the joystick, radio and truck. */
 @media (pointer: coarse) and (max-height: 480px) {
   .poi-card {
-    bottom: calc(180px + env(safe-area-inset-bottom));
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    left: auto;
+    right: calc(12px + env(safe-area-inset-right));
   }
 
   .poi-card img {
@@ -1095,9 +1113,10 @@ body.photo-mode #help {
   }
 
   .radio {
-    top: calc(90px + env(safe-area-inset-top));
+    top: calc(112px + env(safe-area-inset-top));
     bottom: auto;
     padding: 9px 13px;
+    max-width: calc(100vw - 32px);
   }
 }
 

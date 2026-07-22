@@ -7,48 +7,33 @@ import trackUrl from './Barr Background Music.mp3';
  * adaptive mix survives the swap — the bus still swells with driving intensity
  * and ducks under Ahmed's radio calls (§6).
  *
- * The file is fetched and decoded lazily after the audio unlock gesture, so the
- * ~12MB asset never blocks first paint; until it arrives the desert just has
- * wind, which is a fine state for it to be in.
+ * Played through an <audio> element rather than decodeAudioData on purpose:
+ * decoding a 16-minute track expands to ~340MB of PCM, which mobile browsers
+ * will refuse or be killed over. A media element streams it at a few MB of
+ * memory, loops natively, and still routes through the Web Audio graph.
  */
 export class TrackScore {
+  private el: HTMLAudioElement;
   private gain: GainNode;
-  private buffer: AudioBuffer | null = null;
-  private source: AudioBufferSourceNode | null = null;
   private started = false;
 
   constructor(private engine: AudioEngine) {
+    this.el = new Audio(trackUrl);
+    this.el.loop = true;
+    this.el.preload = 'auto';
+
     this.gain = engine.ctx.createGain();
     this.gain.gain.value = 0;
+    engine.ctx.createMediaElementSource(this.el).connect(this.gain);
     this.gain.connect(engine.score);
-    void this.load();
-  }
-
-  private async load() {
-    try {
-      const res = await fetch(trackUrl);
-      const data = await res.arrayBuffer();
-      this.buffer = await this.engine.ctx.decodeAudioData(data);
-      if (this.started) this.play();
-    } catch (err) {
-      // Music is a nice-to-have; a failed fetch must not take the wind with it.
-      console.warn('[dune] score track unavailable', err);
-    }
-  }
-
-  private play() {
-    if (!this.buffer || this.source) return;
-    const src = this.engine.ctx.createBufferSource();
-    src.buffer = this.buffer;
-    src.loop = true;
-    src.connect(this.gain);
-    src.start();
-    this.source = src;
   }
 
   start() {
+    if (this.started) return;
     this.started = true;
-    if (this.buffer) this.play();
+    // play() can reject before a gesture has blessed the element; the unlock
+    // path retries start() on later gestures, so a rejection here is not final.
+    this.el.play().catch(() => { this.started = false; });
   }
 
   /** @param intensity 0..1 — the score leans in while you're actually driving. */

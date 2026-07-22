@@ -172,35 +172,11 @@ export class TuningPanel {
     if (matchMedia('(pointer: coarse)').matches) {
       controls.appendChild(
         this.buildChoice(
-          'Touch controls',
-          ['joystick', 'wheel', 'tilt'],
-          () => this.settings.touchScheme,
-          (v) => {
-            this.settings.touchScheme = v as GameSettings['touchScheme'];
-            saveSettings(this.settings);
-            this.onTouchChange();
-          },
-        ),
-      );
-      controls.appendChild(
-        this.buildChoice(
           'Stick position',
           ['left', 'middle', 'right'],
           () => this.settings.joystickPosition,
           (v) => {
             this.settings.joystickPosition = v as GameSettings['joystickPosition'];
-            saveSettings(this.settings);
-            this.onTouchChange();
-          },
-        ),
-      );
-      controls.appendChild(
-        this.buildChoice(
-          'Pedal side',
-          ['left', 'right'],
-          () => this.settings.handedness,
-          (v) => {
-            this.settings.handedness = v as GameSettings['handedness'];
             saveSettings(this.settings);
             this.onTouchChange();
           },

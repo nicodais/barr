@@ -26,7 +26,6 @@ import { Wildlife } from '../world/Wildlife';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
 import { PhotoMode } from './PhotoMode';
 import { PhotoBar } from '../ui/PhotoBar';
-import { ControlPicker } from '../ui/ControlPicker';
 import { JoystickBar } from '../ui/JoystickBar';
 import { Compass } from '../ui/Compass';
 import { PoiCard } from '../ui/PoiCard';
@@ -64,7 +63,6 @@ export class Game {
   private director: Director;
   private photo: PhotoMode;
   private photoBar: PhotoBar;
-  private picker: ControlPicker;
   private joystickBar: JoystickBar;
   private boundary = new WorldBoundary();
   private compass = new Compass();
@@ -184,18 +182,6 @@ export class Game {
       () => void this.savePhoto(true),
       () => this.exitPhotoMode(),
     );
-    this.picker = new ControlPicker((scheme, handedness) => {
-      this.settings.touchScheme = scheme;
-      this.settings.handedness = handedness;
-      // The picker's stick-side choice seeds the joystick position; the top-right
-      // bar then lets the player nudge it (including to the middle) while driving.
-      if (scheme === 'joystick') this.settings.joystickPosition = handedness;
-      this.settings.touchPickerSeen = true;
-      saveSettings(this.settings);
-      this.applyTouchScheme();
-      void this.audio.unlock();
-    });
-
     this.joystickBar = new JoystickBar((pos) => {
       this.settings.joystickPosition = pos;
       saveSettings(this.settings);
@@ -208,12 +194,11 @@ export class Game {
 
     // Touch controls appear on touch-capable viewports; the picker only
     // interrupts once, on the first such session (§7).
+    // Touch controls appear on touch-capable viewports; the scheme is always
+    // the joystick now, so there is nothing to pick (§7).
     if (matchMedia('(pointer: coarse)').matches) {
       this.input.touch.show();
       this.applyTouchScheme();
-      if (!this.settings.touchPickerSeen) {
-        this.picker.open(this.settings.touchScheme, this.settings.handedness);
-      }
     }
 
     uiRoot.append(
@@ -222,7 +207,6 @@ export class Game {
       this.input.touch.element,
       this.photoBar.element,
       this.panel.element,
-      this.picker.element,
       this.joystickBar.element,
       this.boundary.element,
       this.compass.element,
@@ -231,10 +215,12 @@ export class Game {
 
     // Browsers only allow audio to start from a real gesture, so the first
     // input of any kind unlocks it.
+    // Not once:true — mobile browsers can reject the first resume/play and
+    // permit a later one, so every gesture retries until audio is running.
     const unlock = () => { void this.audio.unlock(); };
-    window.addEventListener('keydown', unlock, { once: true });
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('touchstart', unlock, { once: true });
+    window.addEventListener('keydown', unlock);
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('touchend', unlock);
 
     this.vehicle.onRecover = (reason) => {
       if (reason === 'rollover') this.director.onRollover();
