@@ -699,11 +699,20 @@ body.photo-mode #help {
 /* Touch layouts stack the HUD top-centre, so the card sits lower-left, clear
    of both the compass row and the thumb zone; short viewports drop the photo. */
 @media (pointer: coarse) {
+  /* See-through on touch: the card covers a real slice of a phone screen, so
+     the world stays readable behind it — light blur only, and the whole card
+     (photo included) settles at partial opacity instead of full. */
   .poi-card {
     top: auto;
     bottom: calc(230px + env(safe-area-inset-bottom));
     left: calc(10px + env(safe-area-inset-left));
     width: min(240px, 58vw);
+    background: rgba(30, 22, 17, 0.72);
+    backdrop-filter: blur(2px);
+  }
+
+  .poi-card.poi-card-show {
+    opacity: 0.85;
   }
 
   /* Compact type so the card and Ahmed's frame can coexist on a phone. */
