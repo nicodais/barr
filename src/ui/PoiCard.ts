@@ -22,8 +22,17 @@ export class PoiCard {
     this.photo.alt = '';
     this.photo.decoding = 'async';
     this.photo.loading = 'lazy';
-    // A missing or still-loading photo collapses to text-only, not a broken icon.
-    this.photo.addEventListener('error', () => { this.photo.hidden = true; });
+    // Real photos live at /photos/{id}.jpg, dropped in by hand. Until one
+    // exists, fall back to the in-palette .svg postcard; if that's missing too,
+    // collapse to text-only rather than a broken icon.
+    this.photo.addEventListener('error', () => {
+      const src = this.photo.getAttribute('src') ?? '';
+      if (src.endsWith('.jpg')) {
+        this.photo.src = src.replace(/\.jpg$/, '.svg');
+      } else {
+        this.photo.hidden = true;
+      }
+    });
     this.element.appendChild(this.photo);
 
     this.title = document.createElement('h3');
