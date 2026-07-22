@@ -777,7 +777,8 @@ body.photo-mode #help {
   display: flex;
   align-items: baseline;
   gap: 5px;
-  min-width: 106px;
+  /* Fits three digits: crossing 99 km/h must not resize the panel. */
+  min-width: 122px;
 }
 
 .hud-speed b {
@@ -830,6 +831,10 @@ body.photo-mode #help {
 .hud-stats span {
   display: flex;
   gap: 6px;
+  /* Wide enough for the worst value ("chunks 113 +58"): these numbers change
+     every frame, and without a floor the auto-sized grid columns breathe with
+     them, visibly flashing the whole panel between widths. */
+  min-width: 96px;
 }
 
 .hud-stats i {
