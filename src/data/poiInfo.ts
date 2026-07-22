@@ -24,6 +24,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'gardens across the Emirates — engineering that made desert settlement possible. ' +
       'The aflaj of Al Ain\'s oases are UNESCO-listed and some still run today.',
     photo: '/photos/falaj.jpg',
+    credit: 'https://www.greenprophet.com/2020/10/the-uae-and-omans-3000-year-old-irrigation-system/'
   },
   ghaf: {
     title: 'The Ghaf Tree',
@@ -32,6 +33,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'Bedouin life leaned on its shade, pods and firewood. Sheikh Zayed planted millions ' +
       'in his greening campaigns, and the tree is now a protected symbol of tolerance.',
     photo: '/photos/ghaf.jpg',
+    credit: 'https://www.happydesertsafari.com/blog/ghaf-tree-uae/'
   },
   watchtower: {
     title: 'The Watchtower',
@@ -40,6 +42,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'the Emirates. Many are lovingly restored today — landmarks of a time when water ' +
       'and trade routes were worth watching over.',
     photo: '/photos/watchtower.jpg',
+    credit: 'https://www.flickr.com/photos/ryanechevarria/41194012651'
   },
   majlis: {
     title: 'The Majlis',
@@ -48,6 +51,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'settle matters and share news. UNESCO lists it as intangible cultural heritage, ' +
       'and open majlis councils remain a living institution in the UAE today.',
     photo: '/photos/majlis.jpg',
+    credit: 'https://www.desertsafarisdubai.com/desert-safari-with-vip-majlis-tent/'
   },
   pylons: {
     title: 'The Oil Surveys',
@@ -56,6 +60,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'exports left Abu Dhabi in 1962 and transformed the Emirates within a generation — ' +
       'though plenty of surveyed patches, like this one, gave nothing back.',
     photo: '/photos/pylons.jpg',
+    credit: 'https://emiratitimes.com/a-brief-history-of-oil-in-the-united-arab-emirates/'
   },
   teastand: {
     title: 'The Karak Stop',
@@ -64,6 +69,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'Asian communities and became an Emirati everyday ritual. Roadside cafeterias and ' +
       'tiny tea stands are where half the country pauses, talks and refuels.',
     photo: '/photos/teastand.jpg',
+    credit: 'https://gulfnews.com/uae/the-bitter-truth-about-your-sweet-karak-tea-in-uae-1.68663205'
   },
   famousdune: {
     title: 'The Famous Dune',
@@ -72,6 +78,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'experiences, and certain photogenic dunes — like Moreeb Dune in Liwa — have become ' +
       'destinations in their own right for festivals, hill climbs and a million photos.',
     photo: '/photos/famousdune.jpg',
+    credit: 'https://www.flickr.com/photos/jakelley/34943971041'
   },
   falconry: {
     title: 'Falconry — Al Qannas',
@@ -80,6 +87,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'championed it as living heritage. UNESCO-listed, it thrives today — the UAE issues ' +
       'falcon passports and runs the world\'s largest falcon hospital.',
     photo: '/photos/falconry.jpg',
+    credit: 'https://www.thenationalnews.com/uae/heritage/2022/10/17/uae-rulers-long-history-with-falconry-in-pictures/'
   },
   cameltrack: {
     title: 'Camel Racing',
@@ -88,6 +96,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'a heritage sport the Emirates still celebrates at purpose-built tracks, where ' +
       'robot jockeys have replaced child riders and bloodlines are prized like royalty.',
     photo: '/photos/cameltrack.jpg',
+    credit: 'https://www.usatoday.com/picture-gallery/tech/2017/01/03/centuries-old-tradition-changed-by-technology/96116762/'
   },
   coffeehearth: {
     title: 'Gahwa — Arabic Coffee',
@@ -96,5 +105,6 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'hospitality: served from the long-spouted dallah to every guest, ruler or ' +
       'stranger. The ritual is UNESCO-listed and opens gatherings to this day.',
     photo: '/photos/coffeehearth.jpg',
+    credit: 'https://www.thenationalnews.com/arts-culture/2025/05/12/coffee-ceremony-arabic-gulf-gahwa-brewing-tradition/'
   },
 };
