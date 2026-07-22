@@ -9,9 +9,9 @@ import type { WheelState } from './Vehicle';
  * It's also what makes a dune feel like a surface you're working across rather
  * than a backdrop sliding past.
  *
- * A ribbon per side, laid down from the rear wheel contact points — front and
- * rear wheels track the same line on a 4x4, so two ribbons is what you'd
- * actually see.
+ * A ribbon per wheel: all four leave their own trail, so straight running
+ * reads as deepened ruts where front and rear overlap, and cornering fans the
+ * four lines apart the way a real 4x4 does.
  */
 const MAX_SEGMENTS = 240;
 const TRACK_HALF_WIDTH = 0.19;
@@ -26,7 +26,7 @@ const TELEPORT_BREAK = 12;
 /** Seconds before a track has faded completely. */
 const FADE_TIME = 22;
 const LIFT = 0.04;
-const RIBBONS = 2;
+const RIBBONS = 4;
 
 interface Segment {
   ax: number; ay: number; az: number;
@@ -58,10 +58,10 @@ const FRAGMENT = /* glsl */ `
 export class TrackSystem {
   readonly mesh: THREE.Mesh;
 
-  private segments: Segment[][] = [[], []];
-  private lastPos: Array<{ x: number; z: number } | null> = [null, null];
+  private segments: Segment[][] = Array.from({ length: RIBBONS }, () => []);
+  private lastPos: Array<{ x: number; z: number } | null> = new Array(RIBBONS).fill(null);
   /** Set on a break; consumed by the next pushed segment as its head flag. */
-  private headNext: boolean[] = [true, true];
+  private headNext: boolean[] = new Array(RIBBONS).fill(true);
   private positions = new Float32Array(RIBBONS * MAX_SEGMENTS * 2 * 3);
   private alphas = new Float32Array(RIBBONS * MAX_SEGMENTS * 2);
   private indices = new Uint16Array(RIBBONS * (MAX_SEGMENTS - 1) * 6);
@@ -95,10 +95,10 @@ export class TrackSystem {
     this.mesh.renderOrder = 2;
   }
 
-  /** @param wheels the two rear wheels, in left/right order */
-  update(wheels: WheelState[], rearIndices: [number, number], dt: number) {
+  /** @param wheelIndices which wheels lay a ribbon, one per ribbon slot */
+  update(wheels: WheelState[], wheelIndices: number[], dt: number) {
     for (let r = 0; r < RIBBONS; r++) {
-      const w = wheels[rearIndices[r]];
+      const w = wheels[wheelIndices[r]];
       if (!w?.contact) {
         // Break the ribbon on takeoff so the track doesn't stretch across a jump.
         this.lastPos[r] = null;
@@ -229,9 +229,9 @@ export class TrackSystem {
 
   /** Wipes every track — used when the truck is teleported or recovered. */
   clear() {
-    this.segments = [[], []];
-    this.lastPos = [null, null];
-    this.headNext = [true, true];
+    this.segments = Array.from({ length: RIBBONS }, () => []);
+    this.lastPos = new Array(RIBBONS).fill(null);
+    this.headNext = new Array(RIBBONS).fill(true);
     this.geometry.setDrawRange(0, 0);
   }
 }

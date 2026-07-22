@@ -337,9 +337,9 @@ export class Game {
     );
     this.dust.update(frameDt);
     this.contactShadow.update(this.vehicle.wheels, this.renderQuat, frameDt);
-    // Rear wheels only: on a 4x4 the fronts run the same line, so laying all
-    // four would just z-fight two ribbons against each other.
-    this.tracks.update(this.vehicle.wheels, [2, 3], frameDt);
+    // All four wheels lay their own trail: overlapping front/rear ribbons
+    // read as deepened ruts, and cornering fans the four lines apart.
+    this.tracks.update(this.vehicle.wheels, [0, 1, 2, 3], frameDt);
 
     // Heading from the truck's forward vector; the soft nudge points at the
     // nearest POI this player hasn't found yet, across sessions (§5).
