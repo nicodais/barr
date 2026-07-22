@@ -58,6 +58,78 @@ body {
   pointer-events: none;
 }
 
+/* --- title splash ---------------------------------------------------------- */
+
+/*
+ * Shown on launch over everything (including the loader). The content fades in
+ * over 3s; main.ts fades the whole splash away once the game is running.
+ */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: linear-gradient(180deg, #1d2340 0%, #4a3050 45%, #b06a44 85%, #d99a60 100%);
+  transition: opacity 1s ease;
+}
+
+#splash.splash-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash-content {
+  padding: 0 24px;
+  opacity: 0;
+  animation: splash-in 3s ease forwards;
+}
+
+@keyframes splash-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.splash-ar {
+  display: block;
+  font-family: 'Reem Kufi', serif;
+  font-size: clamp(26px, 5vw, 40px);
+  color: var(--accent);
+  opacity: 0.9;
+  margin-bottom: 2px;
+}
+
+#splash h1 {
+  margin: 0;
+  font-family: 'Reem Kufi', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(46px, 10vw, 88px);
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  color: #f6e7d4;
+  text-shadow: 0 2px 24px rgba(20, 12, 8, 0.45);
+}
+
+#splash p {
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(246, 231, 212, 0.28);
+  font-size: clamp(12px, 2.2vw, 16px);
+  letter-spacing: 0.34em;
+  text-indent: 0.34em; /* recentres letterspaced text */
+  text-transform: uppercase;
+  color: #f6e7d4;
+  opacity: 0.78;
+}
+
 /* --- loader --------------------------------------------------------------- */
 
 #loader {

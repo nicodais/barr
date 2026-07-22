@@ -1,4 +1,4 @@
-# DUNE — prototype
+# Going Barr
 
 Relaxing open-world dune-bashing for the browser. See [CLAUDE.md](CLAUDE.md) for the full design brief.
 

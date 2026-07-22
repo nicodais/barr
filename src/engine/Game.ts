@@ -111,10 +111,10 @@ export class Game {
 
     const check = this.terrain.verifyAlignment(spawn.x, spawn.z);
     if (check.ok) {
-      console.info(`[dune] terrain aligned (max error ${check.worstError.toFixed(3)}m)`);
+      console.info(`[barr] terrain aligned (max error ${check.worstError.toFixed(3)}m)`);
     } else {
       console.warn(
-        `[dune] terrain colliders disagree with the height field by ${check.worstError.toFixed(2)}m` +
+        `[barr] terrain colliders disagree with the height field by ${check.worstError.toFixed(2)}m` +
         ' — check the chunk sample layout or collider translation',
       );
     }
@@ -263,7 +263,7 @@ export class Game {
 
     const drop = this.watchdog.sample(frameDt, this.tier, this.settings.quality !== 'auto');
     if (drop) {
-      console.info(`[dune] frame time sustained above budget — quality ${this.tier} -> ${drop}`);
+      console.info(`[barr] frame time sustained above budget — quality ${this.tier} -> ${drop}`);
       this.applyQuality(drop);
     }
 
@@ -457,12 +457,12 @@ export class Game {
       this.photoBar.say('Could not capture');
       return;
     }
-    const filename = `dune-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
+    const filename = `going-barr-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
     const file = new File([blob], filename, { type: 'image/png' });
 
     if (share && navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: 'DUNE' });
+        await navigator.share({ files: [file], title: 'Going Barr' });
         this.photoBar.say('Shared');
       } catch {
         // Includes the user dismissing the sheet, which isn't an error.

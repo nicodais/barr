@@ -95,7 +95,9 @@ const SECTIONS: Section[] = [
  * over v2 defaults would pair old force values with heavy gravity and quietly
  * make dune faces unclimbable — the exact failure this rescale exists to avoid.
  */
-const STORAGE_KEY = 'dune.tuning.v3';
+const STORAGE_KEY = 'goingbarr.tuning.v3';
+/** Pre-rename key, read once so existing feel-tuning survives the rebrand. */
+const LEGACY_KEY = 'dune.tuning.v3';
 
 export class TuningPanel {
   readonly element: HTMLElement;
@@ -399,7 +401,7 @@ export class TuningPanel {
 
   private load() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw) as Partial<VehicleTuning>;
       // Only adopt keys we still recognise, so an old blob can't inject junk.

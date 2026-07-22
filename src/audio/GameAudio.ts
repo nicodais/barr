@@ -48,7 +48,7 @@ export class GameAudio {
       engine.setMasterVolume(this.muted ? 0 : this.volume);
     } catch (err) {
       // Audio is a nice-to-have; a browser refusing it must not stop the drive.
-      console.warn('[dune] audio unavailable', err);
+      console.warn('[barr] audio unavailable', err);
     }
   }
 
