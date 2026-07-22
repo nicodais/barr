@@ -26,11 +26,12 @@ import { Wildlife } from '../world/Wildlife';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
 import { PhotoMode } from './PhotoMode';
 import { PhotoBar } from '../ui/PhotoBar';
-import { ControlPicker } from '../ui/ControlPicker';
 import { JoystickBar } from '../ui/JoystickBar';
 import { Compass } from '../ui/Compass';
+import { PoiCard } from '../ui/PoiCard';
 import { loadProgress, saveProgress, type Progress } from '../settings/Progress';
 import { POIS } from '../data/pois';
+import type { PoiKind } from '../data/pois';
 
 const PHYSICS_HZ = 60;
 const FIXED_DT = 1 / PHYSICS_HZ;
@@ -62,10 +63,11 @@ export class Game {
   private director: Director;
   private photo: PhotoMode;
   private photoBar: PhotoBar;
-  private picker: ControlPicker;
   private joystickBar: JoystickBar;
   private boundary = new WorldBoundary();
   private compass = new Compass();
+  private poiCard = new PoiCard();
+  private activePoi: PoiKind | null = null;
   private progress: Progress;
   private forward = new THREE.Vector3();
   private watchdog = new QualityWatchdog();
@@ -180,18 +182,6 @@ export class Game {
       () => void this.savePhoto(true),
       () => this.exitPhotoMode(),
     );
-    this.picker = new ControlPicker((scheme, handedness) => {
-      this.settings.touchScheme = scheme;
-      this.settings.handedness = handedness;
-      // The picker's stick-side choice seeds the joystick position; the top-right
-      // bar then lets the player nudge it (including to the middle) while driving.
-      if (scheme === 'joystick') this.settings.joystickPosition = handedness;
-      this.settings.touchPickerSeen = true;
-      saveSettings(this.settings);
-      this.applyTouchScheme();
-      void this.audio.unlock();
-    });
-
     this.joystickBar = new JoystickBar((pos) => {
       this.settings.joystickPosition = pos;
       saveSettings(this.settings);
@@ -204,12 +194,11 @@ export class Game {
 
     // Touch controls appear on touch-capable viewports; the picker only
     // interrupts once, on the first such session (§7).
+    // Touch controls appear on touch-capable viewports; the scheme is always
+    // the joystick now, so there is nothing to pick (§7).
     if (matchMedia('(pointer: coarse)').matches) {
       this.input.touch.show();
       this.applyTouchScheme();
-      if (!this.settings.touchPickerSeen) {
-        this.picker.open(this.settings.touchScheme, this.settings.handedness);
-      }
     }
 
     uiRoot.append(
@@ -218,18 +207,20 @@ export class Game {
       this.input.touch.element,
       this.photoBar.element,
       this.panel.element,
-      this.picker.element,
       this.joystickBar.element,
       this.boundary.element,
       this.compass.element,
+      this.poiCard.element,
     );
 
     // Browsers only allow audio to start from a real gesture, so the first
     // input of any kind unlocks it.
+    // Not once:true — mobile browsers can reject the first resume/play and
+    // permit a later one, so every gesture retries until audio is running.
     const unlock = () => { void this.audio.unlock(); };
-    window.addEventListener('keydown', unlock, { once: true });
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('touchstart', unlock, { once: true });
+    window.addEventListener('keydown', unlock);
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('touchend', unlock);
 
     this.vehicle.onRecover = (reason) => {
       if (reason === 'rollover') this.director.onRollover();
@@ -365,6 +356,26 @@ export class Game {
       }
     }
     this.compass.update(heading, targetBearing, this.progress.discovered.size, POIS.length);
+
+    // The arrival card: fades in inside a POI's radius, fades out on the way
+    // off it. The exit edge is wider than the entry edge so idling right on the
+    // boundary can't flicker the card.
+    if (this.activePoi !== null) {
+      const cur = POIS.find((p) => p.id === this.activePoi)!;
+      const d = Math.hypot(cur.x - this.renderPos.x, cur.z - this.renderPos.z);
+      if (d > cur.radius * 1.35 || this.photo.active) {
+        this.poiCard.hide();
+        this.activePoi = null;
+      }
+    }
+    if (this.activePoi === null && !this.photo.active) {
+      for (const poi of POIS) {
+        if (Math.hypot(poi.x - this.renderPos.x, poi.z - this.renderPos.z) > poi.radius) continue;
+        this.activePoi = poi.id;
+        this.poiCard.show(poi);
+        break;
+      }
+    }
 
     this.audio.update(this.vehicle.telemetry, controls.throttle, frameDt);
     this.director.update(

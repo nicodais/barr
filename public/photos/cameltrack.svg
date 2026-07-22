@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#3a4a78"/><stop offset=".62" stop-color="#c97e54"/><stop offset="1" stop-color="#e8b06a"/>
+</linearGradient></defs>
+<rect width="320" height="180" fill="url(#s)"/>
+<circle cx="248" cy="86" r="17" fill="#f6d9a0" opacity=".9"/>
+<path d="M0 110 L70 84 L150 112 L230 92 L320 116 L320 180 L0 180 Z" fill="#d9a86a"/>
+<path d="M0 140 L90 118 L200 144 L320 126 L320 180 L0 180 Z" fill="#c89a5e"/><path d="M20 150 L300 150" stroke="#6f5439" stroke-width="3"/>
+<path d="M40 150 L40 136 M100 150 L100 136 M160 150 L160 136 M220 150 L220 136 M280 150 L280 136" stroke="#6f5439" stroke-width="4"/>
+<path d="M30 136 L290 136" stroke="#55412a" stroke-width="3"/>
+<path d="M186 120 q6 -14 20 -10 q4 -12 12 -4 q10 -2 10 8 l-3 14 l-5 0 l1 -8 l-24 0 l-1 8 l-5 0 Z" fill="#8a6844"/>
+<path d="M226 108 q8 -4 9 -14 l4 1 q0 12 -8 17 Z" fill="#8a6844"/>
+<text x="8" y="172" font-family="sans-serif" font-size="9" fill="#fff" opacity=".55">illustration — replace with licensed photo</text></svg>

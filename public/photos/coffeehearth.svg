@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#3a4a78"/><stop offset=".62" stop-color="#c97e54"/><stop offset="1" stop-color="#e8b06a"/>
+</linearGradient></defs>
+<rect width="320" height="180" fill="url(#s)"/>
+<circle cx="248" cy="86" r="17" fill="#f6d9a0" opacity=".9"/>
+<path d="M0 110 L70 84 L150 112 L230 92 L320 116 L320 180 L0 180 Z" fill="#d9a86a"/>
+<path d="M0 140 L90 118 L200 144 L320 126 L320 180 L0 180 Z" fill="#c89a5e"/><ellipse cx="150" cy="152" rx="34" ry="7" fill="#7d6e5c"/>
+<path d="M138 108 q-4 22 4 34 l18 0 q8 -12 4 -34 q-2 -10 -13 -10 q-11 0 -13 10 Z" fill="#a9a49b"/>
+<path d="M126 118 q-8 6 -2 14 l14 -4 Z" fill="#a9a49b"/>
+<path d="M136 96 L166 96 L162 104 L140 104 Z" fill="#8c8781"/>
+<circle cx="151" cy="92" r="4" fill="#8c8781"/>
+<rect x="188" y="142" width="11" height="10" rx="2" fill="#c4b49a"/>
+<rect x="204" y="144" width="10" height="9" rx="2" fill="#c4b49a"/>
+<circle cx="150" cy="150" r="5" fill="#e0763a"/>
+<text x="8" y="172" font-family="sans-serif" font-size="9" fill="#fff" opacity=".55">illustration — replace with licensed photo</text></svg>

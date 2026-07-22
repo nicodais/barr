@@ -53,6 +53,7 @@ body {
 #ui > .radio,
 #ui > .hud,
 #ui > .compass,
+#ui > .poi-card,
 #ui > .boundary-fade {
   pointer-events: none;
 }
@@ -633,6 +634,107 @@ body.photo-mode #help {
 }
 
 /*
+ * The POI arrival card: a small plaque with a real-world photo and a few lines
+ * of heritage context. Pointer-transparent and driven purely by proximity.
+ */
+.poi-card {
+  position: fixed;
+  top: 44px;
+  left: 14px;
+  width: min(300px, 62vw);
+  border-radius: 14px;
+  background: rgba(30, 22, 17, 0.92);
+  border: 1px solid var(--panel-line);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  pointer-events: none;
+  z-index: 14;
+}
+
+.poi-card.poi-card-show {
+  opacity: 1;
+  transform: none;
+}
+
+.poi-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.poi-card img[hidden] {
+  display: none;
+}
+
+.poi-card h3 {
+  margin: 10px 13px 5px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.poi-card p {
+  margin: 0 13px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.88;
+}
+
+.poi-card small {
+  display: block;
+  margin: 0 13px 9px;
+  font-size: 8.5px;
+  line-height: 1.3;
+  opacity: 0.42;
+}
+
+.poi-card small[hidden] {
+  display: none;
+}
+
+/* Touch layouts stack the HUD top-centre, so the card sits lower-left, clear
+   of both the compass row and the thumb zone; short viewports drop the photo. */
+@media (pointer: coarse) {
+  .poi-card {
+    top: auto;
+    bottom: calc(230px + env(safe-area-inset-bottom));
+    left: calc(10px + env(safe-area-inset-left));
+    width: min(240px, 58vw);
+  }
+
+  /* Compact type so the card and Ahmed's frame can coexist on a phone. */
+  .poi-card img {
+    aspect-ratio: 2.2 / 1;
+  }
+
+  .poi-card h3 {
+    font-size: 13px;
+  }
+
+  .poi-card p {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+}
+
+/* Landscape phones: bottom-right, clear of the joystick, radio and truck. */
+@media (pointer: coarse) and (max-height: 480px) {
+  .poi-card {
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    left: auto;
+    right: calc(12px + env(safe-area-inset-right));
+  }
+
+  .poi-card img {
+    display: none;
+  }
+}
+
+/*
  * The world-boundary haze. Opacity is driven per-frame from JS as the player
  * leaves the region; it fades to a warm sand-light rather than a hard black cut,
  * so drifting off the edge reads as a whiteout, not a screen wipe.
@@ -675,7 +777,8 @@ body.photo-mode #help {
   display: flex;
   align-items: baseline;
   gap: 5px;
-  min-width: 106px;
+  /* Fits three digits: crossing 99 km/h must not resize the panel. */
+  min-width: 122px;
 }
 
 .hud-speed b {
@@ -728,6 +831,10 @@ body.photo-mode #help {
 .hud-stats span {
   display: flex;
   gap: 6px;
+  /* Wide enough for the worst value ("chunks 113 +58"): these numbers change
+     every frame, and without a floor the auto-sized grid columns breathe with
+     them, visibly flashing the whole panel between widths. */
+  min-width: 96px;
 }
 
 .hud-stats i {
@@ -1011,9 +1118,10 @@ body.photo-mode #help {
   }
 
   .radio {
-    top: calc(90px + env(safe-area-inset-top));
+    top: calc(112px + env(safe-area-inset-top));
     bottom: auto;
     padding: 9px 13px;
+    max-width: calc(100vw - 32px);
   }
 }
 

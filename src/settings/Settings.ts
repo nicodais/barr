@@ -36,7 +36,9 @@ export const DEFAULT_SETTINGS: GameSettings = {
   quality: 'auto',
 };
 
-const TOUCH_SCHEMES: TouchScheme[] = ['joystick', 'wheel', 'tilt'];
+// Joystick only: the wheel and tilt schemes were cut, so any stored value
+// other than 'joystick' falls back to the default rather than resurrecting them.
+const TOUCH_SCHEMES: TouchScheme[] = ['joystick'];
 const HANDEDNESS: Handedness[] = ['left', 'right'];
 const JOYSTICK_POSITIONS: JoystickPosition[] = ['left', 'middle', 'right'];
 const QUALITIES: Array<QualityTier | 'auto'> = ['auto', 'low', 'medium', 'high'];

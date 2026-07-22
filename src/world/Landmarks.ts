@@ -53,7 +53,13 @@ function bake(built: THREE.Group): THREE.Group {
   built.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh)) return;
     // World transform baked into the vertices; the baked group sits at identity.
-    const geo = (obj.geometry as THREE.BufferGeometry).clone().applyMatrix4(obj.matrixWorld);
+    const cloned = (obj.geometry as THREE.BufferGeometry).clone().applyMatrix4(obj.matrixWorld);
+    // mergeGeometries returns null for a bucket mixing indexed (box, cylinder)
+    // and non-indexed (icosahedron, dodecahedron) geometry — which silently
+    // deleted every piece sharing that material. Normalise to non-indexed so
+    // any primitive can share a bucket.
+    const geo = cloned.index ? cloned.toNonIndexed() : cloned;
+    if (geo !== cloned) cloned.dispose();
     const mat = obj.material as THREE.Material;
     let list = buckets.get(mat);
     if (!list) buckets.set(mat, list = []);
@@ -64,7 +70,10 @@ function bake(built: THREE.Group): THREE.Group {
   for (const [mat, geos] of buckets) {
     const merged = mergeGeometries(geos, false);
     for (const g of geos) g.dispose();
-    if (!merged) continue;
+    if (!merged) {
+      console.warn('[dune] landmark bake dropped a material bucket');
+      continue;
+    }
     merged.computeBoundingSphere();
     const mesh = new THREE.Mesh(merged, mat);
     mesh.castShadow = true;
@@ -191,19 +200,24 @@ function buildWatchtower(): THREE.Group {
     rock.rotation.y = i;
     g.add(rock);
   }
-  // Tower built in courses, alternating tone so it reads as stacked stone, not a
-  // smooth cone — and each course rotated a little so the facets don't line up.
+  // Tower built in courses stacked flush — each course's floor sits exactly on
+  // the previous one's ceiling — alternating tone so it reads as stacked stone,
+  // and each course rotated a little so the facets don't line up.
   const courses: Array<[number, number, number]> = [
-    [3.1, 2.9, 0.9], [2.85, 2.6, 2.65], [2.6, 2.35, 4.3], [2.35, 2.15, 5.75],
+    // [bottomRadius, topRadius, height]
+    [3.1, 2.85, 2.0],
+    [2.85, 2.6, 1.9],
+    [2.6, 2.4, 1.8],
+    [2.4, 2.2, 1.6],
   ];
-  let cy = 0.9;
+  let base = 0;
   for (let i = 0; i < courses.length; i++) {
-    const [rb, rt, y] = courses[i];
-    const h = i === courses.length - 1 ? 1.5 : (courses[i + 1]?.[2] ?? y) - cy + 0.05;
-    const course = mesh(new THREE.CylinderGeometry(rt, rb, h, 9), i % 2 ? STONE : STONE_LIGHT, 0, y, 0);
+    const [rb, rt, h] = courses[i];
+    const course = mesh(new THREE.CylinderGeometry(rt, rb, h, 9),
+      i % 2 ? STONE : STONE_LIGHT, 0, base + h / 2, 0);
     course.rotation.y = i * 0.35;
     g.add(course);
-    cy = y;
+    base += h;
   }
   // Broken crown: a partial ring of merlons, most of them missing.
   for (let i = 0; i < 9; i++) {
@@ -211,11 +225,11 @@ function buildWatchtower(): THREE.Group {
     const a = (i / 9) * Math.PI * 2;
     const h = 0.75 + (i % 2) * 0.35;
     g.add(mesh(new THREE.BoxGeometry(0.7, h, 0.7), i % 2 ? STONE : STONE_LIGHT,
-      Math.cos(a) * 2.15, 6.75 + h / 2, Math.sin(a) * 2.15));
+      Math.cos(a) * 1.95, base + h / 2, Math.sin(a) * 1.95));
   }
-  // Dark doorway with a weathered wooden lintel over it.
-  g.add(mesh(new THREE.BoxGeometry(1.1, 1.7, 0.4), WOOD_DARK, 0, 1.55, 2.55));
-  g.add(mesh(new THREE.BoxGeometry(1.35, 0.24, 0.5), WOOD, 0, 2.5, 2.55));
+  // Dark doorway with a weathered wooden lintel over it, at ground level.
+  g.add(mesh(new THREE.BoxGeometry(1.1, 1.7, 0.4), WOOD_DARK, 0, 0.85, 2.9));
+  g.add(mesh(new THREE.BoxGeometry(1.35, 0.24, 0.5), WOOD, 0, 1.8, 2.92));
   return g;
 }
 
