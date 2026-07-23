@@ -1,5 +1,9 @@
 import './style.css';
+import { inject } from '@vercel/analytics';
 import { Game } from './engine/Game';
+
+// Initialize Vercel Analytics
+inject();
 
 const canvas = document.getElementById('viewport') as HTMLCanvasElement | null;
 const uiRoot = document.getElementById('ui') as HTMLElement | null;
