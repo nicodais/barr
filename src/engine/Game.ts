@@ -457,12 +457,12 @@ export class Game {
       this.photoBar.say('Could not capture');
       return;
     }
-    const filename = `going-barr-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
+    const filename = `in-the-barr-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
     const file = new File([blob], filename, { type: 'image/png' });
 
     if (share && navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: 'Going Barr' });
+        await navigator.share({ files: [file], title: 'In the Barr' });
         this.photoBar.say('Shared');
       } catch {
         // Includes the user dismissing the sheet, which isn't an error.

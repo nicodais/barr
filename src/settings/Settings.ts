@@ -46,14 +46,14 @@ const QUALITIES: Array<QualityTier | 'auto'> = ['auto', 'low', 'medium', 'high']
 // Bumped v1 -> v2 so the inverted-steering default reaches returning players:
 // a v1 blob saved before that default flipped would otherwise pin steering to
 // its old, non-inverted value. The bump resets every persisted setting once.
-const STORAGE_KEY = 'goingbarr.settings.v2';
-/** Pre-rename key, read once so players keep their settings across the rebrand. */
-const LEGACY_KEY = 'dune.settings.v2';
+const STORAGE_KEY = 'inthebarr.settings.v2';
+/** Pre-rename keys, read once so players keep their settings across renames. */
+const LEGACY_KEYS = ['goingbarr.settings.v2', 'dune.settings.v2'];
 
 export function loadSettings(): GameSettings {
   const settings = { ...DEFAULT_SETTINGS };
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? LEGACY_KEYS.map((k) => localStorage.getItem(k)).find(Boolean) ?? null;
     if (!raw) return settings;
     const saved = JSON.parse(raw) as Partial<GameSettings>;
     // Only adopt keys we still recognise, and only at the right type, so an

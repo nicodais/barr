@@ -14,15 +14,15 @@ export interface Progress {
   discovered: Set<PoiKind>;
 }
 
-const STORAGE_KEY = 'goingbarr.progress.v1';
-/** Pre-rename key, read once so discovery survives the rebrand. */
-const LEGACY_KEY = 'dune.progress.v1';
+const STORAGE_KEY = 'inthebarr.progress.v1';
+/** Pre-rename keys, read once so discovery survives renames. */
+const LEGACY_KEYS = ['goingbarr.progress.v1', 'dune.progress.v1'];
 const VALID_IDS = new Set<PoiKind>(POIS.map((p) => p.id));
 
 export function loadProgress(): Progress {
   const progress: Progress = { discovered: new Set() };
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? LEGACY_KEYS.map((k) => localStorage.getItem(k)).find(Boolean) ?? null;
     if (!raw) return progress;
     const saved = JSON.parse(raw) as { discovered?: unknown };
     if (Array.isArray(saved.discovered)) {
