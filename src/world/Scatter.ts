@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { duneFieldMask, hash2, heightAt, softnessAt } from '../terrain/height';
+import { duneFieldMask, hash2, heightAt, softnessAt, surfaceAt, wadiAt } from '../terrain/height';
 
 /**
  * Ground dressing — scrub, tussock grass and rocks — scattered across the
@@ -26,6 +26,10 @@ const MAX_PER_SPECIES = 1200;
 const MAX_SLOPE = 0.42;
 /** ...and anything looser than this. Plants hold in packed ground, not slip faces. */
 const MAX_SOFTNESS = 0.62;
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
 
 type Species = 'bush' | 'grass' | 'rock';
 const SPECIES: Species[] = ['bush', 'grass', 'rock'];
@@ -145,7 +149,11 @@ export class Scatter {
     // Density falls off inside dune fields: the corridors between them are
     // where anything actually grows.
     const field = duneFieldMask(baseX + CELL / 2, baseZ + CELL / 2);
-    const chance = (0.78 - field * 0.5) * this.densityScale;
+    let chance = (0.78 - field * 0.5) * this.densityScale;
+    // A wadi bed is the one place out here with a water table worth the name,
+    // so the wash is noticeably greener and stonier than the sand either side
+    // of it — which is what makes it read as a wash rather than a ditch.
+    chance *= 1 + wadiAt(baseX + CELL / 2, baseZ + CELL / 2) * 0.8;
     if (roll > chance) return out;
 
     const count = 1 + Math.floor(hash2(cx + 7919, cz - 104729) * 3);
@@ -163,8 +171,18 @@ export class Scatter {
       const gz = (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e);
       if (Math.hypot(gx, gz) > MAX_SLOPE) continue;
 
+      // What grows here is decided by what the ground is. Bare limestone sheds
+      // rubble and holds nothing; a wadi bed is swept gravel and cobbles that
+      // the last flood left. Sorting the species by surface is most of the
+      // difference between dressing that looks scattered and dressing that
+      // looks like it belongs to the place it's standing on.
+      const surface = surfaceAt(x, z);
+      const stony = Math.max(surface.rock, surface.wadi);
       const h3 = hash2(cx * 7 + i * 3, cz * 11 + i * 5);
-      const species: Species = h3 < 0.55 ? 'bush' : h3 < 0.85 ? 'grass' : 'rock';
+      let species: Species;
+      if (h3 < lerp(0.55, 0, stony)) species = 'bush';
+      else if (h3 < lerp(0.85, 0.1, stony)) species = 'grass';
+      else species = 'rock';
 
       out.push({
         x,

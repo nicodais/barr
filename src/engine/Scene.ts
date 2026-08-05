@@ -80,7 +80,11 @@ export class SceneRig {
     this.sunDir.copy(sunDirection);
 
     this.sun.color.copy(state.sunColor);
-    this.sun.intensity = state.sunIntensity * LIGHT_SCALE;
+    // Dust in the air takes light out of the beam and puts it into the ambient:
+    // the sun weakens, the shadows fill in, and the whole scene loses a little
+    // of its modelling. That trade is most of what a hazy day *looks* like, and
+    // it costs two multiplies.
+    this.sun.intensity = state.sunIntensity * (1 - 0.26 * state.haze) * LIGHT_SCALE;
     this.sun.position.copy(focus).addScaledVector(this.sunDir, SUN_DISTANCE);
     this.sun.target.position.copy(focus);
     this.sun.target.updateMatrixWorld();
@@ -88,11 +92,15 @@ export class SceneRig {
     // stretching into artefacts, so stop casting rather than fight them.
     this.sun.castShadow = this.shadowsAllowed && this.sunDir.y > 0.03;
 
-    this.hemi.color.copy(state.hemiSky);
+    // The sky term picks up the dust colour too, or the fill light stays blue
+    // while the sky it's supposed to be coming from has gone sand-coloured.
+    this.hemi.color.copy(state.hemiSky).lerp(state.hazeColor, state.haze * 0.55);
     this.hemi.groundColor.copy(state.hemiGround);
-    this.hemi.intensity = state.hemiIntensity * LIGHT_SCALE;
+    this.hemi.intensity = state.hemiIntensity * (1 + 0.34 * state.haze) * LIGHT_SCALE;
 
-    this.fog.color.copy(state.fog);
+    // Aerial perspective has to agree with the sky it fades into, or the
+    // horizon prints a seam where the fogged terrain meets the dome.
+    this.fog.color.copy(state.fog).lerp(state.hazeColor, state.haze * 0.7);
     this.fog.near = state.fogNear;
     this.fog.far = state.fogFar;
 

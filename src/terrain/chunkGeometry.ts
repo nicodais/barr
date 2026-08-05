@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { clamp01, heightAt, softnessAt, smoothstep } from './height';
+import { alongCrest, clamp01, heightAt, surfaceAt } from './height';
 
 export const CHUNK_SIZE = 128;
 
@@ -83,10 +83,31 @@ function buildIndices(n: number): Uint16Array | Uint32Array {
 // --- palette ------------------------------------------------------------------
 // Warm and limited (§4). These are albedo, not final pixels — the indigo in the
 // shadows comes from the hemisphere light, not from a dark version of the sand.
-const LOOSE_SAND = new THREE.Color(0xd9a86a);
-const CREST_BLEACH = new THREE.Color(0xe6c896);
-const HARDPACK = new THREE.Color(0xc0a189);
-const SABKHA = new THREE.Color(0xcbb9a6);
+//
+// The two sands are the region, not a colour scheme. Inland Emirati dune sand is
+// quartz wearing an iron-oxide coat, and the wind sorts it: the fine, deeply
+// stained grains ride up onto the crests while the coarse pale ones lag in the
+// interdune. So the map runs red along its ridges and grey-buff in its hollows,
+// and the terrain shader doesn't decide that — `surfaceAt` does, from the same
+// exposure term the dune geometry is built out of.
+/** Iron-stained crest sand. This is the colour the corridor is known for. */
+const SAND_IRON = new THREE.Color(0xba6b3e);
+/** Coarse, pale, carbonate-rich interdune sand. */
+const SAND_PALE = new THREE.Color(0xcaa887);
+/** Serir — the wind-scoured gravel that shows through where sand runs thin. */
+const GRAVEL = new THREE.Color(0xa1907c);
+/** Salt crust on a pan floor: near-white, and the palest thing in the world. */
+const SABKHA = new THREE.Color(0xd8cec0);
+/** Bare limestone. Cool and grey against everything else, which is the point. */
+const LIMESTONE = new THREE.Color(0xa9a294);
+/** Water-worked wadi gravel — darker and greyer than the serir around it. */
+const WADI_GRAVEL = new THREE.Color(0x8d8478);
+
+/**
+ * What the dust and the crest plumes should be tinted toward, so airborne sand
+ * belongs to the ground it came off rather than being a generic beige puff.
+ */
+export const AIRBORNE_SAND = new THREE.Color(0xd9a273);
 
 const scratchColor = new THREE.Color();
 
@@ -162,7 +183,7 @@ export function buildChunkGeometry(
       positions[v * 3 + 1] = h;
       positions[v * 3 + 2] = wz;
 
-      writeColor(colors, v, wx, wz, h);
+      writeColor(colors, v, wx, wz);
     }
   }
 
@@ -261,20 +282,31 @@ function stitchEdge(
   }
 }
 
-function writeColor(out: Float32Array, v: number, wx: number, wz: number, h: number) {
-  const soft = softnessAt(wx, wz);
+function writeColor(out: Float32Array, v: number, wx: number, wz: number) {
+  const s = surfaceAt(wx, wz);
 
-  // Loose sand vs packed ground is the primary read, and it doubles as a legible
-  // cue for where the truck will bog down.
-  scratchColor.copy(HARDPACK).lerp(LOOSE_SAND, soft);
-  // Sabkha floors sit low and firm.
-  scratchColor.lerp(SABKHA, (1 - soft) * smoothstep(12, 2, h) * 0.7);
-  // Crests catch the light and bleach out.
-  scratchColor.lerp(CREST_BLEACH, clamp01(smoothstep(26, 62, h)) * 0.55);
+  // Grain sorting first: this is the primary read of the whole landscape, red
+  // ridges falling away to pale floors.
+  scratchColor.copy(SAND_PALE).lerp(SAND_IRON, s.iron);
+  // Where the sand runs thin the gravel underneath shows through. Partial on
+  // purpose — hardpack here is sand *over* serir, not bare serir.
+  scratchColor.lerp(GRAVEL, (1 - s.softness) * 0.45);
+  // Then the surfaces that aren't dune sand at all, in the order they'd bury
+  // each other: salt pan, then a wash cut across it, then rock under both.
+  scratchColor.lerp(SABKHA, s.sabkha);
+  scratchColor.lerp(WADI_GRAVEL, s.wadi * 0.85);
+  scratchColor.lerp(LIMESTONE, s.rock);
 
-  out[v * 3] = scratchColor.r;
-  out[v * 3 + 1] = scratchColor.g;
-  out[v * 3 + 2] = scratchColor.b;
+  // Wind lanes: faint streaking drawn out along the crest lines, the direction
+  // the sand is actually travelling. Kept to a few percent — at any strength
+  // where you'd notice it as stripes it stops reading as wind and starts
+  // reading as a texture seam.
+  const lane = 1 + Math.sin(alongCrest(wx, wz) * 0.021) * 0.03 * s.softness;
+  scratchColor.multiplyScalar(lane);
+
+  out[v * 3] = clamp01(scratchColor.r);
+  out[v * 3 + 1] = clamp01(scratchColor.g);
+  out[v * 3 + 2] = clamp01(scratchColor.b);
 }
 
 /**

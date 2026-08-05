@@ -23,6 +23,8 @@ const FRAGMENT = /* glsl */ `
   uniform vec3 uSunColor;
   uniform vec3 uSunDirection;
   uniform float uSunIntensity;
+  uniform float uHaze;
+  uniform vec3 uHazeColor;
   varying vec3 vDirection;
 
   void main() {
@@ -53,10 +55,28 @@ const FRAGMENT = /* glsl */ `
     // plane edge never shows a hard line against the sky.
     color = mix( color, uHorizon * 0.82, smoothstep( 0.0, -0.22, h ) );
 
+    // The shamal. Dust blowing off the Rub' al Khali is the defining sky of this
+    // coast — the air carries so much of it that the horizon never resolves to
+    // blue, it just goes milky and warm and the far dunes disappear into it.
+    //
+    // Mie scattering off dust is far less wavelength-selective than Rayleigh off
+    // air, so the effect is: the whole dome washes toward one pale sand colour,
+    // strongly near the horizon (where the air path is longest) and weakly
+    // overhead. Pulling the zenith down toward the same colour is what stops a
+    // hazy sky from reading as a clean sky with fog stuck to the bottom of it.
+    float airMass = mix( 1.0, 0.28, smoothstep( 0.0, 0.75, t ) );
+    color = mix( color, uHazeColor, uHaze * airMass * 0.82 );
+
     // Broad atmospheric glow around the sun, plus a tighter core. No disc:
     // a hard-edged sun would be the only photoreal object in the frame.
     float sunDot = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
     float glow = pow( sunDot, 6.0 ) * 0.30 + pow( sunDot, 128.0 ) * 0.85;
+    // Dust spreads the sun into a wide aureole and eats the core — on a hazy
+    // afternoon out there you can look straight at it. Trading the tight term
+    // for the broad one keeps the total light roughly constant while the shape
+    // of it changes, which is what actually reads as "the air is full of sand".
+    float aureole = pow( sunDot, 2.2 ) * 0.42;
+    glow = mix( glow, aureole + pow( sunDot, 22.0 ) * 0.18, uHaze );
     // Fade the glow out as the sun sinks, so it doesn't burn through the ground.
     float above = smoothstep( -0.12, 0.06, normalize( uSunDirection ).y );
     color += uSunColor * glow * uSunIntensity * above;
@@ -88,6 +108,8 @@ export class Sky {
         uSunColor: { value: new THREE.Color(0xffb26b) },
         uSunDirection: { value: new THREE.Vector3(0, 0.2, 1) },
         uSunIntensity: { value: 1 },
+        uHaze: { value: 0 },
+        uHazeColor: { value: new THREE.Color(0xd8c2a4) },
       },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
@@ -110,6 +132,8 @@ export class Sky {
     (u.uHorizon.value as THREE.Color).copy(state.horizon);
     (u.uSunColor.value as THREE.Color).copy(state.sunColor);
     (u.uSunIntensity.value as number) = state.sunIntensity;
+    (u.uHaze.value as number) = state.haze;
+    (u.uHazeColor.value as THREE.Color).copy(state.hazeColor);
     this.sunDir.copy(sunDirection);
     (u.uSunDirection.value as THREE.Vector3).copy(this.sunDir);
 

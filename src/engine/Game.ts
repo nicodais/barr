@@ -23,6 +23,8 @@ import { WorldBoundary } from './WorldBoundary';
 import { Scatter } from '../world/Scatter';
 import { Birds } from '../world/Birds';
 import { Wildlife } from '../world/Wildlife';
+import { SandPlumes, windFromHaze } from '../world/SandPlumes';
+import { AIRBORNE_SAND } from '../terrain/chunkGeometry';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
 import { PhotoMode } from './PhotoMode';
 import { PhotoBar } from '../ui/PhotoBar';
@@ -53,6 +55,7 @@ export class Game {
   private scatter = new Scatter();
   private birds = new Birds();
   private wildlife = new Wildlife();
+  private plumes = new SandPlumes();
   private chase: ChaseCamera;
   private input: InputManager;
   private hud: DebugHud;
@@ -132,6 +135,7 @@ export class Game {
     this.rig.scene.add(this.scatter.group);
     this.rig.scene.add(this.birds.mesh);
     this.rig.scene.add(this.wildlife.group);
+    this.rig.scene.add(this.plumes.points);
     // Fill the ground dressing around spawn before the first frame, so the
     // world doesn't visibly grow plants while the player is looking at it.
     for (let i = 0; i < 24; i++) this.scatter.update(spawn.x, spawn.z);
@@ -324,11 +328,23 @@ export class Game {
     this.timeOfDay.sunDirection(this.sunDir);
     this.rig.update(this.timeOfDay.state, this.sunDir, this.renderPos, this.chase.camera.position);
 
+    // Airborne sand: lit by the sky, but tinted by the ground it came off.
+    // Without the sand term the dust reads as pale smoke against red dunes.
+    this.dustColor.copy(this.timeOfDay.state.sunColor).lerp(this.timeOfDay.state.horizon, 0.45);
+    this.dustColor.lerp(AIRBORNE_SAND, 0.4);
+    this.dust.setColor(this.dustColor);
+    this.plumes.setColor(this.dustColor);
+    // Same wind that drives the sky's haze, so the weather is one thing (§6).
+    this.plumes.update(
+      frameDt,
+      this.renderPos.x,
+      this.renderPos.z,
+      windFromHaze(this.timeOfDay.state.haze),
+    );
+
     // Ground-contact feedback. Both are driven off wheel contact points rather
     // than the body, so they mark where the truck actually meets the sand and
     // vanish the moment it doesn't.
-    this.dustColor.copy(this.timeOfDay.state.sunColor).lerp(this.timeOfDay.state.horizon, 0.45);
-    this.dust.setColor(this.dustColor);
     this.dust.emitFromWheels(
       this.vehicle.wheels,
       this.vehicle.telemetry.speed,
@@ -486,6 +502,7 @@ export class Game {
     this.rig.applyQuality(profile);
     this.terrain.setQuality(profile);
     this.dust.setMaxParticles(profile.maxDust);
+    this.plumes.setMaxParticles(profile.maxPlumes);
     this.scatter.setDensity(profile.scatterDensity);
     this.birds.setCount(profile.birds);
     this.wildlife.setCount(profile.gazelles);
