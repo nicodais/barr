@@ -994,6 +994,54 @@ body.photo-mode #help {
   border: none;
 }
 
+/* Full-width link-ish button inside a section, for opening another panel. */
+.tuning-link {
+  width: 100%;
+  margin: 4px 0 2px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--panel-line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tuning-link:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+/* --- garage ---------------------------------------------------------------- */
+
+.garage-panel {
+  width: 244px;
+}
+
+/* Four across: the swatch grid has to show the whole palette at once, since
+ * the choice is a comparison between colours rather than a list to read. */
+.garage-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.garage-swatches button {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  border: 1.5px solid rgba(0, 0, 0, 0.35);
+  background: var(--swatch, #888);
+  cursor: pointer;
+  padding: 0;
+}
+
+/* The ring sits outside the swatch rather than recolouring its border, so the
+ * selection marker can't be mistaken for part of the paint. */
+.garage-swatches button.is-active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
 .tuning-actions {
   display: flex;
   gap: 8px;
