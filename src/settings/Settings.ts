@@ -8,6 +8,11 @@
  */
 import type { Handedness, JoystickPosition, TouchScheme } from '../input/TouchSource';
 import type { QualityTier } from '../engine/Quality';
+import {
+  DEFAULT_VEHICLE,
+  sanitizeVehicleConfig,
+  type VehicleConfig,
+} from '../vehicle/vehicleConfig';
 
 export interface GameSettings {
   /** Mirrors steering input for players who prefer it the other way round. */
@@ -23,6 +28,8 @@ export interface GameSettings {
   touchPickerSeen: boolean;
   /** 'auto' lets the device heuristic and watchdog decide. */
   quality: QualityTier | 'auto';
+  /** Body, paint and fitted accessories. Cosmetic only — never handling. */
+  vehicle: VehicleConfig;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -34,6 +41,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   joystickPosition: 'left',
   touchPickerSeen: false,
   quality: 'auto',
+  vehicle: DEFAULT_VEHICLE,
 };
 
 // Joystick only: the wheel and tilt schemes were cut, so any stored value
@@ -49,7 +57,10 @@ const QUALITIES: Array<QualityTier | 'auto'> = ['auto', 'low', 'medium', 'high']
 const STORAGE_KEY = 'dune.settings.v2';
 
 export function loadSettings(): GameSettings {
-  const settings = { ...DEFAULT_SETTINGS };
+  // The spread is shallow, so `vehicle` would otherwise be the *same object* as
+  // DEFAULT_VEHICLE — the garage panel edits settings in place, which would
+  // then quietly rewrite the defaults for the rest of the session.
+  const settings = { ...DEFAULT_SETTINGS, vehicle: { ...DEFAULT_VEHICLE } };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return settings;
@@ -86,6 +97,11 @@ export function loadSettings(): GameSettings {
     }
     if (saved.quality && QUALITIES.includes(saved.quality)) {
       settings.quality = saved.quality;
+    }
+    // Per-field validation lives with the catalogue it validates against, since
+    // that's what has to be edited when a body or swatch is added or retired.
+    if (saved.vehicle) {
+      settings.vehicle = sanitizeVehicleConfig(saved.vehicle);
     }
   } catch {
     // Unavailable or corrupt storage: defaults are already in place.

@@ -14,6 +14,7 @@ import { InputManager } from '../input/InputManager';
 import { emptyInput } from '../input/types';
 import { DebugHud } from '../ui/DebugHud';
 import { TuningPanel } from '../ui/TuningPanel';
+import { GaragePanel } from '../ui/GaragePanel';
 import { loadSettings, saveSettings, type GameSettings } from '../settings/Settings';
 import { GameAudio } from '../audio/GameAudio';
 import { Director } from '../narrative/Director';
@@ -57,6 +58,7 @@ export class Game {
   private input: InputManager;
   private hud: DebugHud;
   private panel: TuningPanel;
+  private garage: GaragePanel;
   private settings: GameSettings;
   private audio = new GameAudio();
   private subtitles = new RadioSubtitles();
@@ -120,7 +122,11 @@ export class Game {
     }
 
     this.vehicle = new Vehicle(RAPIER, this.world, spawn);
-    this.view = createVehicleView();
+    // Settings load before the truck is built: the body and paint the player
+    // last chose are part of the very first frame, so there's no moment where
+    // someone's pickup appears as the default wagon and then swaps.
+    this.settings = loadSettings();
+    this.view = createVehicleView(this.settings.vehicle);
     this.rig.scene.add(this.view.root);
     this.rig.scene.add(this.tracks.mesh);
     this.rig.scene.add(this.contactShadow.mesh);
@@ -136,7 +142,6 @@ export class Game {
     // world doesn't visibly grow plants while the player is looking at it.
     for (let i = 0; i < 24; i++) this.scatter.update(spawn.x, spawn.z);
 
-    this.settings = loadSettings();
     this.progress = loadProgress();
     this.audio.setMuted(this.settings.muted);
     this.audio.setVolume(this.settings.volume);
@@ -173,7 +178,14 @@ export class Game {
         );
       },
       () => this.applyTouchScheme(),
+      () => {
+        // One panel at a time: they share the same corner, and the garage is
+        // worth seeing the truck next to rather than a wall of sliders.
+        this.panel.hide();
+        this.garage.show();
+      },
     );
+    this.garage = new GaragePanel(this.settings, () => this.rebuildVehicleView());
 
     this.photo = new PhotoMode(canvas);
     this.photoBar = new PhotoBar(
@@ -207,6 +219,7 @@ export class Game {
       this.input.touch.element,
       this.photoBar.element,
       this.panel.element,
+      this.garage.element,
       this.joystickBar.element,
       this.boundary.element,
       this.compass.element,
@@ -409,6 +422,7 @@ export class Game {
 
   private handleHotkeys() {
     if (this.input.keyboard.consumePress('KeyT')) this.panel.toggle();
+    if (this.input.keyboard.consumePress('KeyG')) this.garage.toggle();
     if (this.input.keyboard.consumePress('KeyP')) this.togglePhotoMode();
     if (this.input.keyboard.consumePress('Escape') && this.photo.active) this.exitPhotoMode();
     // Recovering while composing a shot would yank the subject out of frame.
@@ -426,6 +440,9 @@ export class Game {
   private enterPhotoMode() {
     this.photo.enter(this.renderQuat);
     this.photoBar.show();
+    // Photo mode is for looking at the truck, so nothing may sit over it.
+    this.panel.hide();
+    this.garage.hide();
     document.body.classList.add('photo-mode');
     this.hud.element.hidden = true;
     this.input.touch.element.hidden = true;
@@ -478,6 +495,23 @@ export class Game {
     link.click();
     URL.revokeObjectURL(url);
     this.photoBar.say('Saved');
+  }
+
+  /**
+   * Swap the truck's mesh for the current garage config. Called only when the
+   * player changes something — the merged bodywork is rebuilt from scratch
+   * here, which is fine once per click and would be ruinous per frame.
+   */
+  private rebuildVehicleView() {
+    this.rig.scene.remove(this.view.root);
+    this.view.dispose();
+    this.view = createVehicleView(this.settings.vehicle);
+    // Placed and posed before it is added, so the new body never renders one
+    // frame at the origin while the truck is out on a dune.
+    this.view.root.position.copy(this.renderPos);
+    this.view.root.quaternion.copy(this.renderQuat);
+    this.view.update(this.vehicle.wheels);
+    this.rig.scene.add(this.view.root);
   }
 
   private applyQuality(tier: QualityTier) {
