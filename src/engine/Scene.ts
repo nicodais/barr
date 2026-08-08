@@ -44,6 +44,24 @@ export class SceneRig {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    // Tone mapping, and it is load-bearing for the palette rather than a
+    // finishing touch.
+    //
+    // The keyframes run the sun at 2.4-3.0x "normal daylight" (see LIGHT_SCALE),
+    // so sand with an albedo around 0.7 reflects well over 1.0 whenever the sun
+    // is high. Clipped, every one of those pixels lands on pure white — and
+    // white is not a lighter red, it is *no* red. The whole grain-sorting model
+    // that makes the ridges run iron-red was being thrown away at exactly the
+    // times of day the light is strongest.
+    //
+    // ACES rolls those highlights off instead of clipping them, and crucially it
+    // desaturates toward white along a curve rather than stepping to it, so a
+    // blown crest stays recognisably sand-coloured. Exposure is above 1 because
+    // ACES darkens the midtones it is protecting, and the flat-shaded look wants
+    // its big colour fields bright.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
+
     this.fog = new THREE.Fog(0xe8b98a, 180, 950);
     this.scene.fog = this.fog;
     this.scene.add(this.sky.mesh);

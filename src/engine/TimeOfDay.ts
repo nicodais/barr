@@ -90,12 +90,12 @@ const KEYFRAMES: Keyframe[] = [
   // Sunrise: the sun cracks the horizon and everything goes amber.
   key(0.10, 4, 78, 0xffab5e, 2.10, 0x1e3f80, 0xe0925c, 0x6f89c4, 0x8a6440, 1.00, 0xd68f60, 130, 790, 0.16, 0xd6a887),
   // Morning gold — a wide, generous band. The wind is starting to get up.
-  key(0.24, 20, 95, 0xffd39a, 2.70, 0x2f6ec4, 0xe8b98a, 0x89a6d6, 0xb08355, 1.05, 0xe3b184, 180, 920, 0.26, 0xdcc3a2),
+  key(0.24, 20, 95, 0xffd39a, 2.30, 0x2f6ec4, 0xe8b98a, 0x89a6d6, 0xb08355, 1.05, 0xe3b184, 180, 920, 0.26, 0xdcc3a2),
   // Midday. Kept short and never fully neutral; this is the least interesting light.
-  key(0.42, 62, 150, 0xfff3dd, 3.00, 0x3f92e2, 0xd8cbb2, 0x9dbde2, 0xbf9a6e, 1.10, 0xd6c8ae, 240, 1010, 0.44, 0xd9cdb6),
+  key(0.42, 62, 150, 0xfff3dd, 2.00, 0x3f92e2, 0xd8cbb2, 0x9dbde2, 0xbf9a6e, 1.10, 0xd6c8ae, 240, 1010, 0.44, 0xd9cdb6),
   // Afternoon: the shamal at full strength, and the haziest hour of the day.
   // The far dunes go flat and pale and the horizon stops having an edge.
-  key(0.60, 30, 225, 0xffd9a4, 2.75, 0x3574c6, 0xe3b48b, 0x8caad8, 0xb4855a, 1.05, 0xdfae86, 190, 880, 0.56, 0xdcc4a0),
+  key(0.60, 30, 225, 0xffd9a4, 2.25, 0x3574c6, 0xe3b48b, 0x8caad8, 0xb4855a, 1.05, 0xdfae86, 190, 880, 0.56, 0xdcc4a0),
   // The hero light. Long shadows, saturated sand, indigo in the lee faces.
   key(0.76, 9, 250, 0xffb26b, 2.45, 0x2455a8, 0xeaa367, 0x7593cc, 0x9c6e44, 0.95, 0xe09a64, 140, 800, 0.46, 0xd8b184),
   // Sunset proper. Dust in the air is what makes this hour the colour it is.

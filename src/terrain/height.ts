@@ -378,87 +378,236 @@ function ridgeBump(
  * fossil beds sit in break straight out of the dunes as bare rock, and their
  * silhouettes are half of what makes this stretch recognisable from the road.
  *
- * They're added after the sand model and are exempt from the repose solver on
- * purpose: limestone doesn't avalanche, so these are allowed to be genuinely
- * steep. You drive around them, not up them — which is what gives the region a
- * shape you can navigate by, instead of dunes that all look like each other.
+ * ## They are cuestas, and that is the whole design
+ *
+ * Jebel Faya is a **cuesta**: tilted beds eroded so that one flank is a long
+ * gentle dip slope following the bedding, and the other is a short steep scarp
+ * cut across it. Getting that right buys three things at once, which is why
+ * this shape rather than a hill:
+ *
+ *  - It looks like the real thing. An asymmetric wedge has a *direction*; the
+ *    dome this replaced had none, and read as a boulder the size of a hill.
+ *  - It gives the flat-shaded style what it wants (§4). A cuesta is naturally
+ *    made of a few big planes meeting at hard edges, which is exactly the
+ *    Firewatch language — large flat colour fields and crisp silhouettes. The
+ *    previous version quantised a smooth dome into small ledges, which produced
+ *    fussy concentric stair-steps: too broken up to read as one clean shape and
+ *    too smooth to read as rock.
+ *  - **It is drivable.** The dip slope is a ramp to the summit, so the outcrop
+ *    is somewhere to go rather than an obstacle to steer around. Climbing the
+ *    back of the ridge and parking on the shelf is the best view in the region,
+ *    and getting up there is a real dune-bashing problem — the ramp is steep
+ *    enough that you have to carry momentum.
+ *
+ * Rock is added after the sand model and is exempt from the repose solver:
+ * limestone doesn't avalanche, so the scarp is allowed to be a genuine cliff.
  */
 interface Jebel {
   x: number;
   z: number;
+  /** Strike direction — the axis the ridge runs along. */
   ca: number;
   sa: number;
-  lengthR: number;
-  widthR: number;
+  /** Half-length along strike. */
+  strikeR: number;
+  /** Distance from the dip-slope toe to the crest, metres. Sets the ramp angle. */
+  dipRun: number;
+  /** Distance from crest to scarp foot, metres. Sets the cliff angle. */
+  scarpRun: number;
+  /** Width of the flat summit shelf, metres. */
+  shelf: number;
   height: number;
-  /** Bedding-plane thickness. Quantising to these is what reads as strata. */
-  ledge: number;
+  /** Bedding benches on the dip slope. Few and large, or it turns to stairs. */
+  benches: number;
+  /** Stable id, so the plan-view faceting is deterministic per outcrop. */
+  seed: number;
 }
 
-function jebel(
-  x: number, z: number, angle: number,
-  lengthR: number, widthR: number, height: number, ledge: number,
-): Jebel {
-  return {
-    x, z,
-    ca: Math.cos(angle),
-    sa: Math.sin(angle),
-    lengthR, widthR, height, ledge,
-  };
+function jebel(spec: {
+  x: number; z: number; bearingDeg: number; strikeR: number;
+  dipRun: number; scarpRun: number; shelf: number; height: number;
+  benches: number; seed: number;
+}): Jebel {
+  const a = (spec.bearingDeg * Math.PI) / 180;
+  return { ...spec, ca: Math.cos(a), sa: Math.sin(a) };
 }
 
+// Dip runs are set from the grade they produce, not chosen for footprint: the
+// ramp is `height / (dipRun - shelf)`, and the bedding benches multiply the
+// steepest part of it by about 1.5 (see `beddingStair`). Both numbers below were
+// picked by working backwards from a target climb angle and then confirmed by
+// sampling a section across each ridge.
 const JEBELS: Jebel[] = [
-  // The fossil ridge: compact, layered, steep-sided, and the source of the wadi.
-  jebel(330, -580, 0.55, 150, 90, 62, 4.5),
-  // A long low limestone spine on the western edge — a horizon feature you
-  // navigate by long before you ever reach it.
-  jebel(-640, 250, 0.18, 210, 58, 38, 3.2),
+  // The fossil ridge. The big one, and the source of the wadi. Climbs at about
+  // 22 degrees, touching 31 on the bench risers — a climb you have to commit to
+  // and can bog halfway up, with the highest ground for kilometres as the payoff.
+  jebel({
+    x: 330, z: -580, bearingDeg: 32, strikeR: 150,
+    dipRun: 179, scarpRun: 44, shelf: 26, height: 62, benches: 3, seed: 11,
+  }),
+  // A long low spine on the western edge — a horizon feature you navigate by
+  // long before you reach it. About 14 degrees: the one you can get up without
+  // thinking about it, so there's an easy summit and a hard one rather than two
+  // of the same.
+  jebel({
+    x: -640, z: 250, bearingDeg: 10, strikeR: 210,
+    dipRun: 170, scarpRun: 30, shelf: 18, height: 38, benches: 2, seed: 29,
+  }),
 ];
 
-/** 0 outside the outcrop, 1 on bare rock. Drives colour and traction. */
-export function rockAt(x: number, z: number): number {
-  let mask = 0;
-  for (const j of JEBELS) {
-    const d = jebelDistance(j, x, z);
-    if (d >= 1) continue;
-    mask = Math.max(mask, smoothstep(1, 0.82, d));
-  }
-  return mask;
+/**
+ * Local coordinates for an outcrop: `s` along strike in metres, `v` across the
+ * dip direction in metres with 0 at the crest line (negative = up the dip
+ * slope, positive = out over the scarp).
+ *
+ * The faceting lives here rather than in the height function. `s` is quantised
+ * into a handful of segments and each segment is given a fixed setback, so the
+ * cliff top steps in and out in straight sections instead of curving. That is
+ * what turns the scarp into a row of flat buttress faces meeting at vertical
+ * corners — angular by construction. A smooth noise offset, which is what this
+ * used to do, gives you a wobbly cliff, and a wobbly cliff under flat shading
+ * is just noise.
+ *
+ * `setback` moves **only the top of the scarp**, never the crest line the ramp
+ * climbs to. Applying it to the crest is the obvious thing and it is wrong: the
+ * setback is piecewise constant, so it puts a vertical step at every segment
+ * boundary, and if the ramp's geometry depends on it those steps land across the
+ * ramp as 13 m walls every 33 m. Sampling a section found exactly that — a
+ * "drivable" slope that was really a flight of stairs. On the cliff the same
+ * discontinuity is the feature.
+ */
+function jebelLocal(j: Jebel, x: number, z: number): { s: number; v: number; setback: number } {
+  const dx = x - j.x;
+  const dz = z - j.z;
+  const s = dx * j.ca + dz * j.sa;
+  const v = -dx * j.sa + dz * j.ca;
+  // Two scales of segment rather than one. A single uniform partition gives
+  // every buttress the same width and the cliff top comes out as an even
+  // zigzag — it reads as a saw blade, not as rock. Overlaying a coarse
+  // partition with a finer one produces broad faces that are themselves
+  // stepped, and because the two boundaries rarely coincide, the run lengths
+  // vary on their own without needing any noise.
+  const coarse = Math.floor((s / j.strikeR) * 1.7);
+  const fine = Math.floor((s / j.strikeR) * 5.3);
+  const setback =
+    (hash2(coarse, j.seed) - 0.5) * 0.72 +
+    (hash2(fine, j.seed + 7717) - 0.5) * 0.34;
+  return { s, v, setback };
 }
 
 /**
- * Normalised elliptical distance, roughened so the outline isn't an ellipse.
- * The perturbation is worth its cost twice over: it breaks the plan view into
- * buttresses and re-entrants, and because it's applied before the ledge
- * quantisation below, the strata come out as broken bands rather than
- * concentric rings.
+ * Bedding benches on the dip slope: flatter treads separated by steeper risers.
+ *
+ * The obvious implementation — quantise with `round()` and lerp toward it — is
+ * what this replaced, and it made the ramp unclimbable. A rounded staircase is
+ * *discontinuous*, so each bench edge is a vertical wall however small you make
+ * the blend; sampling the first version found 60° steps sitting in the middle of
+ * an 11° slope. This version keeps the staircase continuous and its gradient
+ * bounded: the riser is a smoothstep, so the steepest point is a known multiple
+ * (about 3.7x) of the mean grade, and `blend` buys strata at a price in slope
+ * you can actually calculate before you drive into it.
  */
-function jebelDistance(j: Jebel, x: number, z: number): number {
-  const dx = x - j.x;
-  const dz = z - j.z;
-  const u = (dx * j.ca + dz * j.sa) / j.lengthR;
-  const v = (-dx * j.sa + dz * j.ca) / j.widthR;
-  const d = Math.sqrt(u * u + v * v);
-  if (d >= 1.4) return d;
-  return d * (1 + (fbm(x * 0.011, z * 0.011, 2) - 0.5) * 0.34);
+function beddingStair(t: number, benches: number, blend: number): number {
+  const c = t * benches;
+  const i = Math.floor(c);
+  const riser = smoothstep(0.6, 1, c - i);
+  return lerp(t, (i + riser) / benches, blend);
 }
 
-function jebelHeightAt(x: number, z: number): number {
-  let h = 0;
-  for (const j of JEBELS) {
-    const d = jebelDistance(j, x, z);
-    if (d >= 1) continue;
-    // Steep flanks into a broad summit plateau rather than a dome: these are
-    // eroded bedding planes, not sand piles.
-    let local = j.height * smoothstep(1, 0.5, d);
-    // Quantise toward bedding planes. Partial, so the ledges read as steps in a
-    // slope instead of a wedding cake.
-    local = lerp(local, Math.round(local / j.ledge) * j.ledge, 0.55);
-    // Scree and rubble skirt at the foot, where the cliff sheds into the sand.
-    local += fbm(x * 0.05, z * 0.05, 2) * 1.6 * smoothstep(1, 0.7, d);
-    h += local;
+/** How much of the mean grade a bench riser adds. See `beddingStair`. */
+const BENCH_BLEND = 0.18;
+
+/**
+ * Where bare rock is showing, 0..1. Drives colour and traction.
+ *
+ * Derived by comparing the rock surface against the sand rather than from a
+ * separate falloff, so the limestone colour cannot drift out of register with
+ * the limestone geometry. It also gets the interesting part right for free: the
+ * toe of the ramp, where sand has banked over the bedding, comes out as sand
+ * because that is literally what is on top there.
+ */
+export function rockAt(x: number, z: number): number {
+  const top = jebelHeightAt(x, z);
+  if (top === -Infinity) return 0;
+  return smoothstep(-1.5, 1.5, top - duneGroundAt(x, z));
+}
+
+/**
+ * Ground elevation each outcrop stands on, sampled once from the dune field.
+ *
+ * Rock has to be positioned against an absolute datum, not added to whatever
+ * the sand happens to be doing underneath it. Added, the "flat" summit shelf
+ * inherits every metre of dune relief below it and comes out tilted — which
+ * defeats the one job the shelf has, which is to be somewhere you can stop the
+ * truck and look. Lazy for the usual reason: it needs the height field, which
+ * isn't callable while this module is initialising.
+ */
+const jebelBase = new Map<Jebel, number>();
+
+function baseOf(j: Jebel): number {
+  let base = jebelBase.get(j);
+  if (base === undefined) {
+    base = duneGroundAt(j.x, j.z);
+    jebelBase.set(j, base);
   }
-  return h;
+  return base;
+}
+
+/**
+ * Absolute top-of-rock elevation here, or -Infinity off the outcrops.
+ *
+ * The caller takes the max of this and the sand, so the rock punches up through
+ * the dune field and the dunes still bank against its flanks wherever they are
+ * higher than its skirt — which is what the real interface looks like, sand
+ * drifted up against stone rather than stone sitting on a plinth of sand.
+ */
+function jebelHeightAt(x: number, z: number): number {
+  let top = -Infinity;
+  for (const j of JEBELS) {
+    const { s, v, setback } = jebelLocal(j, x, z);
+
+    // The crest line is straight — see the note in `jebelLocal`. Only the brink,
+    // where the shelf gives way to the cliff, steps per segment.
+    const toe = -j.dipRun;
+    const brink = setback * j.scarpRun * 0.55;
+    // Generous bounds. Every surface below runs *past* where the rock meets the
+    // sand and keeps going down, so the caller's `max` against the dune field
+    // finds the crossing on its own. Stopping the rock surface at zero instead
+    // leaves its skirt as a horizontal plane at the outcrop's datum, and every
+    // hollow in the sand around it then reads as a 10 m step — which is exactly
+    // what the first sampling run of this shape found ringing both outcrops.
+    if (v < toe - 60 || v > brink + j.scarpRun * 1.9) continue;
+    if (Math.abs(s) > j.strikeR * 1.25) continue;
+
+    let local: number;
+    if (v <= -j.shelf) {
+      // Dip slope: a linear bedding plane, which is both what the rock does and
+      // what is predictable to drive up. `t` is deliberately unclamped below 0
+      // so the plane continues under the sand past the toe.
+      const t = (v - toe) / (j.dipRun - j.shelf);
+      local = j.height * (t < 0 ? t * 1.6 : beddingStair(Math.min(t, 1), j.benches, BENCH_BLEND));
+    } else if (v <= brink) {
+      // The summit shelf: dead flat, and wide enough to park on and look.
+      local = j.height;
+    } else {
+      // The scarp: near-vertical where it breaks at the brink, easing into a
+      // talus apron of shed rubble at the foot. Steepest at the top is the way
+      // round a cliff actually weathers; the mirror of it gives a dome with a
+      // sharp skirt, which is a hill, not a scarp. Signed so it keeps falling
+      // past the foot and dives under the sand.
+      const t = (v - brink) / j.scarpRun;
+      local = j.height * (1 - t) * Math.abs(1 - t);
+    }
+
+    // The ends of the ridge. A cuesta terminates in a steep nose, so this dives
+    // hard rather than tapering — but it dives *below* the sand, so how much of
+    // the nose you actually see is decided by the dunes banked against it.
+    const endT = clamp01((Math.abs(s) / j.strikeR - 0.68) / 0.32);
+    local -= endT * (j.height + 40);
+
+    top = Math.max(top, baseOf(j) + local);
+  }
+  return top;
 }
 
 // --- the wadi -----------------------------------------------------------------
@@ -564,11 +713,14 @@ function wadiFloorAt(s: number): number {
 // --- assembly -----------------------------------------------------------------
 
 /**
- * The sand model plus rock: everything the wadi is allowed to cut into. Split
- * out from `rawHeightAt` so the wadi's floor profile can sample the ground it's
- * cutting without recursing through itself.
+ * The dune field alone — no rock, no wadi.
+ *
+ * Split out because both of those need to sample the ground they are placed
+ * against: the outcrops need a datum to stand their summit shelf on, and the
+ * wadi needs the profile of what it is cutting. Going through `sandHeightAt`
+ * for that would recurse.
  */
-function sandHeightAt(x: number, z: number): number {
+function duneGroundAt(x: number, z: number): number {
   const s = duneSample(x, z);
 
   // Broad regional swell everything else sits on. Kept low-amplitude: with the
@@ -627,15 +779,24 @@ function sandHeightAt(x: number, z: number): number {
   // a world that's supposed to read as dunes.
   h *= smoothstep(18, 75, Math.hypot(x, z));
 
-  // Rock last, and outside the flattening: an outcrop is bedrock the sand has
-  // piled against, not a shape made of sand.
-  h += jebelHeightAt(x, z);
-
   // No rim wall: the dune field runs on procedurally in every direction so the
   // horizon reads as endless. The curated region is bounded instead by a soft
   // fade-and-respawn once you drive well past the points of interest (see
   // WorldBoundary), which never tells you "no" or drops you into a void.
   return h;
+}
+
+/**
+ * The sand model plus rock: everything the wadi is allowed to cut into.
+ *
+ * `max` rather than `+`: an outcrop is bedrock standing in the sand sea at its
+ * own elevation, not a lump added to whatever the dunes are doing. Taking the
+ * higher of the two also gets the interface right for free — the rock wins
+ * where it stands proud, and the dunes win where they have drifted up over its
+ * skirt.
+ */
+function sandHeightAt(x: number, z: number): number {
+  return Math.max(duneGroundAt(x, z), jebelHeightAt(x, z));
 }
 
 /** The full landscape, before POI pads. Pad targets are sampled from this. */

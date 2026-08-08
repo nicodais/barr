@@ -98,8 +98,15 @@ const SAND_PALE = new THREE.Color(0xcaa887);
 const GRAVEL = new THREE.Color(0xa1907c);
 /** Salt crust on a pan floor: near-white, and the palest thing in the world. */
 const SABKHA = new THREE.Color(0xd8cec0);
-/** Bare limestone. Cool and grey against everything else, which is the point. */
-const LIMESTONE = new THREE.Color(0xa9a294);
+/**
+ * Bare limestone. Cool and grey against everything else, which is the point —
+ * and darker than it looks like it should be on the swatch. Rock this pale
+ * reads as sand at a distance: the first version sat within a few percent of
+ * the interdune value, so an outcrop 400 m away dissolved into the dune behind
+ * it and the region lost the landmarks it navigates by. Value separation is
+ * what makes a silhouette, not hue.
+ */
+const LIMESTONE = new THREE.Color(0x8a8478);
 /** Water-worked wadi gravel — darker and greyer than the serir around it. */
 const WADI_GRAVEL = new THREE.Color(0x8d8478);
 
