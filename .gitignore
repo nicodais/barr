@@ -3,3 +3,7 @@ dist
 .DS_Store
 *.local
 .vercel
+
+# Isolated git worktrees used by background agents. These are checkouts of this
+# same repository, so tracking them would nest a copy of the repo inside itself.
+.claude/worktrees/
