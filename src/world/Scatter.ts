@@ -31,6 +31,35 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/**
+ * Merge parts that may mix indexed and non-indexed primitives.
+ *
+ * `mergeGeometries` returns null the moment one part carries an index buffer
+ * and another doesn't, and three's polyhedra (Icosahedron, Dodecahedron) are
+ * non-indexed while Box, Cone and Cylinder are indexed. The `?? parts[0]`
+ * fallback this replaces made that failure invisible *and* destructive: the
+ * bush merge was returning null on every call, so every bush in the world was
+ * being drawn as `parts[0]` — one 24cm blob, with its other three blobs, six
+ * twigs and stem silently discarded. Landmarks.ts already normalises this way;
+ * the scatter needed to as well.
+ */
+function mergeParts(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const flat = parts.map((p) => {
+    if (!p.index) return p;
+    const g = p.toNonIndexed();
+    p.dispose();
+    return g;
+  });
+  const merged = mergeGeometries(flat, false);
+  if (!merged) {
+    console.warn('[dune] scatter merge failed; falling back to a single part');
+    return flat[0];
+  }
+  for (const g of flat) g.dispose();
+  merged.computeBoundingSphere();
+  return merged;
+}
+
 type Species = 'bush' | 'grass' | 'rock';
 const SPECIES: Species[] = ['bush', 'grass', 'rock'];
 
@@ -284,7 +313,7 @@ function buildBush(): THREE.BufferGeometry {
   const stem = new THREE.CylinderGeometry(0.02, 0.035, 0.16, 4);
   stem.translate(0, 0.08, 0);
   parts.push(stem);
-  return mergeGeometries(parts, false) ?? parts[0];
+  return mergeParts(parts);
 }
 
 /** Tussock grass — a few stiff blades fanning out. */
@@ -301,7 +330,7 @@ function buildGrass(): THREE.BufferGeometry {
     blade.translate(Math.cos(a) * 0.07, 0, Math.sin(a) * 0.07);
     parts.push(blade);
   }
-  return mergeGeometries(parts, false) ?? parts[0];
+  return mergeParts(parts);
 }
 
 /**
