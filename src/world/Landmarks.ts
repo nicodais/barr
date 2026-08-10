@@ -114,6 +114,7 @@ function buildLandmark(poi: Poi): THREE.Group {
     case 'falconry': return buildFalconry();
     case 'cameltrack': return buildCamelTrack();
     case 'coffeehearth': return buildCoffeeHearth();
+    case 'fossilridge': return buildFossilRidge();
   }
 }
 
@@ -475,6 +476,48 @@ function buildCoffeeHearth(): THREE.Group {
   return g;
 }
 
+/**
+ * The summit of the fossil ridge: a survey cairn and a scatter of tilted slabs.
+ *
+ * Deliberately almost nothing. The landform *is* the landmark here — it's the
+ * only POI you have to climb to, and the reward is the view, so anything built
+ * on top competes with the thing the player came up for. What a real summit
+ * like this has is a trig cairn somebody stacked and the shed bedding slabs
+ * that carry the shells, and that is exactly enough to turn bare rock into
+ * somewhere people have been.
+ */
+function buildFossilRidge(): THREE.Group {
+  const g = new THREE.Group();
+
+  // Stacked survey cairn, narrowing as it goes up.
+  const stone = new THREE.DodecahedronGeometry(0.3, 0);
+  for (let i = 0; i < 11; i++) {
+    const t = i / 10;
+    const r = (1 - t) * 0.5;
+    const a = i * 2.4;
+    const m = mesh(
+      stone,
+      i % 2 ? STONE : STONE_LIGHT,
+      Math.cos(a) * r, 0.18 + t * 1.15, Math.sin(a) * r,
+    );
+    m.scale.setScalar(1 - t * 0.42);
+    m.rotation.set(i * 1.3, i * 0.7, i * 1.9);
+    g.add(m);
+  }
+
+  // Bedding slabs prised up and left leaning — the fossil-bearing layers.
+  const slab = new THREE.BoxGeometry(1.5, 0.16, 1.0);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + 0.7;
+    const d = 2.4 + (i % 3) * 0.9;
+    const m = mesh(slab, i % 2 ? DARK_STONE : STONE, Math.cos(a) * d, 0.1, Math.sin(a) * d);
+    m.rotation.set((i % 2 ? 1 : -1) * 0.5, a * 1.4, 0.16);
+    g.add(m);
+  }
+
+  return g;
+}
+
 // --- collision -------------------------------------------------------------
 
 /**
@@ -588,5 +631,10 @@ function colliderSpecs(id: PoiKind): ColliderSpec[] {
     case 'coffeehearth':
       // The hearth ring and the log seat; the pot and cups are too small to matter.
       return [cyl(0, 0.1, 0, 0.14, 0.62), box(-1.1, 0.16, 0.5, 0.16, 0.16, 0.55)];
+    case 'fossilridge':
+      // Only the cairn. The slabs are ankle-high and lie flat enough to drive
+      // over, and colliding with them on a summit you just worked to reach
+      // would turn the payoff into an obstacle course.
+      return [cyl(0, 0.65, 0, 0.65, 0.55)];
   }
 }

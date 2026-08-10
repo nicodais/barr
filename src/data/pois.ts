@@ -24,7 +24,8 @@ export type PoiKind =
   | 'famousdune'
   | 'falconry'
   | 'cameltrack'
-  | 'coffeehearth';
+  | 'coffeehearth'
+  | 'fossilridge';
 
 export interface Poi {
   id: PoiKind;
@@ -126,6 +127,19 @@ export const POIS: Poi[] = [
     lines: [
       "Someone's old coffee fire. Out here you never once refused a traveller his gahwa.",
       'Ruler or lost stranger, same pot, same welcome. That rule is older than the borders are.',
+    ],
+  },
+  // The only POI you have to *climb* to. It sits on the summit shelf of the
+  // fossil ridge, and the radius is deliberately tight — tight enough that the
+  // ramp doesn't trigger it, so the card is the thing waiting at the top rather
+  // than something you collect on the way past the bottom.
+  {
+    id: 'fossilridge',
+    name: 'Fossil Ridge',
+    x: 337, z: -591, radius: 55,
+    lines: [
+      "You made it up. Look at the rock — those are seashells. All this was seabed once.",
+      'Seventy million years of geology, and everyone still just photographs their car on it.',
     ],
   },
 ];
