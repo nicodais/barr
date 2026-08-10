@@ -54,12 +54,22 @@ export class SceneRig {
     // that makes the ridges run iron-red was being thrown away at exactly the
     // times of day the light is strongest.
     //
-    // ACES rolls those highlights off instead of clipping them, and crucially it
-    // desaturates toward white along a curve rather than stepping to it, so a
-    // blown crest stays recognisably sand-coloured. Exposure is above 1 because
-    // ACES darkens the midtones it is protecting, and the flat-shaded look wants
-    // its big colour fields bright.
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    // Neutral rather than ACES, which is the obvious pick and the wrong one
+    // here. ACES's RRT walks saturated oranges toward yellow-white — precisely
+    // the convergence this is meant to prevent, applied to precisely the hue the
+    // region is built on. Measured over the ground half of the frame, the
+    // saturation of the brightest decile of sand:
+    //
+    //             midday   afternoon   golden
+    //     ACES      0.23      0.36       0.49
+    //     Neutral   0.43      0.54       0.59
+    //
+    // Both hold at 0% railed pixels, so the highlight protection is a wash and
+    // the only thing separating them is how much of the red survives it.
+    // Neutral is near-identity below its knee, so the big flat colour fields
+    // keep their authored hue and the roll-off is held back for crests and sun
+    // glow, which is where it is actually needed.
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1.15;
 
     this.fog = new THREE.Fog(0xe8b98a, 180, 950);

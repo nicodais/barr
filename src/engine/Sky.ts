@@ -42,9 +42,14 @@ const FRAGMENT = /* glsl */ `
     // through purple — orange and blue average to mud. A real sky passes
     // through a pale, desaturated haze band instead, so that band is built
     // explicitly and the gradient goes horizon -> pale -> zenith.
+    // Rec.709 weights, not the 0.299/0.587/0.114 display-space ones: these
+    // uniforms are linear (THREE.Color converts on construction), and the
+    // display weights over-count green against a linear value, which tipped the
+    // band khaki under the pale tan midday horizon. The old 1.1 gain on top
+    // pushed it into the tone-map knee as well, desaturating it further to milk.
     vec3 pale = mix( uHorizon, uZenith, 0.55 );
-    float lum = dot( pale, vec3( 0.299, 0.587, 0.114 ) );
-    pale = mix( pale, vec3( lum * 0.92, lum * 1.0, lum * 1.14 ), 0.62 ) * 1.1;
+    float lum = dot( pale, vec3( 0.2126, 0.7152, 0.0722 ) );
+    pale = mix( pale, vec3( lum * 0.94, lum * 1.0, lum * 1.16 ), 0.58 );
 
     vec3 color = mix( uHorizon, pale, smoothstep( 0.0, 0.55, t ) );
     color = mix( color, uZenith, smoothstep( 0.42, 1.0, t ) );
@@ -82,6 +87,20 @@ const FRAGMENT = /* glsl */ `
     color += uSunColor * glow * uSunIntensity * above;
 
     gl_FragColor = vec4( color, 1.0 );
+
+    // Every built-in three material ends with these two chunks; a hand-written
+    // ShaderMaterial gets the prefix that defines them but has to include them
+    // itself. Omitting them meant the sky alone skipped the pipeline everything
+    // else goes through: THREE.Color converts on construction, so these uniforms
+    // hold LINEAR values, and writing them straight to an sRGB framebuffer
+    // displayed them at roughly a third of their authored brightness. The
+    // 0x3f92e2 midday zenith arrived as rgb(13,73,194) — a heavy navy instead of
+    // azure — so the ground rendered brighter than the sky and the whole value
+    // structure was inverted. Adding tone mapping to the renderer made the
+    // mismatch worse, not better: the ground started rolling off while the sky
+    // still clipped raw. The sun glow gets to roll off now too.
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
 
