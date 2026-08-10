@@ -15,6 +15,7 @@ import { emptyInput } from '../input/types';
 import { DebugHud } from '../ui/DebugHud';
 import { TuningPanel } from '../ui/TuningPanel';
 import { GaragePanel } from '../ui/GaragePanel';
+import { CarSelect } from '../ui/CarSelect';
 import { loadSettings, saveSettings, type GameSettings } from '../settings/Settings';
 import { GameAudio } from '../audio/GameAudio';
 import { Director } from '../narrative/Director';
@@ -62,6 +63,13 @@ export class Game {
   private hud: DebugHud;
   private panel: TuningPanel;
   private garage: GaragePanel;
+  private carSelect: CarSelect;
+  /**
+   * True until the player has picked a truck. Gates input rather than the
+   * render loop, so the world is live and lit behind the picker and the car
+   * they are choosing is the actual car, under the actual light.
+   */
+  private choosing = true;
   private settings: GameSettings;
   private audio = new GameAudio();
   private subtitles = new RadioSubtitles();
@@ -190,6 +198,10 @@ export class Game {
       },
     );
     this.garage = new GaragePanel(this.settings, () => this.rebuildVehicleView());
+    this.carSelect = new CarSelect(this.settings.vehicle, () => {
+      this.rebuildVehicleView();
+      saveSettings(this.settings);
+    });
 
     this.photo = new PhotoMode(canvas);
     this.photoBar = new PhotoBar(
@@ -228,6 +240,7 @@ export class Game {
       this.boundary.element,
       this.compass.element,
       this.poiCard.element,
+      this.carSelect.element,
     );
 
     // Browsers only allow audio to start from a real gesture, so the first
@@ -249,6 +262,13 @@ export class Game {
       this.tracks.clear();
     };
 
+    // The picker is the only thing on screen until it's dismissed. Speed
+    // readout, compass and the key legend are all instructions for driving, and
+    // showing them behind a menu is just noise over the truck being previewed.
+    this.hud.element.hidden = true;
+    this.compass.hide();
+    document.body.classList.add('choosing-car');
+
     this.syncTransforms(true);
     this.chase.reset(this.curPos, this.curQuat);
     this.onResize();
@@ -265,6 +285,26 @@ export class Game {
     this.running = true;
     this.lastTime = performance.now();
     requestAnimationFrame(this.frame);
+  }
+
+  /**
+   * Shows the truck picker and resolves once the player commits.
+   *
+   * Called after `start()` on purpose: the render loop is already running, so
+   * the desert is live behind the panel and every change previews on the real
+   * vehicle in real light. Input stays frozen throughout (see `choosing`).
+   */
+  async chooseCar(): Promise<void> {
+    await this.carSelect.open();
+    this.choosing = false;
+    saveSettings(this.settings);
+
+    this.hud.element.hidden = false;
+    this.compass.show();
+    document.body.classList.remove('choosing-car');
+    // The camera has been sitting on a parked truck; hand it over cleanly rather
+    // than letting the follow spring unwind from wherever the preview left it.
+    this.chase.reset(this.curPos, this.curQuat);
   }
 
   private frame = (now: number) => {
@@ -284,7 +324,10 @@ export class Game {
       this.applyQuality(drop);
     }
 
-    const controls = this.photo.active ? this.frozenInput : this.input.vehicle;
+    // Frozen while the picker is up for the same reason as photo mode: the
+    // truck is on screen and being looked at, and a stray key would drive it
+    // out of its own preview.
+    const controls = this.photo.active || this.choosing ? this.frozenInput : this.input.vehicle;
 
     this.accumulator += frameDt;
     let steps = 0;
@@ -407,12 +450,17 @@ export class Game {
     }
 
     this.audio.update(this.vehicle.telemetry, controls.throttle, frameDt);
-    this.director.update(
-      this.vehicle.telemetry,
-      this.renderPos.x,
-      this.renderPos.z,
-      frameDt,
-    );
+    // Ahmed holds off until the player is actually driving. His sign-on is a
+    // greeting to someone who has just set out, and firing it over a menu spends
+    // the one line that establishes him on a moment nobody is in yet.
+    if (!this.choosing) {
+      this.director.update(
+        this.vehicle.telemetry,
+        this.renderPos.x,
+        this.renderPos.z,
+        frameDt,
+      );
+    }
     this.subtitles.update(frameDt);
 
     if (this.photo.active) {

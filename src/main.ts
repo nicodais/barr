@@ -13,6 +13,10 @@ Game.create(canvas, uiRoot)
   .then((game) => {
     loader?.remove();
     game.start();
+    // The picker sits between the loader and the drive: the world is already
+    // rendering behind it, so the truck being chosen is previewed on the sand
+    // under the real light rather than on a turntable.
+    void game.chooseCar();
     // Dev handle for poking at physics state from the console while tuning.
     if (import.meta.env.DEV) {
       (globalThis as Record<string, unknown>).dune = game;

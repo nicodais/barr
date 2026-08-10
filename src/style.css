@@ -100,6 +100,7 @@ body {
 }
 
 /* Nothing but the photo bar belongs on screen while composing a shot. */
+body.choosing-car #help,
 body.photo-mode #help {
   display: none;
 }
@@ -1189,5 +1190,147 @@ body.photo-mode #help {
   .touch-pedal {
     width: 68px;
     height: 74px;
+  }
+}
+
+/* --- car select ---------------------------------------------------------- */
+/* Sits over the live world, so it leans on a scrim rather than a solid panel
+   background — the point of the screen is the truck behind it. */
+.carselect {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4vh 4vw;
+  background: linear-gradient(100deg, rgba(24, 16, 12, 0.88) 0%, rgba(24, 16, 12, 0.55) 42%, rgba(24, 16, 12, 0) 68%);
+  opacity: 0;
+  transition: opacity 0.42s ease;
+  pointer-events: none;
+  z-index: 40;
+}
+.carselect.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.carselect[hidden] { display: none; }
+
+.carselect-panel {
+  width: min(420px, 92vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.carselect-title {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  color: #f3e4d2;
+}
+.carselect-sub {
+  margin: -0.35rem 0 0.3rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: rgba(243, 228, 210, 0.66);
+}
+
+.carselect-bodies {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.carselect-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  border: 1px solid rgba(243, 228, 210, 0.16);
+  border-radius: 7px;
+  background: rgba(40, 27, 20, 0.5);
+  color: #f3e4d2;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.carselect-card:hover { background: rgba(60, 41, 30, 0.6); }
+.carselect-card.is-active {
+  border-color: #e8a76b;
+  background: rgba(94, 61, 38, 0.62);
+}
+.carselect-card-name { font-size: 0.94rem; font-weight: 600; }
+.carselect-card-blurb {
+  font-size: 0.76rem;
+  line-height: 1.3;
+  color: rgba(243, 228, 210, 0.6);
+}
+
+.carselect-section {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.carselect-label {
+  flex: 0 0 3.6rem;
+  font-size: 0.78rem;
+  color: rgba(243, 228, 210, 0.66);
+}
+.carselect-swatches { display: flex; gap: 0.34rem; flex-wrap: wrap; }
+.carselect-swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 2px solid rgba(243, 228, 210, 0.22);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.carselect-swatch:hover { transform: scale(1.12); }
+.carselect-swatch.is-active {
+  border-color: #f3e4d2;
+  transform: scale(1.14);
+}
+
+.carselect-kit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid rgba(243, 228, 210, 0.12);
+  border-bottom: 1px solid rgba(243, 228, 210, 0.12);
+}
+
+.carselect-go {
+  margin-top: 0.2rem;
+  padding: 0.6rem;
+  border: 0;
+  border-radius: 7px;
+  background: #e8a76b;
+  color: #2a1a10;
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+.carselect-go:hover { background: #f2b87e; }
+
+.carselect-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  text-align: center;
+  color: rgba(243, 228, 210, 0.45);
+}
+
+/* On a phone the scrim has to cover the whole screen — a side gradient leaves
+   the panel sitting on bright sand with no contrast behind the text. */
+@media (max-width: 720px) {
+  .carselect {
+    justify-content: center;
+    background: rgba(24, 16, 12, 0.82);
   }
 }

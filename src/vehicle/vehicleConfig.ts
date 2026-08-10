@@ -9,7 +9,7 @@
  * without dragging Three.js into the settings path.
  */
 
-export type BodyId = 'wagon' | 'pickup' | 'swb' | 'runner';
+export type BodyId = 'wagon' | 'pickup' | 'gwagon' | 'buggy';
 export type WheelStyleId = 'steel' | 'alloy' | 'beadlock';
 export type PaintId =
   | 'safari'
@@ -37,6 +37,8 @@ export interface VehicleConfig {
 export interface BodyOption {
   id: BodyId;
   label: string;
+  /** One line for the selection screen — what it is and how it drives. */
+  blurb: string;
 }
 
 export interface PaintOption {
@@ -51,10 +53,26 @@ export interface WheelOption {
 }
 
 export const BODY_OPTIONS: BodyOption[] = [
-  { id: 'wagon', label: 'Wagon' },
-  { id: 'pickup', label: 'Pickup' },
-  { id: 'swb', label: 'Short' },
-  { id: 'runner', label: 'Runner' },
+  {
+    id: 'wagon',
+    label: 'Safari Wagon',
+    blurb: 'Long-roof five-door. The one the desert was built around.',
+  },
+  {
+    id: 'pickup',
+    label: 'Full-Size Pickup',
+    blurb: 'Big American crew cab. Blunt nose, long bed, all shoulders.',
+  },
+  {
+    id: 'gwagon',
+    label: 'Box Wagon',
+    blurb: 'Upright, slab-sided and square. Flat glass, spare on the door.',
+  },
+  {
+    id: 'buggy',
+    label: 'Dune Buggy',
+    blurb: 'Tube frame and an engine out the back. Nothing else.',
+  },
 ];
 
 /**
