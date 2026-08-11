@@ -144,6 +144,48 @@ class PartBuilder {
     this.add(make(), key, [-pos[0], pos[1], pos[2]], rot ? [rot[0], -rot[1], -rot[2]] : undefined);
   }
 
+  /**
+   * A tube spanning two points.
+   *
+   * Placing tubes by centre-plus-Euler-angle is how the cage kept coming out
+   * wrong: the length, the midpoint and the angle all have to be derived from
+   * the two joints by hand, they have to agree, and when they don't you get a
+   * bar that starts in the right place, points the wrong way and stops short of
+   * whatever it was supposed to reach. Three separate members of the roll cage
+   * shipped like that. Stating the endpoints instead makes "this tube connects
+   * these two joints" the thing that's written down, and the arithmetic can't
+   * drift out of step with it.
+   */
+  strut(
+    key: MatKey,
+    from: [number, number, number],
+    to: [number, number, number],
+    radius = 0.045,
+  ) {
+    const dx = to[0] - from[0];
+    const dy = to[1] - from[1];
+    const dz = to[2] - from[2];
+    const len = Math.hypot(dx, dy, dz);
+    const geo = new THREE.CylinderGeometry(radius, radius, len, 6);
+    // Cylinders are built along +Y, so rotate that axis onto the span.
+    strutFrom.set(0, 1, 0);
+    strutTo.set(dx / len, dy / len, dz / len);
+    strutQ.setFromUnitVectors(strutFrom, strutTo);
+    geo.applyQuaternion(strutQ);
+    this.add(geo, key, [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2]);
+  }
+
+  /** The same tube, mirrored to both sides. */
+  strutPair(
+    key: MatKey,
+    from: [number, number, number],
+    to: [number, number, number],
+    radius = 0.045,
+  ) {
+    this.strut(key, from, to, radius);
+    this.strut(key, [-from[0], from[1], from[2]], [-to[0], to[1], to[2]], radius);
+  }
+
   build(): THREE.Mesh[] {
     const meshes: THREE.Mesh[] = [];
     for (const [key, geos] of this.parts) {
@@ -183,6 +225,10 @@ class PartBuilder {
     return meshes;
   }
 }
+
+const strutFrom = new THREE.Vector3();
+const strutTo = new THREE.Vector3();
+const strutQ = new THREE.Quaternion();
 
 const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d);
 /** Cage/bar tubing. Six sides is plenty at this scale and keeps the facet look. */
@@ -609,78 +655,160 @@ function buildGWagon(b: PartBuilder) {
 }
 
 /**
- * Tube-frame dune buggy: a chassis, two seats, an engine, and daylight through
- * the middle of it.
+ * Sand rail — a dragster built for dunes: long, low, rear-engined, and mostly
+ * air.
  *
- * The trap is building a truck and deleting parts, which is what the body this
- * replaced did — it kept a full-width tub and read as a bathtub with a cage on
- * top. Here the structure *is* the silhouette, so the shell is a narrow shallow
- * pan and everything above the waist is tube.
+ * ## Wheels have to be *attached*
+ *
+ * This is the thing the previous version got wrong, and it read as broken on a
+ * real screen. Every closed body here hides its hubs behind arch flares, so
+ * nothing ever had to explain how the wheel joins the truck. Strip the
+ * bodywork away and that explanation is suddenly load-bearing: with no arches
+ * and no suspension, four wheels hovered a foot off a narrow frame, connected
+ * to nothing, and the eye reads that as parts that have fallen off rather than
+ * as a vehicle. So each corner now carries a lower arm, a trailing link and a
+ * coil-over running up to the frame.
+ *
+ * They are static, mounted to the body rather than to the moving wheel, and
+ * that is a deliberate trade: a static arm drifts by a few centimetres at full
+ * articulation, which nobody notices, while an arm parented to the wheel would
+ * swing with steering lock and look far worse. The links are kept short and
+ * close to the hub so there is no long lever to visibly detach.
+ *
+ * ## Reading as a dragster
+ *
+ * Long and low, weight over the back axle, and three cues doing most of the
+ * work: **zoomie headers** standing straight up out of the engine, a **wing**
+ * on struts over the tail, and a frame that runs unbroken from a pointed nose
+ * to well past the rear wheels. Everything sits below the hoop line except
+ * those three, so the silhouette is a low horizontal bar with a tall hoop and
+ * a wing at one end — which is a dragster from any angle.
  */
 function buildBuggy(b: PartBuilder) {
-  const NOSE = 1.9;
-  const TAIL = -1.8;
-  const T = 0.055;
-  const RAIL = 0.64;
+  const NOSE = 2.0;
+  const TAIL = -2.0;
+  const T = 0.05;
+  /** Frame rails, inboard of the wheels with the suspension bridging the gap. */
+  const RAIL = 0.6;
+  /** Nominal static hub, matching what the arches assume on the closed bodies. */
+  const HUB_Y = AXLE_HEIGHT - 0.4;
+  const HOOP_Y = 1.04;
 
-  // Pan: narrow, shallow, pinched to a point at the nose.
+  // --- frame ----------------------------------------------------------------
+  // Two rails the full length of the car. These are the silhouette's baseline,
+  // so they run nose to tail unbroken.
+  b.addPair(() => tube(NOSE - TAIL, 0.075), 'trim', [RAIL, -0.3, (NOSE + TAIL) / 2], [Math.PI / 2, 0, 0]);
+  // Upper rails at waist height, tying the cockpit together.
+  b.addPair(() => tube(2.1, 0.05), 'trim', [RAIL, 0.16, -0.15], [Math.PI / 2, 0, 0]);
+  for (const z of [1.32, 0.5, -0.6, -1.5]) {
+    b.add(tube(RAIL * 2, 0.055), 'trim', [0, -0.3, z], [0, 0, Math.PI / 2]);
+  }
+
+  // Floor pan and low side pods, in body colour so the paint choice registers
+  // on a vehicle that is otherwise almost entirely black tube.
+  b.add(box(RAIL * 2 - 0.06, 0.05, 2.2), 'bodyDark', [0, -0.27, -0.1]);
+  b.addPair(() => box(0.07, 0.3, 1.9), 'body', [RAIL - 0.02, -0.1, -0.15]);
+
+  // Pointed nose: the one place with real bodywork.
   shell(b, 'body', [
-    { z: -1.34, hw: 0.62, y0: -0.36, y1: 0.06, c: 0.07 },
-    { z: -0.5, hw: 0.70, y0: -0.38, y1: 0.10, c: 0.07 },
-    { z: 0.62, hw: 0.70, y0: -0.38, y1: 0.10, c: 0.07 },
-    { z: 1.12, hw: 0.64, y0: -0.36, y1: 0.02, c: 0.08 },
-    { z: 1.62, hw: 0.44, y0: -0.30, y1: -0.02, c: 0.08 },
-    { z: NOSE, hw: 0.22, y0: -0.24, y1: -0.06, c: 0.05 },
+    { z: 0.72, hw: 0.56, y0: -0.3, y1: 0.06, c: 0.07 },
+    { z: 1.42, hw: 0.5, y0: -0.3, y1: 0.0, c: 0.07 },
+    { z: 1.86, hw: 0.28, y0: -0.28, y1: -0.08, c: 0.06 },
   ]);
-  // Scuttle in front of the cockpit, the one panel that catches light up high.
-  b.add(box(1.3, 0.3, 0.1), 'body', [0, 0.2, 0.72]);
-  b.add(box(1.24, 0.1, 0.3), 'bodyDark', [0, 0.16, 0.56]);
+  b.add(box(0.9, 0.04, 0.7), 'bodyDark', [0, -0.33, 1.3]);
 
-  // Chassis rails, visible under and beside the pan.
-  b.addPair(() => tube(3.4, 0.07), 'trim', [RAIL, -0.34, -0.05], [Math.PI / 2, 0, 0]);
-  b.add(tube(1.26, 0.06), 'trim', [0, -0.34, 1.34], [0, 0, Math.PI / 2]);
-  b.add(tube(1.26, 0.06), 'trim', [0, -0.34, -1.5], [0, 0, Math.PI / 2]);
+  // --- suspension, one corner at a time -------------------------------------
+  for (const z of [HALF_WHEELBASE, -HALF_WHEELBASE]) {
+    const front = z > 0;
+    // Lower arm: straight out from the rail to the hub.
+    b.addPair(() => tube(0.36, 0.045), 'steel', [0.62, HUB_Y, z], [0, 0, Math.PI / 2]);
+    // Trailing link, running back to the frame so the wheel is located fore-aft
+    // as well as laterally — one arm alone still reads as a wheel on a stick.
+    b.addPair(
+      () => tube(0.72, 0.04),
+      'steel',
+      [0.78, HUB_Y + 0.05, z + (front ? -0.36 : 0.36)],
+      [Math.PI / 2, 0, 0],
+    );
+    // Coil-over up to the top rail. Leaned inboard, which is both what they do
+    // and what stops it reading as a fence post.
+    b.addPair(() => tube(0.62, 0.055), 'steel', [0.71, HUB_Y + 0.34, z], [0, 0, 0.26]);
+    b.addPair(() => tube(0.3, 0.075), 'amber', [0.735, HUB_Y + 0.26, z], [0, 0, 0.26]);
+    // Hub carrier, so the arms land on something.
+    b.addPair(() => box(0.08, 0.2, 0.14), 'steel', [0.8, HUB_Y, z]);
+  }
 
-  // Cockpit.
-  b.addPair(() => box(0.4, 0.12, 0.44), 'cargo', [0.34, 0.14, -0.02]);
-  b.addPair(() => box(0.4, 0.56, 0.12), 'cargo', [0.34, 0.44, -0.3]);
-  b.addPair(() => box(0.28, 0.16, 0.1), 'trim', [0.34, 0.76, -0.3]);
-  b.addPair(() => box(0.06, 0.5, 0.03), 'amber', [0.26, 0.46, -0.24], [0, 0, 0.12]);
-  b.add(disc(0.17, 0.04, 10), 'trim', [0.34, 0.46, 0.5], [0.5, 0, 0]);
+  // --- cockpit --------------------------------------------------------------
+  b.addPair(() => box(0.38, 0.1, 0.42), 'cargo', [0.3, -0.2, 0.06]);
+  b.addPair(() => box(0.38, 0.52, 0.1), 'cargo', [0.3, 0.08, -0.2]);
+  b.addPair(() => box(0.26, 0.14, 0.09), 'trim', [0.3, 0.38, -0.2]);
+  b.addPair(() => box(0.05, 0.44, 0.03), 'amber', [0.22, 0.1, -0.14], [0, 0, 0.14]);
+  b.add(box(0.86, 0.16, 0.24), 'bodyDark', [0, 0.08, 0.62]);
+  b.add(disc(0.16, 0.04, 10), 'trim', [0.3, 0.16, 0.48], [0.55, 0, 0]);
 
-  // Engine, out behind the rear axle.
+  // --- engine and zoomies ---------------------------------------------------
+  // Sat behind the rear axle where a rail carries it, and left bare.
   shell(b, 'steel', [
-    { z: -1.84, hw: 0.36, y0: -0.2, y1: 0.24, c: 0.07 },
-    { z: -1.6, hw: 0.42, y0: -0.24, y1: 0.3, c: 0.07 },
-    { z: -1.16, hw: 0.42, y0: -0.24, y1: 0.3, c: 0.07 },
+    { z: -1.92, hw: 0.34, y0: -0.24, y1: 0.16, c: 0.07 },
+    { z: -1.66, hw: 0.4, y0: -0.28, y1: 0.22, c: 0.07 },
+    { z: -1.24, hw: 0.4, y0: -0.28, y1: 0.22, c: 0.07 },
   ]);
-  b.addPair(() => tube(0.5, 0.045), 'chrome', [0.28, 0.24, -1.86], [1.1, 0.3, 0]);
-  b.add(tube(1.05, 0.018), 'trim', [-0.48, 0.85, -1.6]);
-  b.add(box(0.2, 0.14, 0.02), 'amber', [-0.48, 1.32, -1.6]);
+  b.add(box(0.74, 0.08, 0.6), 'trim', [0, 0.24, -1.58]);
+  // Zoomie headers: four short stacks straight up out of the block. The single
+  // clearest dragster cue available, and they cost four boxes.
+  for (const side of [1, -1]) {
+    for (let i = 0; i < 2; i++) {
+      const zz = -1.36 - i * 0.3;
+      b.add(tube(0.46, 0.042), 'chrome', [side * 0.3, 0.46, zz], [-0.34, 0, 0]);
+    }
+  }
 
-  // Cage.
-  b.addPair(() => tube(1.6, T), 'trim', [RAIL, 0.5, -0.3]);
-  b.add(tube(1.32, T), 'trim', [0, 1.26, -0.3], [0, 0, Math.PI / 2]);
-  b.addPair(() => tube(0.94, T), 'trim', [RAIL, 0.3, 0.88], [-0.22, 0, 0]);
-  b.add(tube(1.32, T), 'trim', [0, 0.8, 0.96], [0, 0, Math.PI / 2]);
-  b.addPair(() => tube(1.36, T), 'trim', [RAIL, 1.08, 0.32], [1.36, 0, 0]);
-  b.addPair(() => tube(1.28, T), 'trim', [RAIL, 0.6, -1.04], [0.95, 0, 0]);
-  b.add(tube(1.02, 0.04), 'trim', [0, 0.88, -0.3], [0, 0, 0.72]);
+  // --- cage -----------------------------------------------------------------
+  // Every member is stated as the two joints it connects, so the structure is
+  // closed by construction — no bar can point somewhere its ends don't.
+  const HOOP_Z = -0.42;
+  const SCUTTLE_Z = 0.82;
+  const SCUTTLE_Y = 0.56;
+  const RAIL_Y = -0.3;
 
-  // Lamps strapped to the front hoop, and tube bumpers.
+  // Main hoop: uprights and crossbar.
+  b.strutPair('trim', [RAIL, RAIL_Y, HOOP_Z], [RAIL, HOOP_Y, HOOP_Z], T);
+  b.strut('trim', [-RAIL, HOOP_Y, HOOP_Z], [RAIL, HOOP_Y, HOOP_Z], T);
+  // Diagonal across it, corner to corner.
+  b.strut('trim', [RAIL, RAIL_Y, HOOP_Z], [-RAIL, HOOP_Y, HOOP_Z], 0.036);
+
+  // Front hoop over the scuttle, and the roof rails tying the two together.
+  b.strutPair('trim', [RAIL, RAIL_Y, SCUTTLE_Z], [RAIL, SCUTTLE_Y, SCUTTLE_Z], T);
+  b.strut('trim', [-RAIL, SCUTTLE_Y, SCUTTLE_Z], [RAIL, SCUTTLE_Y, SCUTTLE_Z], T);
+  b.strutPair('trim', [RAIL, HOOP_Y, HOOP_Z], [RAIL, SCUTTLE_Y, SCUTTLE_Z], T);
+
+  // Rear stays from the top of the hoop down to the tail of the frame, over the
+  // engine. These are what stop the hoop reading as a standalone arch.
+  b.strutPair('trim', [RAIL, HOOP_Y, HOOP_Z], [RAIL, RAIL_Y + 0.06, TAIL + 0.14], T);
+
+  // --- wing -----------------------------------------------------------------
+  // Small, high and flat over the tail: reads at any distance, and it is the
+  // second half of the dragster silhouette after the zoomies.
+  const WING_Y = 1.12;
+  const WING_Z = -1.82;
+  b.strutPair('trim', [0.46, 0.5, TAIL + 0.2], [0.46, WING_Y - 0.04, WING_Z], 0.032);
+  b.add(box(1.4, 0.05, 0.36), 'body', [0, WING_Y, WING_Z], [0.2, 0, 0]);
+  b.addPair(() => box(0.04, 0.16, 0.32), 'body', [0.68, WING_Y + 0.06, WING_Z]);
+
+  // --- lights and bumpers ---------------------------------------------------
   b.addPair(() => {
-    const g = new THREE.CylinderGeometry(0.11, 0.11, 0.09, 10);
+    const g = new THREE.CylinderGeometry(0.1, 0.1, 0.08, 10);
     g.rotateX(Math.PI / 2);
     return g;
-  }, 'lamp', [0.32, 0.56, 1.02]);
-  b.add(tube(1.3, 0.05), 'steel', [0, -0.24, NOSE - 0.04], [0, 0, Math.PI / 2]);
-  b.add(tube(1.36, 0.05), 'steel', [0, -0.24, TAIL - 0.06], [0, 0, Math.PI / 2]);
+  }, 'lamp', [0.3, 0.3, 0.86]);
+  b.add(tube(1.16, 0.045), 'steel', [0, -0.26, NOSE - 0.06], [0, 0, Math.PI / 2]);
+  b.add(tube(1.2, 0.045), 'steel', [0, -0.22, TAIL + 0.04], [0, 0, Math.PI / 2]);
   for (const side of [1, -1]) {
-    b.add(box(0.16, 0.11, 0.05), 'brake', [side * 0.46, 0.02, TAIL - 0.1]);
+    b.add(box(0.14, 0.1, 0.05), 'brake', [side * 0.42, -0.04, TAIL + 0.02]);
   }
-  // Skid plate in body colour, not bare steel: at this angle a pale slab
-  // under the nose catches the sun and reads as a separate floating object.
-  b.add(box(0.84, 0.05, 0.7), 'bodyDark', [0, -0.42, 1.2]);
+  // Whip and flag, required kit out there and a useful vertical accent.
+  b.add(tube(1.0, 0.016), 'trim', [-0.55, 0.9, -1.9]);
+  b.add(box(0.2, 0.13, 0.02), 'amber', [-0.55, 1.34, -1.9]);
 }
 
 // --- shared body details ------------------------------------------------------
