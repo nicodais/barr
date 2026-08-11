@@ -44,7 +44,8 @@ export function createSandMaterial(): {
       .replace(
         '#include <common>',
         `#include <common>
-         varying vec3 vSandWorld;`,
+         varying vec3 vSandWorld;
+         varying vec3 vSandSmooth;`,
       )
       .replace(
         '#include <worldpos_vertex>',
@@ -52,7 +53,12 @@ export function createSandMaterial(): {
          // Positions are already world-space (see buildChunkGeometry), but go
          // through the model matrix anyway so this can't silently break if that
          // ever stops being true.
-         vSandWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;`,
+         vSandWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+         // The height field's analytic normal, in world space. three throws the
+         // attribute away under FLAT_SHADED and derives a per-face normal
+         // instead, but the smooth one is still needed — see the pan blend in
+         // the fragment shader.
+         vSandSmooth = normalize( mat3( modelMatrix ) * normal );`,
       );
 
     shader.fragmentShader = shader.fragmentShader
@@ -60,6 +66,7 @@ export function createSandMaterial(): {
         '#include <common>',
         `#include <common>
          varying vec3 vSandWorld;
+         varying vec3 vSandSmooth;
          uniform float uRippleStrength;
          uniform vec3 uSunDirection;
          uniform vec3 uSheenColor;
@@ -102,7 +109,23 @@ export function createSandMaterial(): {
       .replace(
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>
+         // Everything from here on works in WORLD space and is converted back
+         // at the end. three's \`normal\` is view-space, which is right for
+         // lighting and useless for the two questions asked below — "is this
+         // ground flat?" and "which way is the wind?" — because in view space
+         // the answers change when the player turns the camera.
+         vec3 sandN = normalize( cross( dFdx( vSandWorld ), dFdy( vSandWorld ) ) );
+         if ( sandN.y < 0.0 ) sandN = -sandN;
          {
+           // On near-level ground the two triangles of every quad get slightly
+           // different face normals, and the whole pan prints as a diagonal
+           // checkerboard. That faceting is exactly what's wanted on a dune
+           // face (§4) and is pure quad noise on flat ground, so fade to the
+           // height field's analytic normal precisely where it stops helping —
+           // above about 85 degrees of levelness, which no dune slope reaches.
+           float pan = smoothstep( 0.978, 0.997, sandN.y );
+           sandN = normalize( mix( sandN, normalize( vSandSmooth ), pan ) );
+
            // Fade with distance: past ~35m the ripple period is down to a pixel
            // or two and sampling it just produces shimmer. This is a texture on
            // the ground the player is driving over, not a feature of the
@@ -112,8 +135,18 @@ export function createSandMaterial(): {
            // where the surface is stable.
            float dist = length( vSandWorld - cameraPosition );
            float near = 1.0 - smoothstep( 9.0, 38.0, dist );
-           float flat_ = smoothstep( 0.62, 0.88, normal.y );
-           float amt = uRippleStrength * near * flat_;
+           float flat_ = smoothstep( 0.62, 0.88, sandN.y );
+
+           // Nyquist fade, and it is not optional. Distance alone can't decide
+           // whether the ripples are resolvable, because a flat pan seen at a
+           // grazing angle packs metres of ground into one pixel row ten metres
+           // from the camera. fwidth measures the actual ground distance one
+           // pixel covers along the ripple axis, so this fades out exactly when
+           // the field stops being representable, whatever the geometry.
+           float footprint = max( fwidth( dot( vSandWorld.xz, WIND ) ), 1e-4 );
+           float resolved = 1.0 - smoothstep( 0.09, 0.26, footprint );
+
+           float amt = uRippleStrength * near * flat_ * resolved;
            if ( amt > 0.001 ) {
              vec2 p = vSandWorld.xz;
              // Small enough to resolve the 68cm primary — at the 35cm the first
@@ -127,8 +160,10 @@ export function createSandMaterial(): {
              const float RIPPLE_SLOPE = 0.012;
              float gx = ( rippleField( p + vec2( E, 0.0 ) ) - rippleField( p - vec2( E, 0.0 ) ) ) / ( 2.0 * E );
              float gz = ( rippleField( p + vec2( 0.0, E ) ) - rippleField( p - vec2( 0.0, E ) ) ) / ( 2.0 * E );
-             normal = normalize( normal + vec3( -gx, 0.0, -gz ) * amt * RIPPLE_SLOPE );
+             sandN = normalize( sandN + vec3( -gx, 0.0, -gz ) * amt * RIPPLE_SLOPE );
            }
+
+           normal = normalize( ( viewMatrix * vec4( sandN, 0.0 ) ).xyz );
          }`,
       )
       .replace(
@@ -146,10 +181,18 @@ export function createSandMaterial(): {
            vec3 viewDir = normalize( cameraPosition - vSandWorld );
            float facing = max( dot( -viewDir, uSunDirection ), 0.0 );
            // Strongest where the surface is edge-on to the eye: crests and the
-           // far side of every ridge.
-           float grazing = 1.0 - abs( dot( viewDir, normal ) );
-           float sheen = pow( facing, 3.0 ) * pow( grazing, 2.2 ) * uSheen;
-           reflectedLight.directDiffuse += uSheenColor * diffuseColor.rgb * sheen * 1.5;
+           // far side of every ridge. Against the world-space normal computed
+           // above, since viewDir is world-space too — pairing it with three's
+           // view-space \`normal\` silently measures nothing in particular.
+           float grazing = 1.0 - abs( dot( viewDir, sandN ) );
+           // A tight exponent on purpose. At 2.2 the term still had real weight
+           // at 45 degrees off edge-on, which meant it was amplifying the
+           // difference between neighbouring facets across the whole
+           // foreground — the terrain is flat-shaded on a 2m grid, so that
+           // reads as quilting. At 3.4 it concentrates on surfaces genuinely
+           // side-on to the eye, which is where the crest glow lives anyway.
+           float sheen = pow( facing, 3.0 ) * pow( grazing, 3.4 ) * uSheen;
+           reflectedLight.directDiffuse += uSheenColor * diffuseColor.rgb * sheen * 1.6;
          }`,
       );
   };

@@ -1,5 +1,6 @@
 import { AHMED_LINES, type LinePool } from '../data/ahmedLines';
 import { POIS, type Poi } from '../data/pois';
+import { DISCOVERIES, DISCOVERY_RADIUS } from '../world/Discoveries';
 import type { VehicleTelemetry } from '../vehicle/Vehicle';
 import type { RadioSubtitles } from './RadioSubtitles';
 
@@ -29,6 +30,9 @@ export interface RadioCallbacks {
 export class Director {
   /** POIs already visited this session — each one only ever fires once. */
   private visited = new Set<string>();
+  /** Small finds already remarked on. Session-only and never persisted: there
+      is no completion state to restore, because there is nothing to complete. */
+  private found = new Set<number>();
   /** Lines already used, so a session doesn't repeat itself (§13). */
   private used = new Map<LinePool, Set<number>>();
   /** Remaining beats of a POI call-in, delivered one at a time as it clears. */
@@ -98,6 +102,19 @@ export class Director {
 
     if (this.cooldown > 0) {
       this.trackAmbientConditions(tel, dt);
+      return;
+    }
+
+    // --- small finds --------------------------------------------------------
+    // Held to the ordinary cooldown but not to the much longer ambient timer:
+    // these are the reward for going somewhere nobody sent you, and making one
+    // wait seventy-five seconds behind an unrelated remark loses the moment.
+    for (let i = 0; i < DISCOVERIES.length; i++) {
+      if (this.found.has(i)) continue;
+      const d = DISCOVERIES[i];
+      if (Math.hypot(d.x - x, d.z - z) > DISCOVERY_RADIUS) continue;
+      this.found.add(i);
+      this.call(d.line);
       return;
     }
 

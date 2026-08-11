@@ -30,6 +30,8 @@ import { SandPlumes, windFromHaze } from '../world/SandPlumes';
 import { Avalanche } from '../world/Avalanche';
 import { createOldTracks } from '../world/OldTracks';
 import { Weather } from '../world/Weather';
+import { Camels } from '../world/Camels';
+import { createDiscoveries } from '../world/Discoveries';
 import { AIRBORNE_SAND } from '../terrain/chunkGeometry';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
 import { PhotoMode } from './PhotoMode';
@@ -64,6 +66,7 @@ export class Game {
   private plumes = new SandPlumes();
   private avalanche = new Avalanche();
   private weather = new Weather();
+  private camels = new Camels();
   private chase: ChaseCamera;
   private input: InputManager;
   private hud: DebugHud;
@@ -162,6 +165,10 @@ export class Game {
     this.rig.scene.add(this.scatter.group);
     this.rig.scene.add(this.birds.mesh);
     this.rig.scene.add(this.wildlife.group);
+    this.rig.scene.add(this.camels.group);
+    // Junk in the sand. No colliders — small enough that a stop would read as
+    // hitting an invisible box rather than as hitting a sandal.
+    this.rig.scene.add(createDiscoveries());
     this.rig.scene.add(this.plumes.points);
     this.rig.scene.add(this.avalanche.points);
     // Everyone who came before. Baked once, one draw call, never updated.
@@ -438,6 +445,7 @@ export class Game {
     this.scatter.update(this.renderPos.x, this.renderPos.z);
     this.birds.update(frameDt, this.renderPos.x, this.renderPos.z);
     this.wildlife.update(frameDt, this.renderPos.x, this.renderPos.z);
+    this.camels.update(frameDt, this.renderPos.x, this.renderPos.z);
 
     this.timeOfDay.update(frameDt);
     // The shamal, folded in after the day curve and before anything reads it,

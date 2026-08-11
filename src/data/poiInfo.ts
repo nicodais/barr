@@ -98,6 +98,14 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
     photo: '/photos/cameltrack.jpg',
     credit: 'https://www.usatoday.com/picture-gallery/tech/2017/01/03/centuries-old-tradition-changed-by-technology/96116762/'
   },
+  oasis: {
+    title: 'The Liwa Oases',
+    body:
+      'Liwa is a 100km crescent of date-palm oases along the northern edge of the Empty ' +
+      'Quarter — the ancestral home of the Bani Yas, and of the family that founded the ' +
+      'UAE. Dates were food, trade and survival, and the summer harvest still empties ' +
+      'Abu Dhabi into the desert every July.',
+  },
   coffeehearth: {
     title: 'Gahwa — Arabic Coffee',
     body:

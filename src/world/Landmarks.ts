@@ -27,6 +27,17 @@ const FOLIAGE = new THREE.MeshLambertMaterial({ color: 0x6b7f4a, flatShading: tr
 const FOLIAGE_DARK = new THREE.MeshLambertMaterial({ color: 0x566b3c, flatShading: true });
 const CANVAS = new THREE.MeshLambertMaterial({ color: 0xc4b49a, flatShading: true });
 const METAL = new THREE.MeshLambertMaterial({ color: 0xa9a49b, flatShading: true });
+// The oasis palette. Date palms are a colder, greyer green than the ghaf and
+// the scrub — that difference is most of what makes a garden read as irrigated
+// rather than as more desert vegetation.
+const PALM = new THREE.MeshLambertMaterial({ color: 0x6f8450, flatShading: true });
+const PALM_DARK = new THREE.MeshLambertMaterial({ color: 0x54663c, flatShading: true });
+const PALM_TRUNK = new THREE.MeshLambertMaterial({ color: 0x8a6f4c, flatShading: true });
+const DATES = new THREE.MeshLambertMaterial({ color: 0x9b5327, flatShading: true });
+const MUD = new THREE.MeshLambertMaterial({ color: 0xa88a68, flatShading: true });
+/** Standing water, and the only cool surface in the world. Deliberately dark —
+    a shallow desert pool is a hole in the light, not a mirror. */
+const WATER = new THREE.MeshLambertMaterial({ color: 0x3d5a5c, flatShading: true });
 
 export function createLandmarks(): THREE.Group {
   const group = new THREE.Group();
@@ -114,6 +125,7 @@ function buildLandmark(poi: Poi): THREE.Group {
     case 'falconry': return buildFalconry();
     case 'cameltrack': return buildCamelTrack();
     case 'coffeehearth': return buildCoffeeHearth();
+    case 'oasis': return buildOasis();
   }
 }
 
@@ -588,5 +600,145 @@ function colliderSpecs(id: PoiKind): ColliderSpec[] {
     case 'coffeehearth':
       // The hearth ring and the log seat; the pot and cups are too small to matter.
       return [cyl(0, 0.1, 0, 0.14, 0.62), box(-1.1, 0.16, 0.5, 0.16, 0.16, 0.55)];
+    case 'oasis': {
+      // Every trunk is solid — a date garden you can drive through is a texture,
+      // not a place. The pool and the basin wall stay flat so nothing traps you.
+      const specs: ColliderSpec[] = PALMS.map((p) => cyl(p.x, 3, p.z, 3, 0.32));
+      specs.push(box(0, 0.35, 5.4, 4.2, 0.4, 0.35));
+      return specs;
+    }
   }
+}
+
+/**
+ * A date garden in an interdune hollow.
+ *
+ * Liwa is not a dune field with an oasis in it — it is a hundred-kilometre
+ * crescent of date gardens that happens to be surrounded by the largest sand
+ * sea on earth, and the family that founded the country came from them. Putting
+ * one in the world is the single most place-specific thing here.
+ *
+ * It also does something no other landmark does: it is the only green, the only
+ * water, and the only shade, and finding it after ten minutes of open sand is
+ * the closest this game gets to an event.
+ */
+const PALMS: Array<{ x: number; z: number; h: number; lean: number }> = [
+  { x: -6.2, z: -3.4, h: 7.4, lean: 0.06 },
+  { x: -3.1, z: 2.8, h: 8.8, lean: -0.09 },
+  { x: 1.4, z: -5.6, h: 6.6, lean: 0.11 },
+  { x: 4.8, z: 0.9, h: 9.4, lean: -0.05 },
+  { x: 7.9, z: -4.2, h: 7.1, lean: 0.08 },
+  { x: -8.4, z: 3.9, h: 6.2, lean: -0.12 },
+  { x: 0.6, z: 7.2, h: 8.1, lean: 0.04 },
+  { x: 9.1, z: 4.6, h: 6.9, lean: -0.07 },
+  { x: -1.8, z: -9.1, h: 7.7, lean: 0.09 },
+];
+
+function buildOasis(): THREE.Group {
+  const g = new THREE.Group();
+
+  for (const p of PALMS) g.add(buildDatePalm(p.x, p.z, p.h, p.lean));
+
+  // The pool the whole thing exists for. Sunk just below grade with a mud rim,
+  // so it reads as water in a hole rather than a green disc lying on the sand.
+  const pool = mesh(new THREE.CylinderGeometry(3.1, 2.6, 0.3, 9), WATER, 0, -0.12, 3.2);
+  pool.receiveShadow = true;
+  g.add(pool);
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2;
+    const rim = mesh(new THREE.BoxGeometry(2.3, 0.34, 0.6), MUD,
+      Math.cos(a) * 3.2, 0.1, 3.2 + Math.sin(a) * 3.2);
+    rim.rotation.y = -a;
+    g.add(rim);
+  }
+
+  // A stub of falaj feeding it, and the low basin wall that holds the flood.
+  for (let i = 0; i < 6; i++) {
+    g.add(mesh(new THREE.BoxGeometry(0.55, 0.5, 1.3), MUD, -0.7, 0.16, 6.6 + i * 1.2));
+    g.add(mesh(new THREE.BoxGeometry(0.55, 0.5, 1.3), MUD, 0.7, 0.16, 6.6 + i * 1.2));
+  }
+  g.add(mesh(new THREE.BoxGeometry(8.4, 0.8, 0.7), MUD, 0, 0.3, 5.4));
+
+  // Someone works here: a palm-frond ladder against a trunk, and crates for the
+  // harvest. No people (§5 keeps the world empty), just the evidence of them.
+  const ladder = new THREE.Group();
+  for (const side of [-0.22, 0.22]) {
+    ladder.add(mesh(new THREE.BoxGeometry(0.09, 4.4, 0.09), WOOD, side, 2.2, 0));
+  }
+  for (let i = 0; i < 7; i++) {
+    ladder.add(mesh(new THREE.BoxGeometry(0.56, 0.07, 0.07), WOOD_DARK, 0, 0.5 + i * 0.6, 0));
+  }
+  ladder.position.set(4.2, 0, 1.6);
+  ladder.rotation.set(0.19, 0.7, 0);
+  g.add(ladder);
+
+  for (const [cx, cz, r] of [[-4.4, 5.6, 0.3], [-3.4, 6.3, 1.1], [6.7, 6.1, -0.5]] as const) {
+    g.add(mesh(new THREE.BoxGeometry(0.9, 0.55, 0.7), WOOD, cx, 0.28, cz)).rotation.y = r;
+    g.add(mesh(new THREE.BoxGeometry(0.78, 0.12, 0.58), DATES, cx, 0.58, cz)).rotation.y = r;
+  }
+
+  // Reeds at the water's edge, because standing water in a desert is never
+  // clean-edged — something always grows in it.
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2 + 0.4;
+    const d = 2.9 + Math.random() * 0.7;
+    const reed = mesh(new THREE.ConeGeometry(0.06, 0.9 + Math.random() * 0.6, 4), PALM_DARK,
+      Math.cos(a) * d, 0.45, 3.2 + Math.sin(a) * d);
+    reed.rotation.z = (Math.random() - 0.5) * 0.5;
+    g.add(reed);
+  }
+
+  return g;
+}
+
+/** One date palm: ringed trunk, a crown of arching fronds, a hanging bunch. */
+function buildDatePalm(x: number, z: number, height: number, lean: number): THREE.Group {
+  const p = new THREE.Group();
+  p.position.set(x, 0, z);
+  p.rotation.z = lean;
+  p.rotation.y = (x * 7.3 + z * 3.1) % Math.PI;
+
+  const trunk = mesh(new THREE.CylinderGeometry(0.26, 0.42, height, 7), PALM_TRUNK, 0, height / 2, 0);
+  p.add(trunk);
+  // The stubs of shed fronds, which are the whole reason a date palm's trunk
+  // reads as scaled rather than smooth. Cheap: eight boxes.
+  const rings = Math.floor(height / 0.95);
+  for (let i = 0; i < rings; i++) {
+    const y = 0.6 + i * 0.95;
+    const a = i * 2.4;
+    const stub = mesh(new THREE.BoxGeometry(0.78, 0.2, 0.24), PALM_TRUNK,
+      Math.cos(a) * 0.16, y, Math.sin(a) * 0.16);
+    stub.rotation.y = -a;
+    stub.rotation.z = 0.5;
+    p.add(stub);
+  }
+
+  // The crown. Fronds are long thin wedges pitched down from horizontal, in two
+  // tiers — the upper ones near-vertical and young, the lower ones drooping.
+  const frond = new THREE.BoxGeometry(0.34, 0.07, 3.3);
+  frond.translate(0, 0, 1.65);
+  for (let i = 0; i < 11; i++) {
+    const a = (i / 11) * Math.PI * 2;
+    const upper = i % 3 === 0;
+    const f = mesh(frond, upper ? PALM : PALM_DARK, 0, height - 0.1, 0);
+    f.rotation.y = a;
+    f.rotation.x = upper ? -0.55 : 0.28;
+    f.scale.set(1, 1, upper ? 0.75 : 1);
+    p.add(f);
+  }
+  // A short spray of new growth standing straight up out of the middle.
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + 0.6;
+    const spike = mesh(new THREE.ConeGeometry(0.1, 1.5, 4), PALM, 0, height + 0.6, 0);
+    spike.rotation.z = Math.cos(a) * 0.3;
+    spike.rotation.x = Math.sin(a) * 0.3;
+    p.add(spike);
+  }
+
+  // The dates themselves, hanging under the crown on one side.
+  const bunch = mesh(new THREE.IcosahedronGeometry(0.42, 0), DATES, 0.75, height - 0.55, 0.2);
+  bunch.scale.set(1, 1.5, 1);
+  p.add(bunch);
+
+  return p;
 }

@@ -24,7 +24,8 @@ export type PoiKind =
   | 'famousdune'
   | 'falconry'
   | 'cameltrack'
-  | 'coffeehearth';
+  | 'coffeehearth'
+  | 'oasis';
 
 export interface Poi {
   id: PoiKind;
@@ -120,6 +121,20 @@ export const POIS: Poi[] = [
     lines: [
       'Camel track. The races are serious business — the Sheikhs breed the winners like royalty.',
       'This stretch got left to the sand when they built the big ovals. Mind the old rails.',
+    ],
+  },
+  // The oasis sits in a genuinely enclosed interdune hollow — the flattest,
+  // lowest, most sheltered ground within 350m of anything else, found by
+  // sampling the height field rather than picked by eye. That matters: a date
+  // garden only exists where the water table comes near the surface, which out
+  // here means the bottom of a basin.
+  {
+    id: 'oasis',
+    name: 'The Date Garden',
+    x: 190, z: -580, radius: 80,
+    lines: [
+      "Dates. Out here. That's not luck — the water sits close under this hollow.",
+      'Liwa is a string of these. Whole villages grew out of gardens the size of this one.',
     ],
   },
   {
