@@ -1334,3 +1334,34 @@ body.photo-mode #help {
     background: rgba(24, 16, 12, 0.82);
   }
 }
+
+/* Stat bars on the car cards. */
+.carselect-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.14rem 0.6rem;
+  margin-top: 0.34rem;
+}
+.carselect-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(243, 228, 210, 0.5);
+}
+.carselect-stat > span { flex: 0 0 3.1rem; }
+.carselect-bar {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(243, 228, 210, 0.14);
+  overflow: hidden;
+}
+.carselect-bar > i {
+  display: block;
+  height: 100%;
+  background: rgba(232, 167, 107, 0.75);
+}
+.carselect-card.is-active .carselect-bar > i { background: #e8a76b; }

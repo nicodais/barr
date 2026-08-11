@@ -25,13 +25,6 @@ export interface VehicleConfig {
   body: BodyId;
   paint: PaintId;
   wheels: WheelStyleId;
-  /** Roof (or cage) rack with a strapped cargo box. */
-  roofRack: boolean;
-  /** Spare wheel — where it hangs depends on the body. */
-  spare: boolean;
-  lightBar: boolean;
-  snorkel: boolean;
-  sandLadders: boolean;
 }
 
 export interface BodyOption {
@@ -39,6 +32,8 @@ export interface BodyOption {
   label: string;
   /** One line for the selection screen — what it is and how it drives. */
   blurb: string;
+  /** Display bars, 0..1. Derived from the tuning below, not invented. */
+  stats: { speed: number; grip: number; weight: number; agility: number };
 }
 
 export interface PaintOption {
@@ -56,24 +51,110 @@ export const BODY_OPTIONS: BodyOption[] = [
   {
     id: 'wagon',
     label: 'Safari Wagon',
-    blurb: 'Long-roof five-door. The one the desert was built around.',
+    blurb: 'The reference. Nothing it does badly, nothing it does first.',
+    stats: { speed: 0.6, grip: 0.62, weight: 0.6, agility: 0.58 },
   },
   {
     id: 'pickup',
     label: 'Full-Size Pickup',
-    blurb: 'Big American crew cab. Blunt nose, long bed, all shoulders.',
+    blurb: 'Two and a half tonnes of momentum. Climbs anything, stops slowly.',
+    stats: { speed: 0.52, grip: 0.72, weight: 0.95, agility: 0.3 },
   },
   {
     id: 'gwagon',
     label: 'Box Wagon',
-    blurb: 'Upright, slab-sided and square. Flat glass, spare on the door.',
+    blurb: 'Tall, square and grippy. Superb on a ridge, nervous across one.',
+    stats: { speed: 0.58, grip: 0.82, weight: 0.62, agility: 0.55 },
   },
   {
     id: 'buggy',
     label: 'Dune Buggy',
-    blurb: 'Tube frame and an engine out the back. Nothing else.',
+    blurb: 'Half a tonne. Floats over soft sand and changes its mind instantly.',
+    stats: { speed: 0.92, grip: 0.42, weight: 0.12, agility: 0.95 },
   },
 ];
+
+/**
+ * How each body actually drives.
+ *
+ * These are real overrides on the tuning object, not a spec sheet next to an
+ * identical car — the earlier version of this feature kept them cosmetic to
+ * protect the driving feel, and the point of stats is that the choice has
+ * consequences. Every number below is a deliberate trade, and the wagon stays
+ * exactly at the tuned baseline so there is always one honest reference to
+ * judge the others against.
+ *
+ * Deliberately untouched everywhere: `gravity` (every force in the tuning is
+ * scaled off it, so a per-body value would silently rescale the whole model)
+ * and the rollover recovery, which stays damage-free and identical for all of
+ * them (§2).
+ */
+export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
+  // The baseline. Empty on purpose.
+  wagon: {},
+
+  // Heavy: hard to stop, hard to turn, and almost impossible to bog because it
+  // carries so much momentum into a climb. The high COM is the cost — this is
+  // the easiest one to put on its roof across a slope.
+  pickup: {
+    mass: 2650,
+    comHeight: 0.40,
+    rollInertia: 1650,
+    pitchInertia: 5400,
+    yawInertia: 3600,
+    engineForce: 3900,
+    topSpeed: 30,
+    brakeForce: 1900,
+    steerRate: 2.4,
+    maxSteerAngle: 0.50,
+    suspensionStiffness: 26,
+    sinkDrag: 1.35,
+    climbBleed: 0.86,
+  },
+
+  // Short, tall and grippy. Best mechanical traction of the four, but the tall
+  // body and high COM mean a sidehill is genuinely tense.
+  gwagon: {
+    mass: 2250,
+    comHeight: 0.42,
+    rollInertia: 1150,
+    engineForce: 3500,
+    topSpeed: 31,
+    hardpackGrip: 1.18,
+    sandGrip: 1.16,
+    hardpackSideGrip: 1.2,
+    sandSideGrip: 1.18,
+    maxSteerAngle: 0.60,
+  },
+
+  // Light enough to stay on top of sand that swallows the others, and low
+  // enough to be very hard to roll. Pays for it in grip: it slides everywhere,
+  // which is the fun of it.
+  buggy: {
+    mass: 720,
+    comHeight: 0.22,
+    rollInertia: 420,
+    pitchInertia: 1500,
+    yawInertia: 900,
+    engineForce: 2300,
+    topSpeed: 39,
+    brakeForce: 1500,
+    steerRate: 4.4,
+    maxSteerAngle: 0.72,
+    suspensionRest: 0.56,
+    suspensionTravel: 0.48,
+    suspensionStiffness: 15,
+    hardpackGrip: 0.86,
+    sandGrip: 0.9,
+    hardpackSideGrip: 0.82,
+    sandSideGrip: 0.86,
+    // The signature: it barely sinks, so soft slip faces that stall a truck are
+    // just a surface to slide across.
+    sinkDrag: 0.35,
+    climbBleed: 0.55,
+    yawAssist: 1.35,
+  },
+};
 
 /**
  * Eight swatches, checked in-engine against red-orange sand at a low sun rather
@@ -108,11 +189,6 @@ export const DEFAULT_VEHICLE: VehicleConfig = {
   body: 'wagon',
   paint: 'safari',
   wheels: 'steel',
-  roofRack: true,
-  spare: true,
-  lightBar: false,
-  snorkel: false,
-  sandLadders: false,
 };
 
 export function paintColor(id: PaintId): number {
@@ -134,8 +210,5 @@ export function sanitizeVehicleConfig(saved: unknown): VehicleConfig {
   if (PAINT_OPTIONS.some((o) => o.id === raw.paint)) config.paint = raw.paint as PaintId;
   if (WHEEL_OPTIONS.some((o) => o.id === raw.wheels)) config.wheels = raw.wheels as WheelStyleId;
 
-  for (const key of ['roofRack', 'spare', 'lightBar', 'snorkel', 'sandLadders'] as const) {
-    if (typeof raw[key] === 'boolean') config[key] = raw[key];
-  }
   return config;
 }

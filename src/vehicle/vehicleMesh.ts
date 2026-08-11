@@ -147,11 +147,33 @@ class PartBuilder {
   build(): THREE.Mesh[] {
     const meshes: THREE.Mesh[] = [];
     for (const [key, geos] of this.parts) {
-      const merged = mergeGeometries(geos, false);
+      // Normalise to non-indexed first. `mergeGeometries` returns null the
+      // moment one part in a bucket carries an index buffer and another
+      // doesn't, and this builder mixes both: Box and Cylinder are indexed,
+      // the lofted shells are not. Unnormalised, the first lofted body
+      // silently deleted every part sharing its material — the whole
+      // bodywork bucket — and the truck rendered as wheels and lamps.
+      // ...and drop every attribute but position and normal while we're here.
+      // The same merge is equally strict about attribute *sets*, and three's
+      // primitives ship a `uv` the lofted shells have no reason to generate.
+      // Nothing in this file is textured — every material is a flat colour — so
+      // the UVs are dead weight that only exists to break the merge.
+      const flat = geos.map((g) => {
+        const n = g.index ? g.toNonIndexed() : g;
+        if (n !== g) g.dispose();
+        for (const name of Object.keys(n.attributes)) {
+          if (name !== 'position' && name !== 'normal') n.deleteAttribute(name);
+        }
+        return n;
+      });
+      const merged = mergeGeometries(flat, false);
       // The source geometries are transient scratch: merging copies their data,
       // so holding them any longer just pins buffers no mesh will ever draw.
-      for (const g of geos) g.dispose();
-      if (!merged) continue;
+      for (const g of flat) g.dispose();
+      if (!merged) {
+        console.warn(`[dune] vehicle merge dropped the "${key}" bucket`);
+        continue;
+      }
       merged.computeBoundingSphere();
       const mesh = new THREE.Mesh(merged, this.materials[key]);
       mesh.castShadow = true;
@@ -177,27 +199,15 @@ function disc(radius: number, width: number, segments: number): THREE.BufferGeom
 // flares and the tailgate spare all stick out past it, exactly as they would on
 // the real thing. The physics box is unchanged.
 const BODY_HALF_W = 0.92;
-const WAIST_TOP = 0.45;
-const ROOF_Y = 1.28;
-const BONNET_TOP = 0.28;
 
 /**
- * What the shared accessory builders need to know about a body. Fitting a light
- * bar or a spare shouldn't need a per-body branch inside every accessory, so
- * each body publishes its mounting points instead.
+ * A body is now just its builder. The bolt-on accessories this used to carry
+ * mounting points for are gone: five toggles multiplying four bodies meant
+ * every silhouette had to survive 32 combinations, which pushed each one toward
+ * a shape generic enough to hang anything off. Fewer, more committed vehicles
+ * beat more permutations of a vague one.
  */
 interface BodySpec {
-  noseZ: number;
-  tailZ: number;
-  /** Top surface a rack or light bar bolts to — roof for the closed bodies. */
-  mountY: number;
-  /** Front/rear z extent available to the roof rack. */
-  rack: [number, number];
-  /** Where a light bar sits, at the leading edge of the roof or cage. */
-  barZ: number;
-  /** Spares hang somewhere different on every body. */
-  spare: 'tailgate' | 'bed' | 'deck';
-  snorkelTopY: number;
   build(b: PartBuilder): void;
 }
 
@@ -208,11 +218,6 @@ export function createVehicleView(config: VehicleConfig = DEFAULT_VEHICLE): Vehi
   const spec = BODIES[config.body];
 
   spec.build(b);
-  if (config.roofRack) buildRoofRack(b, spec);
-  if (config.spare) buildSpare(b, spec);
-  if (config.lightBar) buildLightBar(b, spec);
-  if (config.snorkel) buildSnorkel(b, spec);
-  if (config.sandLadders) buildSandLadders(b, spec, config.roofRack);
 
   const bodyMeshes = b.build();
   for (const mesh of bodyMeshes) root.add(mesh);
@@ -282,21 +287,8 @@ export function createVehicleView(config: VehicleConfig = DEFAULT_VEHICLE): Vehi
 
 // --- shared bodywork ----------------------------------------------------------
 
-/**
- * The engine bay, stepped down from the waist, with the wings at bonnet height.
- * That step is most of what stops a boxy 4x4 reading as a single slab-sided
- * van, and it's clearly there on the reference — the bonnet line sits well
- * below the window line.
- */
-function buildNose(b: PartBuilder, bayZ: number, bayDepth: number, cowlZ: number) {
-  b.add(box(1.82, 1.0 - (WAIST_TOP - BONNET_TOP), bayDepth), 'body', [0, -0.14, bayZ]);
-  // Bonnet lid, slightly proud and inset from the wings.
-  b.add(box(1.74, 0.08, bayDepth - 0.14), 'body', [0, BONNET_TOP + 0.04, bayZ]);
-  // Cowl bridging bonnet up to the waist, under the windscreen.
-  b.add(box(1.78, 0.2, 0.3), 'body', [0, WAIST_TOP - 0.08, cowlZ]);
-}
 
-function buildFront(b: PartBuilder, noseZ: number) {
+function buildFront(b: PartBuilder, noseZ: number, width = 1.94) {
   // Grille: a dark recess with slats catching a little light across it.
   b.add(box(0.98, 0.3, 0.07), 'rubber', [0, 0.13, noseZ + 0.015]);
   for (let i = 0; i < 3; i++) {
@@ -309,9 +301,9 @@ function buildFront(b: PartBuilder, noseZ: number) {
   b.addPair(() => box(0.1, 0.13, 0.05), 'amber', [0.86, 0.13, noseZ + 0.03]);
 
   // Bumper with a valance under it.
-  b.add(box(1.94, 0.24, 0.3), 'chrome', [0, -0.28, noseZ + 0.06]);
-  b.add(box(1.8, 0.2, 0.2), 'trim', [0, -0.48, noseZ + 0.02]);
-  b.add(box(1.86, 0.12, 0.06), 'bodyDark', [0, -0.12, noseZ + 0.04]);
+  b.add(box(width, 0.24, 0.3), 'chrome', [0, -0.28, noseZ + 0.06]);
+  b.add(box(width - 0.14, 0.2, 0.2), 'trim', [0, -0.48, noseZ + 0.02]);
+  b.add(box(width - 0.08, 0.12, 0.06), 'bodyDark', [0, -0.12, noseZ + 0.04]);
 }
 
 function buildRearLamps(b: PartBuilder, tailZ: number) {
@@ -358,495 +350,389 @@ function buildMirrors(b: PartBuilder, z: number, y: number) {
   b.addPair(() => box(0.06, 0.16, 0.11), 'trim', [1.07, y, z]);
 }
 
-/** The upright windscreen a boxy 4x4 has, with its A-pillars and header rail. */
-function buildWindscreen(b: PartBuilder, z: number, topY: number) {
-  b.add(box(1.62, 0.78, 0.06), 'glass', [0, 0.9, z], [-0.26, 0, 0]);
-  b.add(box(1.7, 0.1, 0.1), 'trim', [0, topY, z - 0.095]);
-  b.addPair(() => box(0.08, 0.8, 0.1), 'body', [0.85, 0.9, z - 0.015], [-0.26, 0, 0]);
+// --- lofted volumes -----------------------------------------------------------
+
+/**
+ * One cross-section of a lofted volume: a chamfered rectangle at a station
+ * along Z.
+ */
+interface Station {
+  z: number;
+  /** Half width. */
+  hw: number;
+  /** Floor and roof of the section. */
+  y0: number;
+  y1: number;
+  /** Corner cut. Zero gives a hard box; anything else gives a bevel. */
+  c?: number;
+  /** Lateral offset, for volumes that don't sit on the centreline. */
+  x?: number;
+}
+
+/**
+ * Lofts a run of stations into one shell.
+ *
+ * This is the single biggest thing separating these vehicles from the boxes
+ * they replaced. A car body is a *tapered* volume — it narrows toward the nose,
+ * tucks in at the tail, and the roof pulls in above the waist — and none of
+ * that can be built by stacking axis-aligned boxes. Stacked boxes give you
+ * coincident faces, hard steps where panels should flow, and a silhouette made
+ * of right angles, which is why the first attempt read as toy bricks rather
+ * than as a vehicle.
+ *
+ * The chamfer matters as much as the taper. Under flat shading every bevel is
+ * an extra facet that catches the sun at its own angle, so a chamfered edge
+ * reads as a highlight line down the body — the thing that makes low-poly work
+ * look modelled instead of blocked out. It costs eight verts a station.
+ *
+ * Output is non-indexed so `flatShading` gives each facet its own hard normal.
+ */
+function loft(stations: Station[], capFront = true, capBack = true): THREE.BufferGeometry {
+  const rings = stations.map((s) => {
+    const c = s.c ?? 0;
+    const x = s.x ?? 0;
+    const { hw, y0, y1 } = s;
+    // Counter-clockwise in XY, starting on the right flank. Winding is what
+    // decides which way the normals point, so it is not arbitrary.
+    return [
+      [x + hw, y0 + c], [x + hw, y1 - c],
+      [x + hw - c, y1], [x - hw + c, y1],
+      [x - hw, y1 - c], [x - hw, y0 + c],
+      [x - hw + c, y0], [x + hw - c, y0],
+    ].map(([px, py]) => [px, py, s.z] as [number, number, number]);
+  });
+
+  const verts: number[] = [];
+  const tri = (a: number[], b: number[], c2: number[]) => {
+    verts.push(a[0], a[1], a[2], b[0], b[1], b[2], c2[0], c2[1], c2[2]);
+  };
+
+  for (let s = 0; s < rings.length - 1; s++) {
+    const A = rings[s];
+    const B = rings[s + 1];
+    for (let i = 0; i < A.length; i++) {
+      const j = (i + 1) % A.length;
+      tri(A[i], A[j], B[j]);
+      tri(A[i], B[j], B[i]);
+    }
+  }
+
+  const cap = (ring: [number, number, number][], forward: boolean) => {
+    const cx = ring.reduce((t, p) => t + p[0], 0) / ring.length;
+    const cy = ring.reduce((t, p) => t + p[1], 0) / ring.length;
+    const centre: [number, number, number] = [cx, cy, ring[0][2]];
+    for (let i = 0; i < ring.length; i++) {
+      const j = (i + 1) % ring.length;
+      if (forward) tri(centre, ring[i], ring[j]);
+      else tri(centre, ring[j], ring[i]);
+    }
+  };
+  if (capBack) cap(rings[0], false);
+  if (capFront) cap(rings[rings.length - 1], true);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** A lofted volume added straight to the builder, at the origin. */
+function shell(b: PartBuilder, key: MatKey, stations: Station[], capFront = true, capBack = true) {
+  b.add(loft(stations, capFront, capBack), key, [0, 0, 0]);
 }
 
 // --- bodies -------------------------------------------------------------------
 
 /**
- * The wagon: the long-roof five-door the rest of the game was built around.
+ * The wagon: the long-roof five-door the rest of the game was built around, and
+ * the handling baseline every other body is judged against.
  */
 function buildWagon(b: PartBuilder) {
-  // Cabin and load area.
-  b.add(box(BODY_HALF_W * 2, 1.0, 2.98), 'body', [0, -0.05, -0.6]);
-  buildNose(b, 1.4, 1.34, 0.76);
-  // Sill shadow line, which stops the flank reading as one flat wall.
-  b.add(box(BODY_HALF_W * 2 + 0.01, 0.1, 3.7), 'bodyDark', [0, -0.5, -0.05]);
-
-  // Cabin. The window band is built as a dark box with amber glass sitting
-  // proud of it, so the gaps between panes read as pillars without modelling any.
-  const capH = ROOF_Y - WAIST_TOP;
-  const capMidY = WAIST_TOP + capH / 2;
-  b.add(box(1.74, capH, 2.78), 'body', [0, capMidY, -0.64]);
-  b.add(box(1.765, 0.68, 2.72), 'trim', [0, 0.88, -0.64]);
-  b.add(box(1.78, 0.1, 2.86), 'body', [0, ROOF_Y - 0.05, -0.62]);
-
-  // Side glass: door pane then a long fixed rear pane, split by a B-pillar gap.
-  b.addPair(() => box(0.05, 0.54, 0.92), 'glass', [0.893, 0.88, 0.12]);
-  b.addPair(() => box(0.05, 0.54, 1.34), 'glass', [0.893, 0.88, -1.22]);
-
-  buildWindscreen(b, 0.815, 1.24);
-
-  // Tailgate glass, sitting proud of the rear face — flush with it, the cabin
-  // box swallows all but a sliver and the back of the truck reads as solid.
-  b.add(box(1.6, 0.56, 0.06), 'glass', [0, 0.9, -2.08]);
+  // Hull: tucked at the tail, full through the middle, dropping and narrowing
+  // over the front axle into the nose.
+  shell(b, 'body', [
+    { z: -2.08, hw: 0.80, y0: -0.36, y1: 0.40, c: 0.12 },
+    { z: -1.88, hw: 0.90, y0: -0.48, y1: 0.48, c: 0.10 },
+    { z: 0.30, hw: 0.92, y0: -0.50, y1: 0.50, c: 0.09 },
+    { z: 1.02, hw: 0.91, y0: -0.50, y1: 0.44, c: 0.09 },
+    { z: 1.30, hw: 0.90, y0: -0.50, y1: 0.28, c: 0.10 },
+    { z: 2.00, hw: 0.87, y0: -0.46, y1: 0.24, c: 0.12 },
+    { z: 2.14, hw: 0.76, y0: -0.38, y1: 0.18, c: 0.10 },
+  ]);
+  // Greenhouse, inset from the waist and pulled in above it. The front station
+  // is both lower and further back than the sill, which *is* the windscreen
+  // rake — the glass is the loft, not a plate leaned against it.
+  shell(b, 'body', [
+    { z: -1.98, hw: 0.80, y0: 0.40, y1: 1.22, c: 0.08 },
+    { z: -1.70, hw: 0.845, y0: 0.42, y1: 1.30, c: 0.08 },
+    { z: 0.62, hw: 0.845, y0: 0.42, y1: 1.30, c: 0.08 },
+    { z: 0.96, hw: 0.80, y0: 0.42, y1: 1.22, c: 0.10 },
+  ], false, false);
+  glassBand(b, [-1.62, 0.56], 0.855, 0.62, 1.14, 2);
+  rakedScreen(b, 0.98, 0.62, 1.22, 0.78);
+  b.add(box(1.52, 0.5, 0.06), 'glass', [0, 0.86, -2.0]);
 
   buildArchesAndSteps(b);
-  buildFront(b, 2.12);
-  buildRearLamps(b, -2.10);
-
-  // Door shut lines, cut as thin dark inlays into the flank.
-  b.addPair(() => box(0.02, 0.86, 0.03), 'bodyDark', [BODY_HALF_W, 0.0, 0.66]);
-  b.addPair(() => box(0.02, 0.86, 0.03), 'bodyDark', [BODY_HALF_W, 0.0, -0.44]);
-  b.addPair(() => box(0.02, 0.06, 1.1), 'bodyDark', [BODY_HALF_W, 0.43, 0.11]);
-  b.addPair(() => box(0.04, 0.06, 0.22), 'trim', [BODY_HALF_W + 0.01, 0.2, -0.18]);
-
-  buildMirrors(b, 0.72, 0.62);
-  b.add(box(0.03, 0.11, 0.11), 'bodyDark', [-BODY_HALF_W - 0.005, 0.16, -1.5]);
-  b.add(box(0.5, 0.02, 0.03), 'trim', [-0.3, 0.55, 0.98], [0, 0, 0.12]);
+  buildFront(b, 2.14, 1.62);
+  buildRearLamps(b, -2.08);
+  sideDetails(b, [1.28, 0.14, -1.0], 0.30);
+  buildMirrors(b, 0.86, 0.74);
 }
 
 /**
- * Single-cab pickup. The silhouette job here is the gap: a short cab well
- * forward, then a long open bed, so the roofline stops halfway down the truck
- * instead of running to the tail like the wagon's.
- */
-/**
- * Full-size American crew-cab pickup, in the F-series mould — proportions only,
- * built here from primitives, no badging or licensed geometry (§11).
+ * Full-size American crew cab, in the F-series mould — proportions only, built
+ * from primitives here, no badging or licensed geometry (§11).
  *
- * Three cues do almost all the work of making a truck read as *this* kind of
- * truck rather than a generic one, and none of them is detail:
- *
- *  - **The nose is tall and blunt**, and the grille is a single upright slab
- *    that fills most of it. Everything else in the game has a low bonnet with a
- *    letterbox grille under it; this one is a wall. It gets its own front rather
- *    than the shared `buildFront` for exactly that reason.
- *  - **The beltline is high and dead straight** from the headlamp to the
- *    tailgate, so the glasshouse looks shallow and the body deep.
- *  - **The bed rail steps up** over the rear arch. A flat-topped bed is the
- *    thing that makes a pickup read as a toy.
+ * The read is all in the front third: a nose that stands nearly as tall as the
+ * roof, almost no bonnet drop, and a grille that fills the face rather than
+ * sitting in a letterbox under it.
  */
 function buildPickup(b: PartBuilder) {
-  const NOSE = 2.16;
-  const TAIL = -2.10;
-  const CAB_BACK = -0.34;
-  const BED_FLOOR = 0.42;
-  const BED_WALL_H = 0.5;
-  const wallMidY = BED_FLOOR + BED_WALL_H / 2;
-  const bedMidZ = (CAB_BACK + TAIL) / 2;
-  const bedDepth = CAB_BACK - TAIL;
-  // Deeper flank than the other bodies: the waist sits higher and the bonnet
-  // with it, which is the whole silhouette.
-  const HIGH_WAIST = WAIST_TOP + 0.16;
+  const NOSE = 2.22;
+  const TAIL = -2.14;
+  const WAIST = 0.62;
 
-  b.add(box(BODY_HALF_W * 2, 1.14, 3.2), 'body', [0, 0.02, -0.5]);
-  b.add(box(BODY_HALF_W * 2 + 0.01, 0.1, 3.9), 'bodyDark', [0, -0.5, -0.05]);
+  // Cab hull and bonnet: one shell, because the whole point is how little the
+  // bonnet drops away from the waist.
+  shell(b, 'body', [
+    { z: -0.40, hw: 0.92, y0: -0.50, y1: WAIST, c: 0.09 },
+    { z: 1.06, hw: 0.92, y0: -0.50, y1: WAIST, c: 0.09 },
+    { z: 1.34, hw: 0.91, y0: -0.50, y1: 0.56, c: 0.09 },
+    { z: 2.06, hw: 0.90, y0: -0.48, y1: 0.52, c: 0.11 },
+    { z: NOSE, hw: 0.84, y0: -0.42, y1: 0.46, c: 0.09 },
+  ]);
+  // Bed: a separate shell, slightly narrower, with its own tucked tail.
+  shell(b, 'body', [
+    { z: TAIL, hw: 0.86, y0: -0.44, y1: WAIST + 0.06, c: 0.11 },
+    { z: -1.96, hw: 0.92, y0: -0.50, y1: WAIST + 0.06, c: 0.09 },
+    { z: -0.36, hw: 0.92, y0: -0.50, y1: WAIST + 0.06, c: 0.09 },
+  ]);
+  // Bed well, cut *down* into that shell rather than stood on top of it. The
+  // box has to sit with its top face level with the rail and its body below,
+  // or the "well" reads as a crate strapped to the bed.
+  b.add(box(1.48, 0.36, 1.56), 'bodyDark', [0, WAIST - 0.12, -1.16]);
+  b.add(box(1.5, 0.05, 1.58), 'bodyDark', [0, WAIST - 0.29, -1.16]);
 
-  // Engine bay: tall, square, and barely stepped down from the waist at all.
-  b.add(box(1.86, 0.72, 1.5), 'body', [0, 0.23, 1.38]);
-  b.add(box(1.78, 0.08, 1.36), 'body', [0, 0.6, 1.38]);
-  b.add(box(1.82, 0.2, 0.3), 'body', [0, HIGH_WAIST + 0.02, 0.72]);
-
-  // Bed, floor sunk well below the rail so the walls read as walls.
-  b.add(box(1.72, 0.06, bedDepth - 0.1), 'bodyDark', [0, BED_FLOOR, bedMidZ]);
-  b.addPair(() => box(0.17, BED_WALL_H, bedDepth), 'body', [BODY_HALF_W - 0.085, wallMidY, bedMidZ]);
-  b.add(box(1.86, BED_WALL_H, 0.12), 'body', [0, wallMidY, CAB_BACK - 0.04]);
-  // The step in the rail, over the rear arch.
-  b.addPair(() => box(0.19, 0.12, 0.86), 'body', [BODY_HALF_W - 0.085, wallMidY + BED_WALL_H / 2 + 0.06, -1.45]);
-  // Tailgate: wide, with a pressed horizontal channel across it.
-  b.add(box(1.86, BED_WALL_H + 0.1, 0.1), 'body', [0, wallMidY + 0.05, TAIL + 0.05]);
-  b.add(box(1.6, 0.12, 0.04), 'bodyDark', [0, wallMidY + 0.08, TAIL + 0.09]);
-  b.addPair(() => box(0.21, 0.05, bedDepth), 'trim', [BODY_HALF_W - 0.085, BED_FLOOR + BED_WALL_H, bedMidZ]);
-  b.add(box(1.88, 0.05, 0.14), 'trim', [0, BED_FLOOR + BED_WALL_H + 0.1, TAIL + 0.05]);
-
-  // Crew cab: four doors, so the cabin runs most of the wheelbase.
-  const capH = ROOF_Y + 0.06 - HIGH_WAIST;
-  const capMidY = HIGH_WAIST + capH / 2;
-  const cabMidZ = 0.32;
-  b.add(box(1.76, capH, 1.98), 'body', [0, capMidY, cabMidZ]);
-  b.add(box(1.785, 0.5, 1.92), 'trim', [0, 1.0, cabMidZ]);
-  b.add(box(1.8, 0.1, 2.06), 'body', [0, ROOF_Y + 0.01, cabMidZ]);
-  // Two panes a side, split by a B-pillar — the crew-cab tell from any angle.
-  b.addPair(() => box(0.05, 0.4, 0.78), 'glass', [0.903, 1.0, 0.72]);
-  b.addPair(() => box(0.05, 0.4, 0.66), 'glass', [0.903, 1.0, -0.13]);
-  b.addPair(() => box(0.06, 0.5, 0.06), 'body', [0.9, 1.0, 0.28]);
-  b.add(box(1.62, 0.62, 0.06), 'glass', [0, 1.02, 0.98], [-0.2, 0, 0]);
-  b.add(box(1.72, 0.1, 0.1), 'trim', [0, ROOF_Y + 0.02, 0.92]);
-  b.addPair(() => box(0.08, 0.64, 0.1), 'body', [0.86, 1.02, 0.965], [-0.2, 0, 0]);
-  b.add(box(1.6, 0.42, 0.06), 'glass', [0, 1.02, -0.38]);
+  // Crew cab: four doors, so the greenhouse runs most of the wheelbase.
+  shell(b, 'body', [
+    { z: -0.44, hw: 0.82, y0: WAIST, y1: 1.34, c: 0.08 },
+    { z: -0.20, hw: 0.855, y0: WAIST, y1: 1.38, c: 0.08 },
+    { z: 0.86, hw: 0.855, y0: WAIST, y1: 1.38, c: 0.08 },
+    { z: 1.14, hw: 0.80, y0: WAIST, y1: 1.28, c: 0.10 },
+  ], false, false);
+  glassBand(b, [-0.14, 0.80], 0.865, 0.78, 1.26, 2);
+  rakedScreen(b, 1.16, 0.80, 1.30, 0.82);
+  b.add(box(1.5, 0.38, 0.06), 'glass', [0, 0.98, -0.46]);
 
   buildArchesAndSteps(b);
 
-  // --- the face -------------------------------------------------------------
-  // One upright slab of grille with a heavy surround, rather than the low
-  // letterbox the other bodies wear.
-  b.add(box(1.6, 0.54, 0.08), 'rubber', [0, 0.3, NOSE + 0.02]);
+  // The face: one upright slab of grille filling the nose, heavy bar top and
+  // bottom, square lamps wrapping the corners.
+  b.add(box(1.5, 0.62, 0.08), 'rubber', [0, 0.2, NOSE + 0.01]);
   for (let i = 0; i < 3; i++) {
-    b.add(box(1.52, 0.05, 0.05), 'trim', [0, 0.12 + i * 0.18, NOSE + 0.06]);
+    b.add(box(1.44, 0.05, 0.05), 'trim', [0, 0.0 + i * 0.2, NOSE + 0.05]);
   }
-  b.add(box(1.72, 0.09, 0.09), 'chrome', [0, 0.6, NOSE + 0.03]);
-  b.add(box(1.72, 0.09, 0.09), 'chrome', [0, 0.02, NOSE + 0.03]);
-  // Square headlamps wrapping the corners, sat high on the wings.
-  b.addPair(() => box(0.28, 0.26, 0.06), 'trim', [0.74, 0.34, NOSE + 0.02]);
-  b.addPair(() => box(0.22, 0.19, 0.06), 'lamp', [0.74, 0.36, NOSE + 0.045]);
-  b.addPair(() => box(0.2, 0.08, 0.06), 'amber', [0.74, 0.2, NOSE + 0.045]);
-  b.add(box(1.96, 0.3, 0.32), 'chrome', [0, -0.22, NOSE + 0.05]);
-  b.add(box(1.8, 0.16, 0.2), 'trim', [0, -0.46, NOSE + 0.01]);
-
+  b.add(box(1.62, 0.09, 0.1), 'chrome', [0, 0.53, NOSE + 0.02]);
+  b.addPair(() => box(0.3, 0.24, 0.06), 'trim', [0.68, 0.26, NOSE + 0.01]);
+  b.addPair(() => box(0.24, 0.17, 0.06), 'lamp', [0.68, 0.28, NOSE + 0.04]);
+  b.add(box(1.96, 0.3, 0.3), 'chrome', [0, -0.3, NOSE - 0.02]);
   buildRearLamps(b, TAIL);
-
-  // Door seams, handles and a fuel filler, on the high beltline.
-  b.addPair(() => box(0.02, 1.0, 0.03), 'bodyDark', [BODY_HALF_W, 0.1, 1.3]);
-  b.addPair(() => box(0.02, 1.0, 0.03), 'bodyDark', [BODY_HALF_W, 0.1, 0.28]);
-  b.addPair(() => box(0.02, 1.0, 0.03), 'bodyDark', [BODY_HALF_W, 0.1, -0.36]);
-  b.addPair(() => box(0.04, 0.06, 0.24), 'trim', [BODY_HALF_W + 0.01, 0.42, 0.78]);
-  b.addPair(() => box(0.04, 0.06, 0.24), 'trim', [BODY_HALF_W + 0.01, 0.42, -0.06]);
-  buildMirrors(b, 0.9, 0.82);
-  b.add(box(0.03, 0.12, 0.12), 'bodyDark', [-BODY_HALF_W - 0.005, 0.3, -0.8]);
+  sideDetails(b, [1.2, 0.3, -0.42], 0.5);
+  buildMirrors(b, 1.06, 0.92);
 }
 
 /**
- * The box wagon — a G-Class in proportion and stance, built from primitives
- * here, with no badging or licensed geometry (§11).
+ * The box wagon — a G-Class in proportion and stance, built from primitives,
+ * no badging or licensed geometry (§11).
  *
- * This body is defined by what it *refuses* to do. Everything else in the game
- * has a raked windscreen, rounded shoulders and tucked-in details; this one is
- * orthogonal almost everywhere, and the handful of things that break the boxes
- * are the things people actually recognise it by:
- *
- *  - **The windscreen is vertical.** Not raked a little — vertical. It is the
- *    single strongest cue and the reason this doesn't use `buildWindscreen`.
- *  - **Indicator turrets stand on top of the front wings**, in the driver's
- *    eyeline so they mark where the corners are. Nothing else on any vehicle
- *    sits proud of the bonnet like that.
- *  - **Exposed door hinges** on the outside of the flank, and a grab handle on
- *    the A-pillar.
- *  - **The spare hangs on the back door**, always, not just as an accessory —
- *    the tail is wrong without it.
+ * Defined by refusing to taper. Every other body here narrows somewhere; this
+ * one runs the same width and the same section from bumper to bumper, and the
+ * few things that break the box are the recognisable ones: a vertical
+ * windscreen, indicator turrets standing on the wing tops, and exposed hinges.
+ * The chamfer is kept tight for the same reason — a soft edge would undo it.
  */
 function buildGWagon(b: PartBuilder) {
-  const NOSE = 1.92;
-  const TAIL = -1.82;
-  const ROOF = 1.42;
-  const SIDE = 0.9;
+  const NOSE = 1.98;
+  const TAIL = -1.90;
+  const SIDE = 0.90;
+  const WAIST = 0.52;
 
-  // Slab flank, full height, no tumblehome: the sides are parallel plates.
-  b.add(box(SIDE * 2, 1.06, 3.3), 'body', [0, -0.02, -0.28]);
-  b.add(box(SIDE * 2 + 0.01, 0.1, 3.5), 'bodyDark', [0, -0.5, -0.28]);
-  // Bonnet: flat, level with the waist, barely stepped down at all.
-  b.add(box(1.8, 0.5, 1.16), 'body', [0, 0.26, 1.24]);
-  b.add(box(1.72, 0.07, 1.04), 'body', [0, 0.53, 1.24]);
-
-  // Greenhouse, inset a touch so the waist reads as a ledge running the length.
-  const capH = ROOF - 0.56;
-  b.add(box(1.72, capH, 2.42), 'body', [0, 0.56 + capH / 2, -0.44]);
-  b.add(box(1.8, 0.09, 2.56), 'body', [0, ROOF - 0.045, -0.46]);
-  // Rain gutters along the roof edge — a hard highlight line down each side.
-  b.addPair(() => box(0.06, 0.07, 2.5), 'trim', [0.88, ROOF - 0.1, -0.46]);
-
-  // Flat upright glass all round, with thin pillars between.
-  b.addPair(() => box(0.05, 0.5, 1.0), 'glass', [0.873, 0.9, 0.12]);
-  b.addPair(() => box(0.05, 0.5, 0.82), 'glass', [0.873, 0.9, -1.02]);
-  b.addPair(() => box(0.07, capH, 0.07), 'body', [0.87, 0.56 + capH / 2, -0.44]);
-
-  // The vertical windscreen.
-  b.add(box(1.64, 0.6, 0.06), 'glass', [0, 0.92, 0.79]);
-  b.add(box(1.72, 0.09, 0.12), 'trim', [0, ROOF - 0.08, 0.77]);
-  b.addPair(() => box(0.08, 0.62, 0.09), 'body', [0.86, 0.92, 0.78]);
-  b.add(box(1.68, 0.42, 0.06), 'glass', [0, 0.95, TAIL + 0.06]);
+  shell(b, 'body', [
+    { z: TAIL, hw: SIDE, y0: -0.48, y1: WAIST, c: 0.05 },
+    { z: 1.16, hw: SIDE, y0: -0.48, y1: WAIST, c: 0.05 },
+    { z: 1.22, hw: SIDE, y0: -0.48, y1: 0.42, c: 0.05 },
+    { z: NOSE, hw: SIDE, y0: -0.46, y1: 0.42, c: 0.05 },
+  ]);
+  // Greenhouse: same width as the body, flat sides, flat roof.
+  shell(b, 'body', [
+    { z: TAIL + 0.04, hw: 0.855, y0: WAIST, y1: 1.42, c: 0.05 },
+    { z: 0.82, hw: 0.855, y0: WAIST, y1: 1.42, c: 0.05 },
+  ], false, false);
+  // Vertical windscreen — no rake at all, which is the whole silhouette.
+  b.add(box(1.62, 0.68, 0.06), 'glass', [0, 0.98, 0.83]);
+  b.add(box(1.72, 0.08, 0.14), 'trim', [0, 1.36, 0.81]);
+  b.add(box(1.72, 0.09, 0.16), 'body', [0, 1.42, 0.84]);
+  glassBand(b, [-1.66, 0.72], 0.865, 0.68, 1.3, 2);
+  b.add(box(1.6, 0.5, 0.06), 'glass', [0, 1.0, TAIL + 0.02]);
+  // Rain gutters: a hard highlight line the length of the roof.
+  b.addPair(() => box(0.06, 0.07, 2.6), 'trim', [0.89, 1.35, -0.5]);
 
   buildArchesAndSteps(b);
 
-  // --- the face -------------------------------------------------------------
-  // Round headlamps standing proud in square surrounds, either side of a plain
-  // slatted grille. The lamps sitting *on* the wing rather than inside it is
-  // most of the front-end read.
-  b.add(box(1.06, 0.34, 0.07), 'rubber', [0, 0.28, NOSE + 0.02]);
+  // Round lamps standing proud on the wings, either side of a plain grille.
+  b.add(box(1.04, 0.32, 0.07), 'rubber', [0, 0.2, NOSE + 0.01]);
   for (let i = 0; i < 3; i++) {
-    b.add(box(1.0, 0.04, 0.05), 'trim', [0, 0.16 + i * 0.12, NOSE + 0.055]);
+    b.add(box(0.98, 0.04, 0.05), 'trim', [0, 0.09 + i * 0.11, NOSE + 0.05]);
   }
   b.addPair(() => {
-    const g = new THREE.CylinderGeometry(0.16, 0.16, 0.09, 10);
+    const g = new THREE.CylinderGeometry(0.16, 0.16, 0.1, 10);
     g.rotateX(Math.PI / 2);
     return g;
-  }, 'lamp', [0.66, 0.3, NOSE + 0.04]);
-  b.addPair(() => box(0.38, 0.38, 0.06), 'body', [0.66, 0.3, NOSE - 0.01]);
-  b.add(box(1.9, 0.24, 0.26), 'trim', [0, -0.24, NOSE + 0.04]);
-
-  // Indicator turrets on the wing tops.
-  b.addPair(() => box(0.16, 0.1, 0.24), 'amber', [0.72, 0.61, NOSE - 0.26]);
+  }, 'lamp', [0.62, 0.22, NOSE + 0.04]);
+  b.add(box(1.9, 0.24, 0.24), 'trim', [0, -0.26, NOSE - 0.01]);
+  // The turrets.
+  b.addPair(() => box(0.15, 0.1, 0.24), 'amber', [0.7, 0.47, NOSE - 0.3]);
 
   buildRearLamps(b, TAIL);
+  // Spare on the back door, with its carrier.
+  b.add(box(0.1, 0.44, 0.1), 'trim', [0.16, 0.18, TAIL - 0.1]);
+  b.add(disc(0.42, 0.2, 14), 'rubber', [0.16, 0.2, TAIL - 0.24]);
+  b.add(disc(0.24, 0.22, 12), 'steel', [0.16, 0.2, TAIL - 0.25]);
 
-  // The door-mounted spare is left to the accessory builder rather than being
-  // welded on here, even though this body is the one that most wants one. Built
-  // in, it stacked on top of the accessory version whenever the toggle was on —
-  // two wheels in the same 4 cm of air — and turning the toggle off left a
-  // carrier with nothing in it. One owner for one part.
-  //
-  // What does stay is the carrier arm the wheel bolts to, off to one side the
-  // way a side-hinged gate takes it.
-  b.add(box(0.1, 0.44, 0.1), 'trim', [0.16, 0.16, TAIL - 0.1]);
-
-  // Exposed hinges, flat handles, and the A-pillar grab handle.
-  for (const z of [0.62, -0.42]) {
-    b.addPair(() => box(0.06, 0.09, 0.12), 'trim', [SIDE + 0.02, 0.62, z]);
-    b.addPair(() => box(0.06, 0.09, 0.12), 'trim', [SIDE + 0.02, 0.1, z]);
+  // Exposed hinges — two per door, outside the flank.
+  for (const z of [0.62, -0.5]) {
+    b.addPair(() => box(0.06, 0.09, 0.13), 'trim', [SIDE + 0.02, 0.7, z]);
+    b.addPair(() => box(0.06, 0.09, 0.13), 'trim', [SIDE + 0.02, 0.12, z]);
   }
-  b.addPair(() => box(0.02, 0.9, 0.03), 'bodyDark', [SIDE, 0.06, 0.6]);
-  b.addPair(() => box(0.02, 0.9, 0.03), 'bodyDark', [SIDE, 0.06, -0.44]);
-  b.addPair(() => box(0.05, 0.05, 0.26), 'trim', [SIDE + 0.02, 0.36, 0.2]);
-  b.addPair(() => box(0.05, 0.28, 0.05), 'trim', [SIDE + 0.02, 0.78, 0.66]);
-  buildMirrors(b, 0.74, 0.78);
-  b.add(box(0.03, 0.12, 0.12), 'bodyDark', [-SIDE - 0.005, 0.2, -1.3]);
+  sideDetails(b, [0.58, -0.48], 0.34);
+  buildMirrors(b, 0.8, 0.86);
 }
 
 /**
- * Tube-frame dune buggy: a chassis, two seats, an engine and nothing else.
+ * Tube-frame dune buggy: a chassis, two seats, an engine, and daylight through
+ * the middle of it.
  *
- * The trap here is building a truck and then deleting parts of it, which is
- * what the body this replaced did — it kept a full-width tub, so it read as a
- * bathtub with a cage on top rather than as a frame. A buggy is the other way
- * round: **the structure is the silhouette**, and the bodywork is a few panels
- * hung off it. So this is built tube-first, the tub is narrow and shallow, and
- * you can see the dune straight through the middle of the vehicle.
- *
- * It also skips almost every shared builder. No `buildNose` (there is no engine
- * bay at the front — the engine is behind the axle), no `buildFront` (no grille
- * to cool), and no arch flares, because there is no bodywork for a flare to be
- * proud of.
+ * The trap is building a truck and deleting parts, which is what the body this
+ * replaced did — it kept a full-width tub and read as a bathtub with a cage on
+ * top. Here the structure *is* the silhouette, so the shell is a narrow shallow
+ * pan and everything above the waist is tube.
  */
 function buildBuggy(b: PartBuilder) {
-  const NOSE = 1.86;
-  const TAIL = -1.78;
+  const NOSE = 1.9;
+  const TAIL = -1.8;
   const T = 0.055;
-  const RAIL = 0.66;
-  const HOOP_Y = 1.12;
+  const RAIL = 0.64;
 
-  // --- chassis --------------------------------------------------------------
-  // Two longitudinal rails the length of the car, cross-braced. Everything else
-  // hangs off these.
-  b.addPair(() => tube(3.5, 0.07), 'trim', [RAIL, -0.3, -0.05], [Math.PI / 2, 0, 0]);
-  b.add(tube(1.3, 0.06), 'trim', [0, -0.3, 1.5], [0, 0, Math.PI / 2]);
-  b.add(tube(1.3, 0.06), 'trim', [0, -0.3, -1.5], [0, 0, Math.PI / 2]);
-  b.add(tube(1.3, 0.05), 'trim', [0, -0.3, 0.0], [0, 0, Math.PI / 2]);
+  // Pan: narrow, shallow, pinched to a point at the nose.
+  shell(b, 'body', [
+    { z: -1.34, hw: 0.62, y0: -0.36, y1: 0.06, c: 0.07 },
+    { z: -0.5, hw: 0.70, y0: -0.38, y1: 0.10, c: 0.07 },
+    { z: 0.62, hw: 0.70, y0: -0.38, y1: 0.10, c: 0.07 },
+    { z: 1.12, hw: 0.64, y0: -0.36, y1: 0.02, c: 0.08 },
+    { z: 1.62, hw: 0.44, y0: -0.30, y1: -0.02, c: 0.08 },
+    { z: NOSE, hw: 0.22, y0: -0.24, y1: -0.06, c: 0.05 },
+  ]);
+  // Scuttle in front of the cockpit, the one panel that catches light up high.
+  b.add(box(1.3, 0.3, 0.1), 'body', [0, 0.2, 0.72]);
+  b.add(box(1.24, 0.1, 0.3), 'bodyDark', [0, 0.16, 0.56]);
 
-  // Narrow floor pan and a low scuttle, the only real bodywork on the car.
-  b.add(box(1.28, 0.06, 1.5), 'bodyDark', [0, -0.24, 0.05]);
-  b.add(box(1.32, 0.34, 0.08), 'body', [0, -0.04, 0.82]);
-  b.addPair(() => box(0.07, 0.3, 1.4), 'body', [0.64, -0.06, 0.05]);
-  // Pointed nose cone, the one curved-ish panel on the vehicle.
-  b.add(box(1.16, 0.3, 0.7), 'body', [0, -0.06, 1.28]);
-  b.add(box(0.8, 0.2, 0.4), 'body', [0, -0.02, 1.68]);
+  // Chassis rails, visible under and beside the pan.
+  b.addPair(() => tube(3.4, 0.07), 'trim', [RAIL, -0.34, -0.05], [Math.PI / 2, 0, 0]);
+  b.add(tube(1.26, 0.06), 'trim', [0, -0.34, 1.34], [0, 0, Math.PI / 2]);
+  b.add(tube(1.26, 0.06), 'trim', [0, -0.34, -1.5], [0, 0, Math.PI / 2]);
 
-  // --- cockpit --------------------------------------------------------------
-  b.addPair(() => box(0.4, 0.12, 0.44), 'cargo', [0.36, 0.0, -0.02]);
-  b.addPair(() => box(0.4, 0.56, 0.12), 'cargo', [0.36, 0.3, -0.3]);
-  b.addPair(() => box(0.28, 0.16, 0.1), 'trim', [0.36, 0.62, -0.3]);
-  // Harness straps over each seat back.
-  b.addPair(() => box(0.06, 0.5, 0.03), 'amber', [0.28, 0.32, -0.24], [0, 0, 0.12]);
-  b.add(box(0.9, 0.12, 0.26), 'bodyDark', [0, 0.16, 0.66]);
-  // Steering wheel, visible because there is no roof or screen in the way.
-  b.add(disc(0.17, 0.04, 10), 'trim', [0.36, 0.34, 0.5], [0.5, 0, 0]);
+  // Cockpit.
+  b.addPair(() => box(0.4, 0.12, 0.44), 'cargo', [0.34, 0.14, -0.02]);
+  b.addPair(() => box(0.4, 0.56, 0.12), 'cargo', [0.34, 0.44, -0.3]);
+  b.addPair(() => box(0.28, 0.16, 0.1), 'trim', [0.34, 0.76, -0.3]);
+  b.addPair(() => box(0.06, 0.5, 0.03), 'amber', [0.26, 0.46, -0.24], [0, 0, 0.12]);
+  b.add(disc(0.17, 0.04, 10), 'trim', [0.34, 0.46, 0.5], [0.5, 0, 0]);
 
-  // --- engine, behind the rear axle ----------------------------------------
-  // The defining rear-end read: a bare block with headers curling out of it,
-  // sat out in the open where a truck would have a load bed.
-  b.add(box(0.8, 0.5, 0.66), 'steel', [0, -0.02, -1.42]);
-  b.add(box(0.86, 0.1, 0.7), 'trim', [0, 0.25, -1.42]);
-  b.addPair(() => tube(0.5, 0.045), 'chrome', [0.3, 0.16, -1.72], [1.1, 0.3, 0]);
-  b.add(tube(0.7, 0.06), 'chrome', [0, 0.3, -1.9], [0, 0, Math.PI / 2]);
-  // Whip antenna — the flag every buggy in the desert is required to fly.
-  b.add(tube(1.5, 0.018), 'trim', [-0.5, 0.9, -1.6]);
-  b.add(box(0.24, 0.16, 0.02), 'amber', [-0.5, 1.58, -1.6]);
+  // Engine, out behind the rear axle.
+  shell(b, 'steel', [
+    { z: -1.84, hw: 0.36, y0: -0.2, y1: 0.24, c: 0.07 },
+    { z: -1.6, hw: 0.42, y0: -0.24, y1: 0.3, c: 0.07 },
+    { z: -1.16, hw: 0.42, y0: -0.24, y1: 0.3, c: 0.07 },
+  ]);
+  b.addPair(() => tube(0.5, 0.045), 'chrome', [0.28, 0.24, -1.86], [1.1, 0.3, 0]);
+  b.add(tube(1.05, 0.018), 'trim', [-0.48, 0.85, -1.6]);
+  b.add(box(0.2, 0.14, 0.02), 'amber', [-0.48, 1.32, -1.6]);
 
-  // --- cage -----------------------------------------------------------------
-  // Matte black, like the sliders: bare steel tubing reads as pale spindly
-  // sticks against a bright sky and loses its silhouette entirely.
-  b.addPair(() => tube(1.5, T), 'trim', [RAIL, 0.4, -0.3]);
-  b.add(tube(1.36, T), 'trim', [0, HOOP_Y, -0.3], [0, 0, Math.PI / 2]);
-  // Forward hoop over the scuttle, and the roof rails joining the two.
-  b.addPair(() => tube(0.9, T), 'trim', [RAIL, 0.18, 0.86], [-0.22, 0, 0]);
-  b.add(tube(1.36, T), 'trim', [0, 0.66, 0.94], [0, 0, Math.PI / 2]);
-  b.addPair(() => tube(1.3, T), 'trim', [RAIL, 0.94, 0.3], [1.36, 0, 0]);
-  // Rear stays running back over the engine, and a diagonal across the hoop.
-  b.addPair(() => tube(1.24, T), 'trim', [RAIL, 0.5, -1.02], [0.95, 0, 0]);
-  b.add(tube(1.5, 0.04), 'trim', [0, 0.76, -0.3], [0, 0, 0.72]);
+  // Cage.
+  b.addPair(() => tube(1.6, T), 'trim', [RAIL, 0.5, -0.3]);
+  b.add(tube(1.32, T), 'trim', [0, 1.26, -0.3], [0, 0, Math.PI / 2]);
+  b.addPair(() => tube(0.94, T), 'trim', [RAIL, 0.3, 0.88], [-0.22, 0, 0]);
+  b.add(tube(1.32, T), 'trim', [0, 0.8, 0.96], [0, 0, Math.PI / 2]);
+  b.addPair(() => tube(1.36, T), 'trim', [RAIL, 1.08, 0.32], [1.36, 0, 0]);
+  b.addPair(() => tube(1.28, T), 'trim', [RAIL, 0.6, -1.04], [0.95, 0, 0]);
+  b.add(tube(1.02, 0.04), 'trim', [0, 0.88, -0.3], [0, 0, 0.72]);
 
-  // --- lights and bumpers ---------------------------------------------------
-  // Lamps strapped to the front hoop rather than set into bodywork.
+  // Lamps strapped to the front hoop, and tube bumpers.
   b.addPair(() => {
     const g = new THREE.CylinderGeometry(0.11, 0.11, 0.09, 10);
     g.rotateX(Math.PI / 2);
     return g;
-  }, 'lamp', [0.34, 0.42, 1.0]);
-  b.add(tube(1.5, 0.05), 'steel', [0, -0.18, NOSE + 0.06], [0, 0, Math.PI / 2]);
-  b.addPair(() => tube(0.5, 0.045), 'steel', [0.5, -0.24, NOSE - 0.14], [0, 0.5, 0]);
-  b.add(tube(1.4, 0.05), 'steel', [0, -0.2, TAIL - 0.04], [0, 0, Math.PI / 2]);
+  }, 'lamp', [0.32, 0.56, 1.02]);
+  b.add(tube(1.3, 0.05), 'steel', [0, -0.24, NOSE - 0.04], [0, 0, Math.PI / 2]);
+  b.add(tube(1.36, 0.05), 'steel', [0, -0.24, TAIL - 0.06], [0, 0, Math.PI / 2]);
   for (const side of [1, -1]) {
-    b.add(box(0.16, 0.11, 0.05), 'brake', [side * 0.5, 0.0, TAIL - 0.06]);
+    b.add(box(0.16, 0.11, 0.05), 'brake', [side * 0.46, 0.02, TAIL - 0.1]);
   }
+  // Skid plate in body colour, not bare steel: at this angle a pale slab
+  // under the nose catches the sun and reads as a separate floating object.
+  b.add(box(0.84, 0.05, 0.7), 'bodyDark', [0, -0.42, 1.2]);
+}
 
-  // Skid plate under the nose — the only flat panel that catches light down low.
-  b.add(box(1.1, 0.05, 0.9), 'steel', [0, -0.42, 1.2]);
+// --- shared body details ------------------------------------------------------
+
+/** Side glass as a run of panes, split by pillars. */
+function glassBand(
+  b: PartBuilder,
+  span: [number, number],
+  x: number,
+  y0: number,
+  y1: number,
+  panes: number,
+) {
+  const [back, front] = span;
+  const total = front - back;
+  const gap = 0.07;
+  const each = (total - gap * (panes - 1)) / panes;
+  for (let i = 0; i < panes; i++) {
+    const z = back + each / 2 + i * (each + gap);
+    b.addPair(() => box(0.05, y1 - y0, each), 'glass', [x, (y0 + y1) / 2, z]);
+    if (i > 0) {
+      b.addPair(() => box(0.06, y1 - y0, gap), 'body', [x - 0.005, (y0 + y1) / 2, z - each / 2 - gap / 2]);
+    }
+  }
+}
+
+/** A raked windscreen with its pillars, leaning back from `z`. */
+function rakedScreen(b: PartBuilder, z: number, y0: number, y1: number, width: number) {
+  const h = y1 - y0;
+  b.add(box(width * 2, h + 0.06, 0.06), 'glass', [0, (y0 + y1) / 2, z - 0.06], [-0.24, 0, 0]);
+  b.add(box(width * 2 + 0.08, 0.09, 0.1), 'trim', [0, y1 + 0.02, z - 0.19]);
+  b.addPair(() => box(0.08, h + 0.06, 0.09), 'body', [width - 0.02, (y0 + y1) / 2, z - 0.07], [-0.24, 0, 0]);
+}
+
+/** Door seams and handles down the flank, at the given z stations. */
+function sideDetails(b: PartBuilder, seams: number[], handleY: number) {
+  for (const z of seams) {
+    b.addPair(() => box(0.02, 0.9, 0.03), 'bodyDark', [BODY_HALF_W, 0.02, z]);
+  }
+  for (let i = 0; i < seams.length - 1; i++) {
+    const mid = (seams[i] + seams[i + 1]) / 2;
+    b.addPair(() => box(0.04, 0.06, 0.22), 'trim', [BODY_HALF_W + 0.01, handleY, mid]);
+  }
 }
 
 const BODIES: Record<BodyId, BodySpec> = {
-  wagon: {
-    noseZ: 2.12,
-    tailZ: -2.10,
-    mountY: ROOF_Y,
-    rack: [0.75, -1.75],
-    barZ: 0.74,
-    spare: 'tailgate',
-    snorkelTopY: ROOF_Y + 0.3,
-    build: buildWagon,
-  },
-  pickup: {
-    noseZ: 2.16,
-    tailZ: -2.10,
-    // Crew cab roof sits higher than the others', so the rack and bar follow it.
-    mountY: ROOF_Y + 0.06,
-    rack: [1.2, -0.36],
-    barZ: 0.98,
-    spare: 'bed',
-    snorkelTopY: ROOF_Y + 0.36,
-    build: buildPickup,
-  },
-  gwagon: {
-    noseZ: 1.92,
-    tailZ: -1.82,
-    mountY: 1.42,
-    rack: [0.7, -1.68],
-    barZ: 0.72,
-    // The door-mounted spare is part of this body, so the accessory toggle has
-    // nowhere useful left to put one — it hangs on the bed rail equivalent.
-    spare: 'tailgate',
-    snorkelTopY: 1.72,
-    build: buildGWagon,
-  },
-  buggy: {
-    // No roof: the rack and light bar mount to the cage, which is much lower
-    // and much shorter than any of the closed bodies' roofs.
-    noseZ: 1.86,
-    tailZ: -1.78,
-    mountY: 1.12,
-    rack: [0.2, -0.8],
-    barZ: 0.94,
-    spare: 'deck',
-    snorkelTopY: 1.44,
-    build: buildBuggy,
-  },
+  wagon: { build: buildWagon },
+  pickup: { build: buildPickup },
+  gwagon: { build: buildGWagon },
+  buggy: { build: buildBuggy },
 };
 
-// --- accessories --------------------------------------------------------------
-
-function buildRoofRack(b: PartBuilder, spec: BodySpec) {
-  const [front, back] = spec.rack;
-  const railY = spec.mountY + 0.09;
-  const length = front - back;
-  const midZ = (front + back) / 2;
-
-  b.addPair(() => box(0.05, 0.05, length), 'trim', [0.74, railY, midZ]);
-  // Slats every ~0.4m, however long the rack ended up on this body.
-  const slats = Math.max(2, Math.round(length / 0.4));
-  for (let i = 0; i <= slats; i++) {
-    b.add(box(1.53, 0.045, 0.045), 'trim', [0, railY, back + (length * i) / slats]);
-  }
-  // Short legs lifting the rack off the roof.
-  for (const z of [front - 0.1, back + 0.1]) {
-    b.addPair(() => box(0.05, 0.09, 0.05), 'trim', [0.74, spec.mountY + 0.03, z]);
-  }
-  // Cargo box strapped to the front of the rack.
-  const boxDepth = Math.min(1.0, length - 0.3);
-  const boxZ = front - 0.16 - boxDepth / 2;
-  b.add(box(0.92, 0.3, boxDepth), 'cargo', [0, railY + 0.18, boxZ]);
-  b.add(box(0.94, 0.05, boxDepth + 0.02), 'trim', [0, railY + 0.33, boxZ]);
-}
-
-function buildSpare(b: PartBuilder, spec: BodySpec) {
-  if (spec.spare === 'tailgate') {
-    // Offset the way a side-hinged gate carries it.
-    const z = spec.tailZ - 0.26;
-    b.add(disc(0.4, 0.2, 14), 'rubber', [0.16, 0.06, z]);
-    b.add(disc(0.23, 0.22, 12), 'steel', [0.16, 0.06, z - 0.01]);
-    b.add(box(0.12, 0.12, 0.24), 'trim', [0.16, 0.06, z + 0.16]);
-    return;
-  }
-  if (spec.spare === 'bed') {
-    // Stood against the bulkhead, off to one side, where a bed spare rides.
-    b.add(disc(0.4, 0.2, 14), 'rubber', [0.42, 0.72, -0.82]);
-    b.add(disc(0.23, 0.22, 12), 'steel', [0.42, 0.72, -0.81]);
-    b.add(box(0.06, 0.9, 0.05), 'trim', [0.42, 0.6, -0.72]);
-    return;
-  }
-  // Runner: laid flat on the open deck, because there's no gate and no bulkhead.
-  b.add(new THREE.CylinderGeometry(0.4, 0.4, 0.2, 14), 'rubber', [0.32, 0.14, -1.42]);
-  b.add(new THREE.CylinderGeometry(0.23, 0.23, 0.22, 12), 'steel', [0.32, 0.14, -1.42]);
-}
-
-/**
- * Light bar across the leading edge of the roof or cage. Sits proud and high on
- * purpose: mounted flush it disappears into the roofline from the chase camera,
- * which is the only angle the player ever sees it from.
- */
-function buildLightBar(b: PartBuilder, spec: BodySpec) {
-  const y = spec.mountY + 0.16;
-  b.add(box(1.24, 0.13, 0.11), 'trim', [0, y, spec.barZ]);
-  for (let i = 0; i < 5; i++) {
-    b.add(box(0.18, 0.1, 0.03), 'lamp', [-0.44 + i * 0.22, y, spec.barZ + 0.06]);
-  }
-  b.addPair(() => box(0.05, 0.14, 0.05), 'trim', [0.56, spec.mountY + 0.07, spec.barZ]);
-}
-
-/** Airbox duct up the passenger-side A-pillar, in matte black plastic. */
-function buildSnorkel(b: PartBuilder, spec: BodySpec) {
-  const bottom = -0.05;
-  const top = spec.snorkelTopY;
-  const height = top - bottom;
-  b.add(box(0.12, height, 0.12), 'trim', [0.97, bottom + height / 2, 0.6]);
-  // Forward-facing ram head, wider than the duct so it reads from behind too.
-  b.add(box(0.17, 0.3, 0.2), 'trim', [0.97, top - 0.08, 0.68]);
-  b.add(box(0.19, 0.06, 0.19), 'rubber', [0.97, top - 0.24, 0.69]);
-  b.add(box(0.15, 0.05, 0.14), 'rubber', [0.97, 0.42, 0.61]);
-}
-
-/**
- * Recovery ladders. On the rack they hang off its outer rails, which is both
- * how they're actually carried and the only placement that stays visible from
- * directly behind; with no rack they drop to the flank above the sliders.
- */
-function buildSandLadders(b: PartBuilder, spec: BodySpec, onRack: boolean) {
-  const x = onRack ? 0.8 : BODY_HALF_W + 0.06;
-  // Flank mount sits below the door handles rather than across them, which read
-  // as one confused lump of black trim when they overlapped.
-  const y = onRack ? spec.mountY + 0.24 : -0.04;
-  const [front, back] = spec.rack;
-  const z = onRack ? (front + back) / 2 - 0.15 : -0.35;
-  const length = onRack ? Math.min(1.6, front - back - 0.2) : 1.4;
-
-  b.addPair(() => box(0.05, 0.3, length), 'amber', [x, y, z]);
-  const rungs = Math.max(3, Math.round(length / 0.24));
-  for (let i = 0; i < rungs; i++) {
-    const rz = z - length / 2 + (length * (i + 0.5)) / rungs;
-    b.addPair(() => box(0.07, 0.14, 0.05), 'trim', [x, y, rz]);
-  }
-}
-
-/**
- * Wheels. The tyre is most of what you see and the dish is a bit over half the
- * diameter, matching the reference's proportions.
- *
- * Every style resolves to exactly two geometries — one rubber, one steel — so
- * the dark cut-outs are merged into the *tyre* geometry rather than being their
- * own meshes. Four wheels therefore cost 8 draw calls whichever style is
- * fitted, instead of scaling with how detailed the rim looks.
- */
 function buildWheelGeometry(
   style: WheelStyleId,
 ): { tyre: THREE.BufferGeometry; rim: THREE.BufferGeometry } {

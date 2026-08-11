@@ -6,25 +6,14 @@ import {
   WHEEL_OPTIONS,
   type VehicleConfig,
 } from '../vehicle/vehicleConfig';
-import { buildChoice, buildToggle } from './controls';
+import { buildChoice } from './controls';
 
-interface AccessoryRow {
-  key: 'roofRack' | 'spare' | 'lightBar' | 'snorkel' | 'sandLadders';
-  label: string;
-}
 
 /**
  * Only kit that survives the chase camera is offered. Anything that lives under
  * the truck or inside the cabin is invisible in the one view the player spends
  * the whole session in, so it would be a menu entry that appears to do nothing.
  */
-const ACCESSORIES: AccessoryRow[] = [
-  { key: 'roofRack', label: 'Roof rack' },
-  { key: 'spare', label: 'Spare wheel' },
-  { key: 'lightBar', label: 'Light bar' },
-  { key: 'snorkel', label: 'Snorkel' },
-  { key: 'sandLadders', label: 'Sand ladders' },
-];
 
 /**
  * The garage: body, paint, wheels and kit (§4 visual choices only — none of
@@ -77,17 +66,6 @@ export class GaragePanel {
         (v) => this.set({ wheels: v as VehicleConfig['wheels'] }),
       ),
     );
-
-    const kit = this.section(body, 'Fitted');
-    for (const acc of ACCESSORIES) {
-      kit.appendChild(
-        buildToggle(
-          acc.label,
-          () => this.config[acc.key],
-          (v) => this.set({ [acc.key]: v } as Partial<VehicleConfig>),
-        ),
-      );
-    }
 
     const actions = document.createElement('div');
     actions.className = 'tuning-actions';

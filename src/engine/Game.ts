@@ -16,6 +16,7 @@ import { DebugHud } from '../ui/DebugHud';
 import { TuningPanel } from '../ui/TuningPanel';
 import { GaragePanel } from '../ui/GaragePanel';
 import { CarSelect } from '../ui/CarSelect';
+import { BODY_TUNING } from '../vehicle/vehicleConfig';
 import { loadSettings, saveSettings, type GameSettings } from '../settings/Settings';
 import { GameAudio } from '../audio/GameAudio';
 import { Director } from '../narrative/Director';
@@ -70,6 +71,8 @@ export class Game {
    * they are choosing is the actual car, under the actual light.
    */
   private choosing = true;
+  private baseTuning: Record<string, number>;
+  private previewAngle = 2.1;
   private settings: GameSettings;
   private audio = new GameAudio();
   private subtitles = new RadioSubtitles();
@@ -133,6 +136,10 @@ export class Game {
     }
 
     this.vehicle = new Vehicle(RAPIER, this.world, spawn);
+    // The tuned baseline, captured before any body override touches it. This is
+    // what §2's "tuned by feel" produced, and the per-body deltas are read as
+    // departures from it rather than becoming the new normal.
+    this.baseTuning = { ...this.vehicle.tuning };
     // Settings load before the truck is built: the body and paint the player
     // last chose are part of the very first frame, so there's no moment where
     // someone's pickup appears as the default wagon and then swaps.
@@ -200,6 +207,7 @@ export class Game {
     this.garage = new GaragePanel(this.settings, () => this.rebuildVehicleView());
     this.carSelect = new CarSelect(this.settings.vehicle, () => {
       this.rebuildVehicleView();
+      this.applyBodyTuning();
       saveSettings(this.settings);
     });
 
@@ -269,6 +277,8 @@ export class Game {
     this.compass.hide();
     document.body.classList.add('choosing-car');
 
+    this.applyBodyTuning();
+
     this.syncTransforms(true);
     this.chase.reset(this.curPos, this.curQuat);
     this.onResize();
@@ -285,6 +295,44 @@ export class Game {
     this.running = true;
     this.lastTime = performance.now();
     requestAnimationFrame(this.frame);
+  }
+
+  /**
+   * Folds the chosen body's handling overrides into the live tuning object.
+   *
+   * Rebuilt from the baseline every time rather than patched in place: applying
+   * deltas cumulatively means switching pickup -> buggy -> pickup in the picker
+   * leaves the truck carrying half of each, and the bug only shows up as "the
+   * handling feels wrong sometimes", which is the worst kind to chase.
+   */
+  /**
+   * Turntable for the picker: a slow orbit around the parked truck, tilted down
+   * onto it, framing it against the dunes.
+   *
+   * Driven here rather than by nudging the chase camera's orbit input, because
+   * that input is a *temporary* offset which eases itself back to centre — a
+   * constant value settles at an angle instead of going round. This walks the
+   * angle itself, so it never stops.
+   */
+  private orbitPreview(dt: number) {
+    this.previewAngle += dt * 0.22;
+    const cam = this.chase.camera;
+    const radius = 8.4;
+    const target = this.renderPos;
+    cam.position.set(
+      target.x + Math.sin(this.previewAngle) * radius,
+      target.y + 2.5,
+      target.z + Math.cos(this.previewAngle) * radius,
+    );
+    // Aimed a little above the sills so the car sits in the frame rather than
+    // on its bottom edge, and never below the horizon.
+    cam.lookAt(target.x, target.y + 0.55, target.z);
+  }
+
+  private applyBodyTuning() {
+    Object.assign(this.vehicle.tuning, this.baseTuning);
+    Object.assign(this.vehicle.tuning, BODY_TUNING[this.settings.vehicle.body]);
+    this.vehicle.applyTuning();
   }
 
   /**
@@ -363,7 +411,9 @@ export class Game {
     this.view.root.quaternion.copy(this.renderQuat);
     this.view.update(this.vehicle.wheels);
 
-    if (this.photo.active) {
+    if (this.choosing) {
+      this.orbitPreview(frameDt);
+    } else if (this.photo.active) {
       this.photo.updateCamera(this.chase.camera, this.renderPos);
     } else {
       this.chase.update(

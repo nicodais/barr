@@ -4,7 +4,7 @@ import {
   WHEEL_OPTIONS,
   type VehicleConfig,
 } from '../vehicle/vehicleConfig';
-import { buildToggle } from './controls';
+
 
 /**
  * The car you pick before you start driving.
@@ -13,11 +13,10 @@ import { buildToggle } from './controls';
  * structure" doesn't mean no moment to choose a truck — it means nothing gates
  * you once you're out there). Three decisions shape it:
  *
- *  - **The world renders behind it, with the real vehicle in it.** This is a
- *    preview of the thing itself under the actual desert light, not a spinning
- *    turntable on a grey card. Picking a paint that vanishes against red sand is
- *    a mistake you should be able to see before you commit to it, and the only
- *    way to show that honestly is to show it on the sand.
+ *  - **The preview is the real vehicle in the real world**, on a slow turntable
+ *    under the actual desert light rather than on a grey card. Picking a paint
+ *    that vanishes against red sand is a mistake you should be able to see
+ *    before committing to it, and the only honest way to show that is on sand.
  *  - **It never blocks.** Everything on it is optional and there's a default
  *    already chosen, so hitting Enter or clicking straight through is a complete
  *    interaction. Nobody should have to read a spec sheet to go for a drive.
@@ -47,7 +46,7 @@ export class CarSelect {
 
     const sub = document.createElement('p');
     sub.className = 'carselect-sub';
-    sub.textContent = 'All four drive identically. Choose whichever you like the look of.';
+    sub.textContent = 'They handle differently. Pick one and head out — you can swap later.';
 
     this.bodyList = document.createElement('div');
     this.bodyList.className = 'carselect-bodies';
@@ -65,7 +64,27 @@ export class CarSelect {
       blurb.className = 'carselect-card-blurb';
       blurb.textContent = option.blurb;
 
-      card.append(name, blurb);
+      // Stat bars, on every card at once rather than only the selected one.
+      // The question this screen answers is "which of these do I want", and
+      // that is a comparison — showing one car's numbers at a time turns it
+      // into four separate readings the player has to hold in their head.
+      const stats = document.createElement('div');
+      stats.className = 'carselect-stats';
+      for (const [key, value] of Object.entries(option.stats)) {
+        const stat = document.createElement('div');
+        stat.className = 'carselect-stat';
+        const label = document.createElement('span');
+        label.textContent = key;
+        const track = document.createElement('div');
+        track.className = 'carselect-bar';
+        const fill = document.createElement('i');
+        fill.style.width = `${Math.round(value * 100)}%`;
+        track.appendChild(fill);
+        stat.append(label, track);
+        stats.appendChild(stat);
+      }
+
+      card.append(name, blurb, stats);
       card.onclick = () => {
         this.config.body = option.id;
         this.sync();
@@ -99,18 +118,9 @@ export class CarSelect {
     }
     paintRow.append(paintLabel, this.swatches);
 
-    // Wheels and kit, collapsed into one compact strip — this screen is about
-    // the car, and the garage covers the fiddly stuff later.
     const kit = document.createElement('div');
     kit.className = 'carselect-kit';
-    kit.append(
-      this.buildWheelChoice(),
-      buildToggle('Roof rack', () => this.config.roofRack, (v) => this.set('roofRack', v)),
-      buildToggle('Spare wheel', () => this.config.spare, (v) => this.set('spare', v)),
-      buildToggle('Light bar', () => this.config.lightBar, (v) => this.set('lightBar', v)),
-      buildToggle('Snorkel', () => this.config.snorkel, (v) => this.set('snorkel', v)),
-      buildToggle('Sand ladders', () => this.config.sandLadders, (v) => this.set('sandLadders', v)),
-    );
+    kit.append(this.buildWheelChoice());
 
     const go = document.createElement('button');
     go.type = 'button';
@@ -149,11 +159,6 @@ export class CarSelect {
     }
     row.append(label, group);
     return row;
-  }
-
-  private set(key: 'roofRack' | 'spare' | 'lightBar' | 'snorkel' | 'sandLadders', value: boolean) {
-    this.config[key] = value;
-    this.onChange();
   }
 
   /** Marks the current choices active across every control on the screen. */
