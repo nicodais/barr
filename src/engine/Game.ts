@@ -29,6 +29,7 @@ import { Wildlife } from '../world/Wildlife';
 import { SandPlumes, windFromHaze } from '../world/SandPlumes';
 import { Avalanche } from '../world/Avalanche';
 import { createOldTracks } from '../world/OldTracks';
+import { Weather } from '../world/Weather';
 import { AIRBORNE_SAND } from '../terrain/chunkGeometry';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
 import { PhotoMode } from './PhotoMode';
@@ -62,6 +63,7 @@ export class Game {
   private wildlife = new Wildlife();
   private plumes = new SandPlumes();
   private avalanche = new Avalanche();
+  private weather = new Weather();
   private chase: ChaseCamera;
   private input: InputManager;
   private hud: DebugHud;
@@ -438,6 +440,13 @@ export class Game {
     this.wildlife.update(frameDt, this.renderPos.x, this.renderPos.z);
 
     this.timeOfDay.update(frameDt);
+    // The shamal, folded in after the day curve and before anything reads it,
+    // so the sky, sun, fog and the crest plumes' wind all pick it up without
+    // any of them knowing weather exists. Not gated on `choosing`: a storm
+    // rolling in behind the car picker is a good first impression of the place.
+    const weatherEvent = this.weather.update(frameDt);
+    this.weather.apply(this.timeOfDay.state);
+    if (weatherEvent && !this.choosing) this.director.onWeather(weatherEvent);
     this.timeOfDay.sunDirection(this.sunDir);
     this.rig.update(this.timeOfDay.state, this.sunDir, this.renderPos, this.chase.camera.position);
 
@@ -465,6 +474,7 @@ export class Game {
     // keeps more of the dune's own colour and less of the sky's.
     this.avalanche.setColor(this.slumpColor.copy(this.dustColor).lerp(AIRBORNE_SAND, 0.45));
     // Same wind that drives the sky's haze, so the weather is one thing (§6).
+    this.plumes.setStorm(this.weather.intensity);
     this.plumes.update(
       frameDt,
       this.renderPos.x,

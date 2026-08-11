@@ -74,6 +74,13 @@ export class SandPlumes {
   private activeLimit = MAX_PARTICLES;
   /** Fractional gust emission carried between frames. */
   private budget = 0;
+  /**
+   * 0..1 storm term. The wind value alone already maxes out during a shamal, so
+   * without this the difference between "breezy afternoon" and "storm" is a
+   * handful more wisps two hundred metres away. This is what brings the sand in
+   * close and makes it something you're driving *through*.
+   */
+  private storm = 0;
   private dirty = false;
 
   private geometry: THREE.BufferGeometry;
@@ -110,6 +117,11 @@ export class SandPlumes {
     (this.material.uniforms.uColor.value as THREE.Color).copy(color);
   }
 
+  /** @param k 0..1 shamal intensity, from Weather. */
+  setStorm(k: number) {
+    this.storm = k < 0 ? 0 : k > 1 ? 1 : k;
+  }
+
   setMaxParticles(n: number) {
     this.activeLimit = Math.max(0, Math.min(MAX_PARTICLES, Math.floor(n)));
     if (this.cursor >= this.activeLimit) this.cursor = 0;
@@ -143,9 +155,14 @@ export class SandPlumes {
    */
   private emitGust(px: number, pz: number, wind: number) {
     const angle = Math.random() * Math.PI * 2;
-    const radius = NEAR + Math.random() * (FAR - NEAR);
+    // In a storm the ring closes right in — sand streams past the windscreen,
+    // not just off the ridge line on the horizon.
+    const near = NEAR * (1 - 0.78 * this.storm);
+    const radius = near + Math.random() * (FAR - near);
     const crest = crestNear(px + Math.cos(angle) * radius, pz + Math.sin(angle) * radius);
-    if (crest.amp < MIN_AMP || crest.softness < MIN_SOFTNESS) return;
+    // And smaller features start giving sand up too: in a real shamal every
+    // ripple crest is moving, not only the big brinks.
+    if (crest.amp < MIN_AMP * (1 - 0.65 * this.storm) || crest.softness < MIN_SOFTNESS) return;
 
     // How willing this brink is to give sand up at all.
     const strength = wind * Math.min(1, (crest.amp - MIN_AMP) / 10) * crest.softness;
@@ -191,7 +208,7 @@ export class SandPlumes {
     // Deliberately faint. A plume you notice individually is a smoke machine;
     // the effect wants to be something you only see because the ridge line has
     // gone soft at the top.
-    this.alphas[i] = 0.05 + strength * 0.11;
+    this.alphas[i] = (0.05 + strength * 0.11) * (1 + 1.7 * this.storm);
     this.dirty = true;
   }
 

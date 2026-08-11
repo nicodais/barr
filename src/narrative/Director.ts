@@ -125,6 +125,18 @@ export class Director {
     }
   }
 
+  /**
+   * The shamal arriving or lifting. Held to the same governors as any other
+   * ambient line — if he's mid-sentence or hasn't signed on yet, the weather
+   * simply goes uncommented, which is better than him talking over himself
+   * about it.
+   */
+  onWeather(event: 'arriving' | 'clearing') {
+    if (this.subtitles.busy || !this.signedOn) return;
+    this.ambientTimer = AMBIENT_COOLDOWN;
+    this.call(this.take(event === 'arriving' ? 'stormIn' : 'stormOut'));
+  }
+
   /** Hooked to the vehicle's damage-free auto-flip. */
   onRollover() {
     if (this.subtitles.busy || !this.signedOn) return;
