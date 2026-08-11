@@ -7,24 +7,26 @@
  *
  * ## The region
  *
- * This is not "a desert" — it's the Al Badayer / Mleiha corridor in Sharjah,
- * the stretch of the Emirates that dune bashing actually happens in. Three
+ * This is not "a desert" — it's **Liwa**, on the northern edge of the Rub' al
+ * Khali in Al Dhafra, and specifically the ground around **Tal Moreeb**. Four
  * things about that place drive everything below:
  *
+ *  - There is **one landmark and it dominates**. The great dune is visible from
+ *    everywhere and the region is oriented around it (see MOREEB). Every other
+ *    feature here is scenery by comparison, which is the honest relationship.
  *  - The sand is **red**. Inland Emirati dune sand is quartz with an iron-oxide
  *    coating on the grains, and the finer, more heavily stained grains get blown
  *    up onto the crests — so ridges run red-orange while the coarser, paler
  *    interdune floors stay grey-buff. That's a grain-sorting fact, and it's
  *    modelled as one (see `surfaceAt`) rather than painted on.
- *  - The dunes are **linear and layered**. The shamal blows out of the
- *    north-west and the dune trains here run roughly NNE–SSW, riding on top of
- *    much larger compound ridges (draa). A single dune scale reads as
- *    corrugated iron; the hierarchy is what makes a ridgeline look like
- *    landscape.
- *  - There is **rock in it**. The corridor is the margin of the sand sea, not
- *    its middle: limestone outcrops break through, and wadis run out of them and
- *    die in the sand. Unbroken dunes horizon-to-horizon is the one thing the
- *    real place isn't.
+ *  - The dunes are **big and layered**. The shamal blows out of the north-west,
+ *    and Liwa's dune trains ride on compound ridges (draa) far larger than
+ *    anything in the Emirates' northern deserts. A single dune scale reads as
+ *    corrugated iron; the hierarchy is what makes a ridgeline read as landscape.
+ *  - There is **no rock**. This is deep sand sea — the only ground that isn't
+ *    dune is the sabkha and salt-pan floor in the interdune corridors. An
+ *    outcrop here would be the one thing that reads as wrong, which is why the
+ *    limestone cuestas this file used to carry are gone.
  *
  * ## Slopes are governed, not guessed
  *
@@ -106,10 +108,6 @@ function fract(x: number): number {
   return x - Math.floor(x);
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
 /**
  * fbm remapped to actually span 0..1.
  *
@@ -127,19 +125,18 @@ function fbmRange(x: number, z: number, octaves: number, spread = 0.12): number 
 // --- regional orientation -----------------------------------------------------
 
 /**
- * Dune trend for the corridor.
+ * Dune trend for the region.
  *
  * `+Z` is north and `+X` is east — that's Compass's convention
- * (`atan2(forward.x, forward.z)`), and the POI bearings assume it too. The dune
- * trains between Al Badayer and Al Faya run close to NNE–SSW, driven by the
- * shamal out of the north-west, so crest lines sit on a bearing of about 20°
- * and the sand transport axis is perpendicular to them, on about 110°.
+ * (`atan2(forward.x, forward.z)`), and the POI bearings assume it too. Liwa's
+ * megadune trains run roughly WNW–ESE under the shamal, so crest lines sit near
+ * a bearing of 105° and the sand transport axis is perpendicular, close to 15°.
  *
  * Every downwind measurement in this file is along `u` and every along-crest one
  * is along `v`, so re-aiming the whole dune field is these two numbers and
  * nothing else.
  */
-const CREST_BEARING = (20 * Math.PI) / 180;
+const CREST_BEARING = (105 * Math.PI) / 180;
 export const WIND_X = Math.cos(CREST_BEARING);
 export const WIND_Z = -Math.sin(CREST_BEARING);
 
@@ -195,18 +192,18 @@ const PROFILE_PEAK = 1.5;
  * 0.10 is the value where the steepest tenth of a percent of the sand sits at
  * the angle of repose, which is exactly the physical claim this file is making.
  */
-const SLOPE_RESERVE = 0.1;
+const SLOPE_RESERVE = 0.12;
 
 // --- the dune field -----------------------------------------------------------
 
 const WAVELENGTH = 165;
 /**
- * Compound ridge (draa) spacing. Real draa in the Emirates run 0.5–2 km apart
- * and carry the smaller dunes on their backs; 640 m puts three of them across
- * the curated region, which is enough for the horizon to have shape without the
- * player spending the whole session on one flank.
+ * Compound ridge (draa) spacing. Liwa's draa run 1–2 km apart and carry the
+ * smaller dunes on their backs; 810 m is a compression of that, and puts not
+ * quite two across the curated region — enough for the horizon to have real
+ * structure without the player spending a whole session on one flank.
  */
-const MEGA_WAVELENGTH = 640;
+const MEGA_WAVELENGTH = 810;
 
 /**
  * How built-up the dune field is at this point, 0..1.
@@ -274,7 +271,7 @@ function megaduneAt(u: number, v: number, mask: number): Megadune {
   const wander = (fbm(u * 0.0006 + 61, v * 0.0004 - 19, 2) - 0.5) * 90;
   const phase = 2 * Math.PI * fract((u + wander) / MEGA_WAVELENGTH);
   const along = fbmRange(u * 0.0007 - 5, v * 0.0009 + 3, 2, 0.3);
-  const amp = (18 + 28 * along) * mask;
+  const amp = (20 + 30 * along) * mask;
   const top = 0.5 - 0.5 * Math.cos(phase);
   return {
     h: amp * top,
@@ -370,356 +367,141 @@ function ridgeBump(
   if (d >= 1) return 0;
   return height * (1 - d * d) * (1 - d * d);
 }
-
-// --- limestone outcrops -------------------------------------------------------
-
-/**
- * The corridor is the *margin* of the sand sea. Al Faya and the ridge the
- * fossil beds sit in break straight out of the dunes as bare rock, and their
- * silhouettes are half of what makes this stretch recognisable from the road.
- *
- * ## They are cuestas, and that is the whole design
- *
- * Jebel Faya is a **cuesta**: tilted beds eroded so that one flank is a long
- * gentle dip slope following the bedding, and the other is a short steep scarp
- * cut across it. Getting that right buys three things at once, which is why
- * this shape rather than a hill:
- *
- *  - It looks like the real thing. An asymmetric wedge has a *direction*; the
- *    dome this replaced had none, and read as a boulder the size of a hill.
- *  - It gives the flat-shaded style what it wants (§4). A cuesta is naturally
- *    made of a few big planes meeting at hard edges, which is exactly the
- *    Firewatch language — large flat colour fields and crisp silhouettes. The
- *    previous version quantised a smooth dome into small ledges, which produced
- *    fussy concentric stair-steps: too broken up to read as one clean shape and
- *    too smooth to read as rock.
- *  - **It is drivable.** The dip slope is a ramp to the summit, so the outcrop
- *    is somewhere to go rather than an obstacle to steer around. Climbing the
- *    back of the ridge and parking on the shelf is the best view in the region,
- *    and getting up there is a real dune-bashing problem — the ramp is steep
- *    enough that you have to carry momentum.
- *
- * Rock is added after the sand model and is exempt from the repose solver:
- * limestone doesn't avalanche, so the scarp is allowed to be a genuine cliff.
- */
-interface Jebel {
-  x: number;
-  z: number;
-  /** Strike direction — the axis the ridge runs along. */
-  ca: number;
-  sa: number;
-  /** Half-length along strike. */
-  strikeR: number;
-  /** Distance from the dip-slope toe to the crest, metres. Sets the ramp angle. */
-  dipRun: number;
-  /** Distance from crest to scarp foot, metres. Sets the cliff angle. */
-  scarpRun: number;
-  /** Width of the flat summit shelf, metres. */
-  shelf: number;
-  height: number;
-  /** Bedding benches on the dip slope. Few and large, or it turns to stairs. */
-  benches: number;
-  /** Stable id, so the plan-view faceting is deterministic per outcrop. */
-  seed: number;
-}
-
-function jebel(spec: {
-  x: number; z: number; bearingDeg: number; strikeR: number;
-  dipRun: number; scarpRun: number; shelf: number; height: number;
-  benches: number; seed: number;
-}): Jebel {
-  const a = (spec.bearingDeg * Math.PI) / 180;
-  return { ...spec, ca: Math.cos(a), sa: Math.sin(a) };
-}
-
-// Dip runs are set from the grade they produce, not chosen for footprint: the
-// ramp is `height / (dipRun - shelf)`, and the bedding benches multiply the
-// steepest part of it by about 1.5 (see `beddingStair`). Both numbers below were
-// picked by working backwards from a target climb angle and then confirmed by
-// sampling a section across each ridge.
-const JEBELS: Jebel[] = [
-  // The fossil ridge. The big one, and the source of the wadi. Climbs at about
-  // 22 degrees, touching 31 on the bench risers — a climb you have to commit to
-  // and can bog halfway up, with the highest ground for kilometres as the payoff.
-  jebel({
-    x: 330, z: -580, bearingDeg: 32, strikeR: 150,
-    dipRun: 179, scarpRun: 44, shelf: 26, height: 62, benches: 3, seed: 11,
-  }),
-  // A long low spine on the western edge — a horizon feature you navigate by
-  // long before you reach it. About 14 degrees: the one you can get up without
-  // thinking about it, so there's an easy summit and a hard one rather than two
-  // of the same.
-  jebel({
-    x: -640, z: 250, bearingDeg: 10, strikeR: 210,
-    dipRun: 170, scarpRun: 30, shelf: 18, height: 38, benches: 2, seed: 29,
-  }),
-];
+// --- the great dune -----------------------------------------------------------
 
 /**
- * Local coordinates for an outcrop: `s` along strike in metres, `v` across the
- * dip direction in metres with 0 at the crest line (negative = up the dip
- * slope, positive = out over the scarp).
+ * Tal Moreeb — the one landmark this region is built around.
  *
- * The faceting lives here rather than in the height function. `s` is quantised
- * into a handful of segments and each segment is given a fixed setback, so the
- * cliff top steps in and out in straight sections instead of curving. That is
- * what turns the scarp into a row of flat buttress faces meeting at vertical
- * corners — angular by construction. A smooth noise offset, which is what this
- * used to do, gives you a wobbly cliff, and a wobbly cliff under flat shading
- * is just noise.
+ * ## Compressed, and honest about it
  *
- * `setback` moves **only the top of the scarp**, never the crest line the ramp
- * climbs to. Applying it to the crest is the obvious thing and it is wrong: the
- * setback is piecewise constant, so it puts a vertical step at every segment
- * boundary, and if the ramp's geometry depends on it those steps land across the
- * ramp as 13 m walls every 33 m. Sampling a section found exactly that — a
- * "drivable" slope that was really a flight of stairs. On the cliff the same
- * discontinuity is the feature.
+ * The real dune is roughly 1.6 km long and rises somewhere between 100 m and
+ * 300 m depending where you call the base. The curated region is about 1.5 km
+ * across, so at true scale the great dune would be *larger than the entire
+ * playable area* — you would spawn on it and never find its edges. This is
+ * built at about 120 m over a 640 m crest instead: still more than twice
+ * anything else in the world, still visible from every corner of the region,
+ * and still a climb that takes commitment, but with room left over for a
+ * desert to exist around it.
+ *
+ * ## The climb face is the point
+ *
+ * Moreeb is famous because people race up it. The Liwa festival runs hill
+ * climbs straight at the steep face, and that is the interaction worth having
+ * here: pick your line, carry everything you have into it, and find out how far
+ * up you get. So the dune is deliberately asymmetric in a way the procedural
+ * field never is —
+ *
+ *  - **The south-west face is the climb.** Long, straight, unbroken and pitched
+ *    just inside what a truck can actually take with a run-up. It is the only
+ *    slope in the region tuned to be *nearly* too steep.
+ *  - **The north-east face is a slip face** at the angle of repose, which is
+ *    what the sand does when it is left alone.
+ *
+ * Like the sculpted set pieces it sits among, this is exempt from the repose
+ * solver — the solver governs the procedural field, and a hand-placed landmark
+ * that the whole map is named for gets to be its own shape. What it does obey
+ * is drivability, which was measured rather than guessed (see MOREEB).
  */
-function jebelLocal(j: Jebel, x: number, z: number): { s: number; v: number; setback: number } {
-  const dx = x - j.x;
-  const dz = z - j.z;
-  const s = dx * j.ca + dz * j.sa;
-  const v = -dx * j.sa + dz * j.ca;
-  // Two scales of segment rather than one. A single uniform partition gives
-  // every buttress the same width and the cliff top comes out as an even
-  // zigzag — it reads as a saw blade, not as rock. Overlaying a coarse
-  // partition with a finer one produces broad faces that are themselves
-  // stepped, and because the two boundaries rarely coincide, the run lengths
-  // vary on their own without needing any noise.
-  const coarse = Math.floor((s / j.strikeR) * 1.7);
-  const fine = Math.floor((s / j.strikeR) * 5.3);
-  const setback =
-    (hash2(coarse, j.seed) - 0.5) * 0.72 +
-    (hash2(fine, j.seed + 7717) - 0.5) * 0.34;
-  return { s, v, setback };
-}
-
-/**
- * Bedding benches on the dip slope: flatter treads separated by steeper risers.
- *
- * The obvious implementation — quantise with `round()` and lerp toward it — is
- * what this replaced, and it made the ramp unclimbable. A rounded staircase is
- * *discontinuous*, so each bench edge is a vertical wall however small you make
- * the blend; sampling the first version found 60° steps sitting in the middle of
- * an 11° slope. This version keeps the staircase continuous and its gradient
- * bounded: the riser is a smoothstep, so the steepest point is a known multiple
- * (about 3.7x) of the mean grade, and `blend` buys strata at a price in slope
- * you can actually calculate before you drive into it.
- */
-function beddingStair(t: number, benches: number, blend: number): number {
-  const c = t * benches;
-  const i = Math.floor(c);
-  const riser = smoothstep(0.6, 1, c - i);
-  return lerp(t, (i + riser) / benches, blend);
-}
-
-/** How much of the mean grade a bench riser adds. See `beddingStair`. */
-const BENCH_BLEND = 0.18;
-
-/**
- * Where bare rock is showing, 0..1. Drives colour and traction.
- *
- * Derived by comparing the rock surface against the sand rather than from a
- * separate falloff, so the limestone colour cannot drift out of register with
- * the limestone geometry. It also gets the interesting part right for free: the
- * toe of the ramp, where sand has banked over the bedding, comes out as sand
- * because that is literally what is on top there.
- */
-export function rockAt(x: number, z: number): number {
-  const top = jebelHeightAt(x, z);
-  if (top === -Infinity) return 0;
-  return smoothstep(-1.5, 1.5, top - duneGroundAt(x, z));
-}
-
-/**
- * Ground elevation each outcrop stands on, sampled once from the dune field.
- *
- * Rock has to be positioned against an absolute datum, not added to whatever
- * the sand happens to be doing underneath it. Added, the "flat" summit shelf
- * inherits every metre of dune relief below it and comes out tilted — which
- * defeats the one job the shelf has, which is to be somewhere you can stop the
- * truck and look. Lazy for the usual reason: it needs the height field, which
- * isn't callable while this module is initialising.
- */
-const jebelBase = new Map<Jebel, number>();
-
-function baseOf(j: Jebel): number {
-  let base = jebelBase.get(j);
-  if (base === undefined) {
-    base = duneGroundAt(j.x, j.z);
-    jebelBase.set(j, base);
-  }
-  return base;
-}
-
-/**
- * Absolute top-of-rock elevation here, or -Infinity off the outcrops.
- *
- * The caller takes the max of this and the sand, so the rock punches up through
- * the dune field and the dunes still bank against its flanks wherever they are
- * higher than its skirt — which is what the real interface looks like, sand
- * drifted up against stone rather than stone sitting on a plinth of sand.
- */
-function jebelHeightAt(x: number, z: number): number {
-  let top = -Infinity;
-  for (const j of JEBELS) {
-    const { s, v, setback } = jebelLocal(j, x, z);
-
-    // The crest line is straight — see the note in `jebelLocal`. Only the brink,
-    // where the shelf gives way to the cliff, steps per segment.
-    const toe = -j.dipRun;
-    const brink = setback * j.scarpRun * 0.55;
-    // Generous bounds. Every surface below runs *past* where the rock meets the
-    // sand and keeps going down, so the caller's `max` against the dune field
-    // finds the crossing on its own. Stopping the rock surface at zero instead
-    // leaves its skirt as a horizontal plane at the outcrop's datum, and every
-    // hollow in the sand around it then reads as a 10 m step — which is exactly
-    // what the first sampling run of this shape found ringing both outcrops.
-    if (v < toe - 60 || v > brink + j.scarpRun * 1.9) continue;
-    if (Math.abs(s) > j.strikeR * 1.25) continue;
-
-    let local: number;
-    if (v <= -j.shelf) {
-      // Dip slope: a linear bedding plane, which is both what the rock does and
-      // what is predictable to drive up. `t` is deliberately unclamped below 0
-      // so the plane continues under the sand past the toe.
-      const t = (v - toe) / (j.dipRun - j.shelf);
-      local = j.height * (t < 0 ? t * 1.6 : beddingStair(Math.min(t, 1), j.benches, BENCH_BLEND));
-    } else if (v <= brink) {
-      // The summit shelf: dead flat, and wide enough to park on and look.
-      local = j.height;
-    } else {
-      // The scarp: near-vertical where it breaks at the brink, easing into a
-      // talus apron of shed rubble at the foot. Steepest at the top is the way
-      // round a cliff actually weathers; the mirror of it gives a dome with a
-      // sharp skirt, which is a hill, not a scarp. Signed so it keeps falling
-      // past the foot and dives under the sand.
-      const t = (v - brink) / j.scarpRun;
-      local = j.height * (1 - t) * Math.abs(1 - t);
-    }
-
-    // The ends of the ridge. A cuesta terminates in a steep nose, so this dives
-    // hard rather than tapering — but it dives *below* the sand, so how much of
-    // the nose you actually see is decided by the dunes banked against it.
-    const endT = clamp01((Math.abs(s) / j.strikeR - 0.68) / 0.32);
-    local -= endT * (j.height + 40);
-
-    top = Math.max(top, baseOf(j) + local);
-  }
-  return top;
-}
-
-// --- the wadi -----------------------------------------------------------------
-
-/**
- * A gravel wash running out of the fossil ridge and dying in the sand.
- *
- * This is what the sand-sea margin actually looks like: the rare rain comes off
- * the rock, cuts a flat-floored channel through the dunes, and loses the fight
- * a few hundred metres out. It earns its place in the drive too — it's the one
- * piece of firm, fast, flat ground in the region, so it reads as a road without
- * anyone having built one.
- */
-const WADI = {
-  x0: 190,
-  z0: -660,
-  /** Bearing 315° — out of the ridge, away to the north-west. */
-  dirX: -Math.SQRT1_2,
-  dirZ: Math.SQRT1_2,
-  length: 300,
-  halfWidth: 20,
-  bankWidth: 28,
-  depth: 5.5,
-  meander: 24,
-  /** Radians per metre along the channel; ~330 m per meander. */
-  meanderRate: 0.019,
-  /** How far in from each end the channel fades up to grade. */
-  headFade: 45,
-  tailFade: 150,
+const MOREEB = {
+  x: 300,
+  z: -210,
+  /** Crest bearing, radians. Runs across the prevailing dune trend. */
+  bearing: (52 * Math.PI) / 180,
+  /** Half-length of the crest line. */
+  crestR: 320,
+  height: 120,
   /**
-   * Hard ceiling on how far the channel may lower the ground.
+   * Horizontal run of the climb face.
    *
-   * Without it, the floor's monotonic descent meets a dune that happens to lie
-   * across the line and the grading obediently cuts a 30 m canyon through it,
-   * with banks at 50°. Water in sand does not do that — it ponds, spreads, and
-   * goes around. Capping the cut turns those crossings into the shallow braided
-   * trough they should be, and keeps the bank slope bounded by
-   * `maxCut / bankWidth` everywhere.
+   * Solved backwards from the angle rather than picked: the profile below is
+   * steepest at its foot at 1.5x the mean grade, so a 35° worst case over a
+   * 120 m rise needs 1.5 * 120 / tan(35°) ≈ 257 m of run, plus the crown. Past
+   * the angle of repose on purpose — this is the one slope in the region that
+   * is genuinely marginal, and the appeal of the real dune is precisely that it
+   * is steeper than sand has any business being. Sampling puts the built result
+   * near 37° once the dune field underneath adds its own gradient.
    */
-  maxCut: 7,
+  climbRun: 285,
+  /**
+   * Slip face. At repose, like every other slip face here — 1.5 * 120 /
+   * tan(33°) ≈ 277 m. It is *longer* than the climb face, which looks wrong
+   * written down and is right: repose is a shallower angle than the climb.
+   */
+  slipRun: 280,
+  /** Flat-ish crest to stop on. */
+  crown: 26,
 };
 
-/** Centreline offset perpendicular to the axis, at distance `s` along it. */
-function wadiMeander(s: number): number {
-  return WADI.meander * Math.sin(s * WADI.meanderRate);
-}
+const MOREEB_CA = Math.cos(MOREEB.bearing);
+const MOREEB_SA = Math.sin(MOREEB.bearing);
 
-/** Along/lateral coordinates in the channel's own frame. */
-function wadiFrame(x: number, z: number): { s: number; lateral: number } {
-  const dx = x - WADI.x0;
-  const dz = z - WADI.z0;
-  const s = dx * WADI.dirX + dz * WADI.dirZ;
-  const n = -dx * WADI.dirZ + dz * WADI.dirX;
-  return { s, lateral: Math.abs(n - wadiMeander(s)) };
-}
-
-/** 0 outside the wash, 1 on the channel floor. */
-export function wadiAt(x: number, z: number): number {
-  const { s, lateral } = wadiFrame(x, z);
-  if (s < -WADI.bankWidth || s > WADI.length + WADI.bankWidth) return 0;
-  const across = 1 - smoothstep(WADI.halfWidth, WADI.halfWidth + WADI.bankWidth, lateral);
-  if (across <= 0) return 0;
-  const along =
-    smoothstep(0, WADI.headFade, s) *
-    smoothstep(WADI.length, WADI.length - WADI.tailFade, s);
-  return across * along;
-}
+/** Where the summit sits, for the POI and the compass to agree with the hill. */
+export const GREAT_DUNE = { x: MOREEB.x, z: MOREEB.z };
 
 /**
- * The channel floor's height profile, sampled lazily along the axis.
+ * Height added by the great dune, and how much of it is here at all.
  *
- * A wadi floor is *graded* — water cut it, so it's flat across and runs
- * monotonically downhill. Subtracting a fixed channel shape from the dune field
- * would instead give a trench with dunes in the bottom of it, which is not a
- * thing water has ever produced. So the floor is built from the pre-wadi ground
- * along the centreline, forced to descend by a running minimum, and the ground
- * is then graded toward it.
- *
- * Sampled lazily for the same reason the POI pads are: it needs the height
- * field, which isn't callable while this module is still initialising.
+ * The `presence` term is returned alongside the height because the surface
+ * model needs it: sand this steep and this exposed is scoured and re-sorted
+ * constantly, so the dune's own faces read differently from the field around
+ * them, and the colour has to know where the dune is without re-deriving it.
  */
-const WADI_SAMPLES = 24;
-let wadiFloor: Float32Array | null = null;
+function moreebAt(x: number, z: number): { h: number; presence: number } {
+  const dx = x - MOREEB.x;
+  const dz = z - MOREEB.z;
+  // s runs along the crest, v across it: negative into the climb face,
+  // positive out over the slip face.
+  const s = dx * MOREEB_CA + dz * MOREEB_SA;
+  const v = -dx * MOREEB_SA + dz * MOREEB_CA;
 
-function wadiFloorAt(s: number): number {
-  if (!wadiFloor) {
-    wadiFloor = new Float32Array(WADI_SAMPLES + 1);
-    let running = Infinity;
-    for (let i = 0; i <= WADI_SAMPLES; i++) {
-      const t = (i / WADI_SAMPLES) * WADI.length;
-      const off = wadiMeander(t);
-      const cx = WADI.x0 + WADI.dirX * t - WADI.dirZ * off;
-      const cz = WADI.z0 + WADI.dirZ * t + WADI.dirX * off;
-      running = Math.min(running, sandHeightAt(cx, cz));
-      wadiFloor[i] = running;
-    }
+  if (v < -MOREEB.climbRun || v > MOREEB.slipRun) return { h: 0, presence: 0 };
+
+  // Along the crest: full height across the middle, falling away to squared-off
+  // shoulders rather than a point. A dune this size ends in a nose, not a tip.
+  //
+  // The taper fraction is a slope, not a styling choice, and it was the single
+  // steepest thing in the region before it was solved for. At 0.34 the nose
+  // shed the full 120 m over 109 m of crest — a 48° flank on the *ends* of the
+  // dune, steeper than either of its actual faces, and invisible in the stats
+  // because so little of the dune is "present" out there that it reads as
+  // field. 0.54 spreads the same drop over 173 m and brings it to 35°.
+  const along = clamp01((1 - Math.abs(s) / MOREEB.crestR) / 0.54);
+  if (along <= 0) return { h: 0, presence: 0 };
+
+  let profile: number;
+  if (v <= -MOREEB.crown) {
+    // The climb: steepest at the foot, easing toward the crest.
+    //
+    // That direction is the whole design. A smoothstep — or anything with an
+    // exponent above 1 — is shallow at the bottom and steepens in the middle or
+    // at the top, which puts the hardest metres exactly where the truck has
+    // already spent its momentum; you get the same failure every run with no
+    // way to read it coming. Front-loading the grade means the decision is made
+    // at the bottom, where the player can still act on it: commit or don't.
+    // `1-(1-t)^1.5` has a gradient of exactly 1.5x the mean at t=0 and falls
+    // monotonically from there, which is why the run above could be solved from
+    // an angle. Getting this exponent wrong is expensive and quiet: the first
+    // attempt used a cubic falloff whose gradient at the foot is 3.5x the mean,
+    // so the bottom of the climb was a 58° wall — the steepest thing in the
+    // region, sitting exactly where the player is meant to commit.
+    const t = clamp01((v + MOREEB.climbRun) / (MOREEB.climbRun - MOREEB.crown));
+    profile = 1 - Math.pow(1 - t, 1.5);
+  } else if (v <= 0) {
+    profile = 1;
+  } else {
+    // Slip face: smoothstep down, so it breaks over the brink rather than
+    // starting at full pitch the way the climb face does.
+    const t = clamp01(v / MOREEB.slipRun);
+    profile = 1 - t * t * (3 - 2 * t);
   }
-  const t = clamp01(s / WADI.length) * WADI_SAMPLES;
-  const i = Math.min(WADI_SAMPLES - 1, Math.floor(t));
-  return lerp(wadiFloor[i], wadiFloor[i + 1], t - i) - WADI.depth;
+
+  const presence = along * profile;
+  return { h: MOREEB.height * presence, presence };
 }
 
 // --- assembly -----------------------------------------------------------------
 
-/**
- * The dune field alone — no rock, no wadi.
- *
- * Split out because both of those need to sample the ground they are placed
- * against: the outcrops need a datum to stand their summit shelf on, and the
- * wadi needs the profile of what it is cutting. Going through `sandHeightAt`
- * for that would recurse.
- */
+/** The procedural dune field, before the great dune is added on top of it. */
 function duneGroundAt(x: number, z: number): number {
   const s = duneSample(x, z);
 
@@ -740,8 +522,8 @@ function duneGroundAt(x: number, z: number): number {
   // so the width radius is what decides the face angle, and each of these is
   // sized to come out at or just under repose on its own.
   let sculpted = 0;
-  // A big steep-faced dune: the momentum-climb proving ground.
-  sculpted += ridgeBump(x, z, 470, -260, 0.4, 150, 115, 44);
+  // No sculpted hero dune here any more: the great dune is the hero, and a 44 m
+  // lump 200 m off its flank read as a spare hill nobody had a use for.
   // A long sidehill traverse: rollover tension without a cliff at the end.
   sculpted += ridgeBump(x, z, -430, 300, 1.9, 250, 88, 30);
   // A short sharp kicker for airtime and landing compression. The steepest of
@@ -786,27 +568,9 @@ function duneGroundAt(x: number, z: number): number {
   return h;
 }
 
-/**
- * The sand model plus rock: everything the wadi is allowed to cut into.
- *
- * `max` rather than `+`: an outcrop is bedrock standing in the sand sea at its
- * own elevation, not a lump added to whatever the dunes are doing. Taking the
- * higher of the two also gets the interface right for free — the rock wins
- * where it stands proud, and the dunes win where they have drifted up over its
- * skirt.
- */
-function sandHeightAt(x: number, z: number): number {
-  return Math.max(duneGroundAt(x, z), jebelHeightAt(x, z));
-}
-
 /** The full landscape, before POI pads. Pad targets are sampled from this. */
 function rawHeightAt(x: number, z: number): number {
-  const h = sandHeightAt(x, z);
-  const w = wadiAt(x, z);
-  if (w <= 0) return h;
-  const { s } = wadiFrame(x, z);
-  const floor = Math.max(wadiFloorAt(s), h - WADI.maxCut);
-  return h + (floor - h) * w;
+  return duneGroundAt(x, z) + moreebAt(x, z).h;
 }
 
 // --- POI ground pads ----------------------------------------------------------
@@ -919,25 +683,25 @@ export interface Surface {
   softness: number;
   /** Iron-oxide staining, 0 = pale carbonate-rich, 1 = deep red. */
   iron: number;
-  /** Bare limestone. */
-  rock: number;
-  /** Water-worked wadi gravel. */
-  wadi: number;
+  /**
+   * How much of the great dune is under this point, 0..1. Its faces are scoured
+   * and re-sorted by every wind that hits them, so they don't wear the same
+   * surface as the field around them.
+   */
+  greatDune: number;
   /** Salt crust on a pan floor. */
   sabkha: number;
 }
 
 export function surfaceAt(x: number, z: number): Surface {
   const s = duneSample(x, z);
-  const rock = rockAt(x, z);
-  const wadi = wadiAt(x, z);
+  const { presence } = moreebAt(x, z);
 
   const base = fbm(x * 0.0035 + 40, z * 0.0035 - 25, 3);
   // Windward faces get packed hard by the wind; lee/slip faces stay loose.
   const lee = smoothstep(s.crest - 0.08, s.crest + 0.12, s.p);
-  // Neither rock nor a scoured gravel bed holds loose sand.
   const natural = clamp01(
-    clamp01(0.2 + base * 0.55 + lee * 0.4) * (0.35 + 0.65 * s.field) * (1 - rock) * (1 - 0.85 * wadi),
+    clamp01(0.2 + base * 0.55 + lee * 0.4) * (0.35 + 0.65 * s.field),
   );
   // Spawn pan is hardpack: a stable reference surface for tuning. Applied only
   // to the traction value, never to the mineralogy below — the pan is a place
@@ -951,12 +715,18 @@ export function surfaceAt(x: number, z: number): Surface {
   // Broad regional variation, so the red isn't uniform across the whole map —
   // out there it comes in patches too, depending on what the sand came off.
   const patch = 0.58 + 0.42 * fbmRange(x * 0.0016 + 91, z * 0.0016 - 33, 2, 0.14);
-  const iron = clamp01((0.16 + 0.78 * exposure) * patch + 0.16 * (natural - 0.35));
+  // The great dune runs redder than anything around it, and for the reason the
+  // rest of the model already encodes: it is the highest, most exposed sand
+  // here, so it collects the finest and most heavily iron-stained grains.
+  const iron = clamp01(
+    (0.16 + 0.78 * exposure) * patch + 0.16 * (natural - 0.35) + 0.3 * presence,
+  );
 
   // Salt pan: the flat, firm, low-lying floors between dune fields.
-  const sabkha = smoothstep(0.46, 0.26, s.field) * (1 - natural) * (1 - rock);
+  // A salt pan can't be halfway up the great dune, whatever the field mask says.
+  const sabkha = smoothstep(0.46, 0.26, s.field) * (1 - natural) * (1 - presence);
 
-  return { softness, iron, rock, wadi, sabkha };
+  return { softness, iron, greatDune: presence, sabkha };
 }
 
 /**

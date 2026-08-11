@@ -24,8 +24,7 @@ export type PoiKind =
   | 'famousdune'
   | 'falconry'
   | 'cameltrack'
-  | 'coffeehearth'
-  | 'fossilridge';
+  | 'coffeehearth';
 
 export interface Poi {
   id: PoiKind;
@@ -93,13 +92,16 @@ export const POIS: Poi[] = [
       "Karak's still on the stove. Don't touch it.",
     ],
   },
+  // Tal Moreeb. Sits on the summit, so the card is what's waiting at the top of
+  // the climb rather than something collected at the bottom — and the radius is
+  // kept tight for the same reason.
   {
     id: 'famousdune',
-    name: 'The Famous Dune',
-    x: 470, z: -260, radius: 95,
+    name: 'Tal Moreeb',
+    x: 310, z: -218, radius: 70,
     lines: [
-      'This dune has more photos of it than my entire family. I never understood why.',
-      'People drive two hours to stand on sand that looks like all the other sand. Mashallah.',
+      'Tal Moreeb. Three hundred metres of sand, and every year people race cars straight up it.',
+      'You got up. Most people need a run-up and a second go. Sit a minute — the view is the point.',
     ],
   },
   {
@@ -127,19 +129,6 @@ export const POIS: Poi[] = [
     lines: [
       "Someone's old coffee fire. Out here you never once refused a traveller his gahwa.",
       'Ruler or lost stranger, same pot, same welcome. That rule is older than the borders are.',
-    ],
-  },
-  // The only POI you have to *climb* to. It sits on the summit shelf of the
-  // fossil ridge, and the radius is deliberately tight — tight enough that the
-  // ramp doesn't trigger it, so the card is the thing waiting at the top rather
-  // than something you collect on the way past the bottom.
-  {
-    id: 'fossilridge',
-    name: 'Fossil Ridge',
-    x: 337, z: -591, radius: 55,
-    lines: [
-      "You made it up. Look at the rock — those are seashells. All this was seabed once.",
-      'Seventy million years of geology, and everyone still just photographs their car on it.',
     ],
   },
 ];

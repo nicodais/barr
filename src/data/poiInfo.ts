@@ -72,7 +72,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
     credit: 'https://gulfnews.com/uae/the-bitter-truth-about-your-sweet-karak-tea-in-uae-1.68663205'
   },
   famousdune: {
-    title: 'The Famous Dune',
+    title: 'Tal Moreeb',
     body:
       'Dune bashing grew from desert know-how into one of the UAE\'s signature ' +
       'experiences, and certain photogenic dunes — like Moreeb Dune in Liwa — have become ' +
@@ -97,14 +97,6 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'robot jockeys have replaced child riders and bloodlines are prized like royalty.',
     photo: '/photos/cameltrack.jpg',
     credit: 'https://www.usatoday.com/picture-gallery/tech/2017/01/03/centuries-old-tradition-changed-by-technology/96116762/'
-  },
-  fossilridge: {
-    title: 'Fossil Ridge',
-    body:
-      'The limestone ridges around Mleiha are old seabed: the peninsula lay under a warm ' +
-      'shallow sea in the Cretaceous, and the rock is dense with shells, sea urchins and ' +
-      'ammonites. Neighbouring Jebel Faya has yielded stone tools around 125,000 years old — ' +
-      'among the earliest known traces of humans outside Africa.',
   },
   coffeehearth: {
     title: 'Gahwa — Arabic Coffee',

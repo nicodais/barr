@@ -99,16 +99,15 @@ const GRAVEL = new THREE.Color(0xa1907c);
 /** Salt crust on a pan floor: near-white, and the palest thing in the world. */
 const SABKHA = new THREE.Color(0xd8cec0);
 /**
- * Bare limestone. Cool and grey against everything else, which is the point —
- * and darker than it looks like it should be on the swatch. Rock this pale
- * reads as sand at a distance: the first version sat within a few percent of
- * the interdune value, so an outcrop 400 m away dissolved into the dune behind
- * it and the region lost the landmarks it navigates by. Value separation is
- * what makes a silhouette, not hue.
+ * The great dune's own faces, and the most saturated thing in the world.
+ *
+ * Tal Moreeb is the reddest sand in the region for the reason the grain-sorting
+ * model already encodes — it is the highest and most exposed sand here, so it
+ * collects the finest, most heavily iron-stained grains. Giving it a colour of
+ * its own rather than leaning on the iron term alone is what lets it read as a
+ * landmark from the far side of the map instead of as a big dune.
  */
-const LIMESTONE = new THREE.Color(0x8a8478);
-/** Water-worked wadi gravel — darker and greyer than the serir around it. */
-const WADI_GRAVEL = new THREE.Color(0x8d8478);
+const DUNE_CREST_RED = new THREE.Color(0xa8552c);
 
 /**
  * What the dust and the crest plumes should be tinted toward, so airborne sand
@@ -298,11 +297,10 @@ function writeColor(out: Float32Array, v: number, wx: number, wz: number) {
   // Where the sand runs thin the gravel underneath shows through. Partial on
   // purpose — hardpack here is sand *over* serir, not bare serir.
   scratchColor.lerp(GRAVEL, (1 - s.softness) * 0.45);
-  // Then the surfaces that aren't dune sand at all, in the order they'd bury
-  // each other: salt pan, then a wash cut across it, then rock under both.
+  // Then the salt pan, and the great dune over the top of everything — nothing
+  // buries it, because it is 120 m of sand standing on the lot.
   scratchColor.lerp(SABKHA, s.sabkha);
-  scratchColor.lerp(WADI_GRAVEL, s.wadi * 0.85);
-  scratchColor.lerp(LIMESTONE, s.rock);
+  scratchColor.lerp(DUNE_CREST_RED, s.greatDune * 0.5);
 
   // Wind lanes: faint streaking drawn out along the crest lines, the direction
   // the sand is actually travelling. Kept to a few percent — at any strength
