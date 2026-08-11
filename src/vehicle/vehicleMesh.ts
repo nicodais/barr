@@ -513,10 +513,15 @@ function buildWagon(b: PartBuilder) {
     { z: -1.70, hw: 0.845, y0: 0.42, y1: 1.30, c: 0.08 },
     { z: 0.62, hw: 0.845, y0: 0.42, y1: 1.30, c: 0.08 },
     { z: 0.96, hw: 0.80, y0: 0.42, y1: 1.22, c: 0.10 },
-  ], false, false);
+  ], false, true);
   glassBand(b, [-1.62, 0.56], 0.855, 0.62, 1.14, 2);
-  rakedScreen(b, 0.98, 0.62, 1.22, 0.78);
-  b.add(box(1.52, 0.5, 0.06), 'glass', [0, 0.86, -2.0]);
+  rakedScreen(b, 0.96, 0.42, 1.22, 0.80);
+  // Proud of the capped rear face, so it reads as glass set into a panel — and
+  // well short of filling it. At near the full width and height of the cabin's
+  // back it stopped reading as a window and started reading as the whole tail
+  // being made of glass.
+  b.add(box(1.26, 0.42, 0.06), 'glass', [0, 0.94, -2.02]);
+  b.add(box(1.4, 0.04, 0.05), 'bodyDark', [0, 0.62, -2.03]);
 
   buildArchesAndSteps(b);
   buildFront(b, 2.14, 1.62);
@@ -547,17 +552,30 @@ function buildPickup(b: PartBuilder) {
     { z: 2.06, hw: 0.90, y0: -0.48, y1: 0.52, c: 0.11 },
     { z: NOSE, hw: 0.84, y0: -0.42, y1: 0.46, c: 0.09 },
   ]);
-  // Bed: a separate shell, slightly narrower, with its own tucked tail.
+  // Bed. Built as a floor with walls standing on it, not as a solid shell with
+  // a darker box sunk into the top — there is no CSG here, so an "inset" block
+  // is just more geometry buried inside the volume, invisible from outside. The
+  // first version did exactly that and the pickup shipped with a sealed deck
+  // where its load bed should be.
+  const FLOOR_Y = 0.28;
+  const RAIL_Y = WAIST + 0.06;
   shell(b, 'body', [
-    { z: TAIL, hw: 0.86, y0: -0.44, y1: WAIST + 0.06, c: 0.11 },
-    { z: -1.96, hw: 0.92, y0: -0.50, y1: WAIST + 0.06, c: 0.09 },
-    { z: -0.36, hw: 0.92, y0: -0.50, y1: WAIST + 0.06, c: 0.09 },
+    { z: TAIL, hw: 0.86, y0: -0.44, y1: FLOOR_Y, c: 0.11 },
+    { z: -1.96, hw: 0.92, y0: -0.50, y1: FLOOR_Y, c: 0.09 },
+    { z: -0.36, hw: 0.92, y0: -0.50, y1: FLOOR_Y, c: 0.09 },
   ]);
-  // Bed well, cut *down* into that shell rather than stood on top of it. The
-  // box has to sit with its top face level with the rail and its body below,
-  // or the "well" reads as a crate strapped to the bed.
-  b.add(box(1.48, 0.36, 1.56), 'bodyDark', [0, WAIST - 0.12, -1.16]);
-  b.add(box(1.5, 0.05, 1.58), 'bodyDark', [0, WAIST - 0.29, -1.16]);
+  b.add(box(1.7, 0.05, 1.74), 'bodyDark', [0, FLOOR_Y + 0.02, -1.22]);
+  // Walls: sides, bulkhead behind the cab, and the tailgate.
+  const wallMid = (FLOOR_Y + RAIL_Y) / 2;
+  const wallH = RAIL_Y - FLOOR_Y;
+  b.addPair(() => box(0.14, wallH, 1.78), 'body', [0.85, wallMid, -1.24]);
+  b.add(box(1.84, wallH, 0.13), 'body', [0, wallMid, -0.42]);
+  b.add(box(1.84, wallH + 0.08, 0.12), 'body', [0, wallMid + 0.04, TAIL + 0.07]);
+  b.add(box(1.56, 0.1, 0.04), 'bodyDark', [0, wallMid + 0.04, TAIL + 0.02]);
+  // Capping rails, and the step up over the rear arch.
+  b.addPair(() => box(0.18, 0.05, 1.78), 'trim', [0.85, RAIL_Y, -1.24]);
+  b.add(box(1.86, 0.05, 0.15), 'trim', [0, RAIL_Y + 0.08, TAIL + 0.07]);
+  b.addPair(() => box(0.19, 0.1, 0.88), 'body', [0.85, RAIL_Y + 0.05, -1.45]);
 
   // Crew cab: four doors, so the greenhouse runs most of the wheelbase.
   shell(b, 'body', [
@@ -565,10 +583,10 @@ function buildPickup(b: PartBuilder) {
     { z: -0.20, hw: 0.855, y0: WAIST, y1: 1.38, c: 0.08 },
     { z: 0.86, hw: 0.855, y0: WAIST, y1: 1.38, c: 0.08 },
     { z: 1.14, hw: 0.80, y0: WAIST, y1: 1.28, c: 0.10 },
-  ], false, false);
+  ], false, true);
   glassBand(b, [-0.14, 0.80], 0.865, 0.78, 1.26, 2);
-  rakedScreen(b, 1.16, 0.80, 1.30, 0.82);
-  b.add(box(1.5, 0.38, 0.06), 'glass', [0, 0.98, -0.46]);
+  rakedScreen(b, 1.14, 0.62, 1.28, 0.80);
+  b.add(box(1.24, 0.34, 0.06), 'glass', [0, 1.02, -0.48]);
 
   buildArchesAndSteps(b);
 
@@ -613,13 +631,14 @@ function buildGWagon(b: PartBuilder) {
   shell(b, 'body', [
     { z: TAIL + 0.04, hw: 0.855, y0: WAIST, y1: 1.42, c: 0.05 },
     { z: 0.82, hw: 0.855, y0: WAIST, y1: 1.42, c: 0.05 },
-  ], false, false);
-  // Vertical windscreen — no rake at all, which is the whole silhouette.
-  b.add(box(1.62, 0.68, 0.06), 'glass', [0, 0.98, 0.83]);
+  ], false, true);
+  // Vertical windscreen — no rake at all, which is the whole silhouette. Sized
+  // to *close* the open front of the cabin shell rather than to fit inside it.
+  b.add(box(1.74, 0.94, 0.06), 'glass', [0, 0.97, 0.83]);
   b.add(box(1.72, 0.08, 0.14), 'trim', [0, 1.36, 0.81]);
   b.add(box(1.72, 0.09, 0.16), 'body', [0, 1.42, 0.84]);
   glassBand(b, [-1.66, 0.72], 0.865, 0.68, 1.3, 2);
-  b.add(box(1.6, 0.5, 0.06), 'glass', [0, 1.0, TAIL + 0.02]);
+  b.add(box(1.3, 0.44, 0.06), 'glass', [0, 1.06, TAIL + 0.02]);
   // Rain gutters: a hard highlight line the length of the roof.
   b.addPair(() => box(0.06, 0.07, 2.6), 'trim', [0.89, 1.35, -0.5]);
 
@@ -835,12 +854,23 @@ function glassBand(
   }
 }
 
-/** A raked windscreen with its pillars, leaning back from `z`. */
-function rakedScreen(b: PartBuilder, z: number, y0: number, y1: number, width: number) {
+/**
+ * A raked windscreen with its pillars, closing the front of a cabin shell.
+ *
+ * Deliberately oversized against the opening it covers. The cabin lofts are
+ * capped at the back but left open at the front, because a vertical cap can't
+ * sit behind a raked pane without one poking through the other — so this pane
+ * *is* the front of the cabin, and it has to overlap the hole rather than fit
+ * it. Sized to fit, it leaves a slot around the edges that you can see the
+ * far side of the interior through, which is exactly how the first version
+ * shipped.
+ */
+function rakedScreen(b: PartBuilder, z: number, y0: number, y1: number, halfW: number) {
   const h = y1 - y0;
-  b.add(box(width * 2, h + 0.06, 0.06), 'glass', [0, (y0 + y1) / 2, z - 0.06], [-0.24, 0, 0]);
-  b.add(box(width * 2 + 0.08, 0.09, 0.1), 'trim', [0, y1 + 0.02, z - 0.19]);
-  b.addPair(() => box(0.08, h + 0.06, 0.09), 'body', [width - 0.02, (y0 + y1) / 2, z - 0.07], [-0.24, 0, 0]);
+  const midY = (y0 + y1) / 2;
+  b.add(box(halfW * 2 + 0.06, h + 0.14, 0.06), 'glass', [0, midY, z - 0.02], [-0.24, 0, 0]);
+  b.addPair(() => box(0.09, h + 0.14, 0.08), 'body', [halfW + 0.01, midY, z - 0.02], [-0.24, 0, 0]);
+  b.add(box(halfW * 2 + 0.14, 0.1, 0.12), 'trim', [0, y1 + 0.05, z - 0.13]);
 }
 
 /** Door seams and handles down the flank, at the given z stations. */
