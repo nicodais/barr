@@ -28,6 +28,7 @@ import { Birds } from '../world/Birds';
 import { Wildlife } from '../world/Wildlife';
 import { SandPlumes, windFromHaze } from '../world/SandPlumes';
 import { Avalanche } from '../world/Avalanche';
+import { createOldTracks } from '../world/OldTracks';
 import { AIRBORNE_SAND } from '../terrain/chunkGeometry';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
 import { PhotoMode } from './PhotoMode';
@@ -161,6 +162,8 @@ export class Game {
     this.rig.scene.add(this.wildlife.group);
     this.rig.scene.add(this.plumes.points);
     this.rig.scene.add(this.avalanche.points);
+    // Everyone who came before. Baked once, one draw call, never updated.
+    this.rig.scene.add(createOldTracks());
     // Fill the ground dressing around spawn before the first frame, so the
     // world doesn't visibly grow plants while the player is looking at it.
     for (let i = 0; i < 24; i++) this.scatter.update(spawn.x, spawn.z);
