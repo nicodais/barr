@@ -25,7 +25,48 @@ const FRAGMENT = /* glsl */ `
   uniform float uSunIntensity;
   uniform float uHaze;
   uniform vec3 uHazeColor;
+  uniform float uNight;
   varying vec3 vDirection;
+
+  float hash13( vec3 p ) {
+    p = fract( p * 0.1031 );
+    p += dot( p, p.zyx + 31.32 );
+    return fract( ( p.x + p.y ) * p.z );
+  }
+
+  /**
+   * Stars, procedural.
+   *
+   * Geometry would be the obvious approach and it's the wrong one here: a
+   * points cloud is another draw call, another buffer, and it has to be
+   * parented to something that doesn't rotate with the camera. Hashing the view
+   * direction into cells and putting at most one star in each costs a handful
+   * of instructions, is fixed in world space for free, and can size each star
+   * against the pixel footprint — which matters, because a star smaller than a
+   * pixel doesn't look distant, it looks like a stuck sensor.
+   *
+   * The desert is the reason to bother. There is no light out here for a
+   * hundred kilometres, and what you get on a clear night in the Empty Quarter
+   * is genuinely the thing people drive out to see.
+   */
+  float starField( vec3 dir ) {
+    vec3 p = dir * 190.0;
+    vec3 cell = floor( p );
+    float h = hash13( cell );
+    // Density. Most cells are empty; a sky where every cell has a star reads as
+    // static, not as stars.
+    if ( h < 0.978 ) return 0.0;
+
+    vec3 at = vec3( hash13( cell + 11.3 ), hash13( cell + 27.7 ), hash13( cell + 51.1 ) );
+    float d = length( fract( p ) - at );
+    // Never smaller than a pixel: below that the star flickers in and out as
+    // the camera turns, which is the single most obvious way a procedural sky
+    // gives itself away.
+    float pixel = max( fwidth( p.x ), 0.02 );
+    float radius = max( 0.055, pixel * 0.9 );
+    float mag = 0.35 + 0.65 * fract( h * 137.7 );
+    return smoothstep( radius, 0.0, d ) * mag * mag;
+  }
 
   void main() {
     vec3 dir = normalize( vDirection );
@@ -86,6 +127,17 @@ const FRAGMENT = /* glsl */ `
     float above = smoothstep( -0.12, 0.06, normalize( uSunDirection ).y );
     color += uSunColor * glow * uSunIntensity * above;
 
+    // Stars go in before nothing else — under the sun glow, over the gradient,
+    // and cut by both the dust and the last of the daylight. Dust is what
+    // actually kills a desert night sky, so it's weighted heavily.
+    float starVisible = uNight * ( 1.0 - uHaze * 0.85 );
+    if ( starVisible > 0.004 ) {
+      // Thinned near the horizon, where you are looking through the most air
+      // and, out here, the most blown sand.
+      float lift = smoothstep( -0.02, 0.30, dir.y );
+      color += vec3( 0.95, 0.97, 1.0 ) * starField( dir ) * starVisible * lift * 1.35;
+    }
+
     gl_FragColor = vec4( color, 1.0 );
 
     // Every built-in three material ends with these two chunks; a hand-written
@@ -129,6 +181,7 @@ export class Sky {
         uSunIntensity: { value: 1 },
         uHaze: { value: 0 },
         uHazeColor: { value: new THREE.Color(0xd8c2a4) },
+        uNight: { value: 0 },
       },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
@@ -153,6 +206,7 @@ export class Sky {
     (u.uSunIntensity.value as number) = state.sunIntensity;
     (u.uHaze.value as number) = state.haze;
     (u.uHazeColor.value as THREE.Color).copy(state.hazeColor);
+    (u.uNight.value as number) = state.night;
     this.sunDir.copy(sunDirection);
     (u.uSunDirection.value as THREE.Vector3).copy(this.sunDir);
 

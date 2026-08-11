@@ -10,6 +10,7 @@ import { createVehicleView, type VehicleView } from '../vehicle/vehicleMesh';
 import { DustSystem } from '../vehicle/DustSystem';
 import { ContactShadow } from '../vehicle/ContactShadow';
 import { TrackSystem } from '../vehicle/TrackSystem';
+import { Headlights } from '../vehicle/Headlights';
 import { InputManager } from '../input/InputManager';
 import { emptyInput } from '../input/types';
 import { DebugHud } from '../ui/DebugHud';
@@ -67,6 +68,7 @@ export class Game {
   private avalanche = new Avalanche();
   private weather = new Weather();
   private camels = new Camels();
+  private headlights = new Headlights();
   private chase: ChaseCamera;
   private input: InputManager;
   private hud: DebugHud;
@@ -154,6 +156,9 @@ export class Game {
     // someone's pickup appears as the default wagon and then swaps.
     this.settings = loadSettings();
     this.view = createVehicleView(this.settings.vehicle);
+    // Parented to the body, so the beams sweep with the truck — including the
+    // pitch and roll, which is most of what makes night driving feel different.
+    this.view.root.add(this.headlights.group);
     this.rig.scene.add(this.view.root);
     this.rig.scene.add(this.tracks.mesh);
     this.rig.scene.add(this.contactShadow.mesh);
@@ -471,6 +476,7 @@ export class Game {
     sand.uSheenColor.value.copy(this.timeOfDay.state.sunColor);
     sand.uSheen.value = Math.max(0, 1 - Math.max(this.sunDir.y, 0) / 0.62) * (1 - 0.45 * haze);
     sand.uRippleStrength.value = 1 - 0.4 * haze;
+    this.headlights.setNight(this.timeOfDay.state.night);
 
     // Airborne sand: lit by the sky, but tinted by the ground it came off.
     // Without the sand term the dust reads as pale smoke against red dunes.
@@ -670,6 +676,11 @@ export class Game {
     // frame at the origin while the truck is out on a dune.
     this.view.root.position.copy(this.renderPos);
     this.view.root.quaternion.copy(this.renderQuat);
+    // The headlights outlive the body — they belong to the truck, not to the
+    // shell the player just swapped — so they get re-parented rather than
+    // rebuilt. Missing this leaves someone who changes paint at night driving
+    // in the dark for the rest of the session.
+    this.view.root.add(this.headlights.group);
     this.view.update(this.vehicle.wheels);
     this.rig.scene.add(this.view.root);
   }
