@@ -22,6 +22,8 @@ export interface QualityProfile {
   maxDust: number;
   /** Crest sand plumes. Cheap enough that even the low tier keeps some. */
   maxPlumes: number;
+  /** Sand sloughing down slip faces under the wheels. */
+  maxAvalanche: number;
   /** Multiplier on ground-dressing density, 0..1. */
   scatterDensity: number;
   birds: number;
@@ -38,6 +40,7 @@ export const PROFILES: Record<QualityTier, QualityProfile> = {
     chunkBudget: 1,
     maxDust: 90,
     maxPlumes: 70,
+    maxAvalanche: 60,
     scatterDensity: 0.45,
     birds: 5,
     gazelles: 4,
@@ -51,6 +54,7 @@ export const PROFILES: Record<QualityTier, QualityProfile> = {
     chunkBudget: 2,
     maxDust: 180,
     maxPlumes: 150,
+    maxAvalanche: 130,
     scatterDensity: 0.72,
     birds: 9,
     gazelles: 6,
@@ -64,6 +68,7 @@ export const PROFILES: Record<QualityTier, QualityProfile> = {
     chunkBudget: 2,
     maxDust: 320,
     maxPlumes: 260,
+    maxAvalanche: 220,
     scatterDensity: 1,
     birds: 14,
     gazelles: 9,

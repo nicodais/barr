@@ -27,6 +27,7 @@ import { Scatter } from '../world/Scatter';
 import { Birds } from '../world/Birds';
 import { Wildlife } from '../world/Wildlife';
 import { SandPlumes, windFromHaze } from '../world/SandPlumes';
+import { Avalanche } from '../world/Avalanche';
 import { AIRBORNE_SAND } from '../terrain/chunkGeometry';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
 import { PhotoMode } from './PhotoMode';
@@ -59,6 +60,7 @@ export class Game {
   private birds = new Birds();
   private wildlife = new Wildlife();
   private plumes = new SandPlumes();
+  private avalanche = new Avalanche();
   private chase: ChaseCamera;
   private input: InputManager;
   private hud: DebugHud;
@@ -107,6 +109,7 @@ export class Game {
   private renderQuat = new THREE.Quaternion();
   private sunDir = new THREE.Vector3();
   private dustColor = new THREE.Color();
+  private slumpColor = new THREE.Color();
 
   private constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
     this.rig = new SceneRig(canvas);
@@ -157,6 +160,7 @@ export class Game {
     this.rig.scene.add(this.birds.mesh);
     this.rig.scene.add(this.wildlife.group);
     this.rig.scene.add(this.plumes.points);
+    this.rig.scene.add(this.avalanche.points);
     // Fill the ground dressing around spawn before the first frame, so the
     // world doesn't visibly grow plants while the player is looking at it.
     for (let i = 0; i < 24; i++) this.scatter.update(spawn.x, spawn.z);
@@ -454,6 +458,9 @@ export class Game {
     this.dustColor.lerp(AIRBORNE_SAND, 0.4);
     this.dust.setColor(this.dustColor);
     this.plumes.setColor(this.dustColor);
+    // Sloughed sand is lit the same way, but it never left the ground, so it
+    // keeps more of the dune's own colour and less of the sky's.
+    this.avalanche.setColor(this.slumpColor.copy(this.dustColor).lerp(AIRBORNE_SAND, 0.45));
     // Same wind that drives the sky's haze, so the weather is one thing (§6).
     this.plumes.update(
       frameDt,
@@ -472,6 +479,10 @@ export class Game {
       landingImpact,
     );
     this.dust.update(frameDt);
+    // Sand letting go under the wheels on a slip face. Reads the same wheel
+    // contacts the dust does, but keys off the *steepness* of the face rather
+    // than the speed across it.
+    this.avalanche.update(frameDt, this.vehicle.wheels, this.vehicle.telemetry.speed);
     this.contactShadow.update(this.vehicle.wheels, this.renderQuat, frameDt);
     // Rear wheels only: on a 4x4 the fronts run the same line, so laying all
     // four would just z-fight two ribbons against each other.
@@ -649,6 +660,7 @@ export class Game {
     this.terrain.setQuality(profile);
     this.dust.setMaxParticles(profile.maxDust);
     this.plumes.setMaxParticles(profile.maxPlumes);
+    this.avalanche.setMaxGrains(profile.maxAvalanche);
     this.scatter.setDensity(profile.scatterDensity);
     this.birds.setCount(profile.birds);
     this.wildlife.setCount(profile.gazelles);
