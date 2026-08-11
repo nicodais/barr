@@ -691,6 +691,15 @@ export interface Surface {
   greatDune: number;
   /** Salt crust on a pan floor. */
   sabkha: number;
+  /**
+   * How much sky this point can see, 0 = interdune floor, 1 = crest. Drives the
+   * grain sorting, and doubles as the ambient-occlusion term the shader bakes
+   * into vertex colour (§4) — the two are the same quantity. A hollow between
+   * two 40 m dunes has most of its hemisphere blocked by sand; a crest has all
+   * of it. Ray-marched AO would compute exactly this, at a few thousand extra
+   * height samples per chunk; the dune profile already knows it for free.
+   */
+  exposure: number;
 }
 
 export function surfaceAt(x: number, z: number): Surface {
@@ -726,7 +735,7 @@ export function surfaceAt(x: number, z: number): Surface {
   // A salt pan can't be halfway up the great dune, whatever the field mask says.
   const sabkha = smoothstep(0.46, 0.26, s.field) * (1 - natural) * (1 - presence);
 
-  return { softness, iron, greatDune: presence, sabkha };
+  return { softness, iron, greatDune: presence, sabkha, exposure };
 }
 
 /**

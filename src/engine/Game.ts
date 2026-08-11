@@ -434,6 +434,20 @@ export class Game {
     this.timeOfDay.sunDirection(this.sunDir);
     this.rig.update(this.timeOfDay.state, this.sunDir, this.renderPos, this.chase.camera.position);
 
+    // The sand shader runs off the same sun and weather as everything else.
+    //
+    // Sheen is a low-sun phenomenon: forward scatter needs the light coming at
+    // the surface almost edge-on, and by noon there's nothing to scatter
+    // *toward* the eye. Haze cuts it too — the beam it needs is the same one
+    // dust takes out (SceneRig). Ripples just lose contrast in dust, since
+    // they're read off shading and dust flattens shading.
+    const sand = this.terrain.sand;
+    const haze = this.timeOfDay.state.haze;
+    sand.uSunDirection.value.copy(this.sunDir);
+    sand.uSheenColor.value.copy(this.timeOfDay.state.sunColor);
+    sand.uSheen.value = Math.max(0, 1 - Math.max(this.sunDir.y, 0) / 0.62) * (1 - 0.45 * haze);
+    sand.uRippleStrength.value = 1 - 0.4 * haze;
+
     // Airborne sand: lit by the sky, but tinted by the ground it came off.
     // Without the sand term the dust reads as pale smoke against red dunes.
     this.dustColor.copy(this.timeOfDay.state.sunColor).lerp(this.timeOfDay.state.horizon, 0.45);

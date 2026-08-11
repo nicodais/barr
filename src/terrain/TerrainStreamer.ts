@@ -10,6 +10,7 @@ import {
   buildChunkHeightSamples,
   type EdgeRatios,
 } from './chunkGeometry';
+import { createSandMaterial, type SandUniforms } from './sandMaterial';
 
 /** Extra slack before eviction, so chunks don't thrash on the boundary. */
 const EVICT_SLACK = 160;
@@ -47,6 +48,8 @@ export interface TerrainStats {
 export class TerrainStreamer {
   readonly group = new THREE.Group();
   readonly material: THREE.MeshLambertMaterial;
+  /** Live shader uniforms for ripples and sheen — driven by SceneRig each frame. */
+  readonly sand: SandUniforms;
   readonly stats: TerrainStats = { resident: 0, colliders: 0, pending: 0 };
 
   private chunks = new Map<string, Chunk>();
@@ -59,12 +62,9 @@ export class TerrainStreamer {
     private rapier: typeof RAPIER,
     private world: RAPIER.World,
   ) {
-    this.material = new THREE.MeshLambertMaterial({
-      vertexColors: true,
-      // Derives per-face normals in the fragment shader, which is what lets the
-      // geometry stay indexed and still read as faceted (§4).
-      flatShading: true,
-    });
+    const sand = createSandMaterial();
+    this.material = sand.material;
+    this.sand = sand.uniforms;
     this.group.matrixAutoUpdate = false;
   }
 

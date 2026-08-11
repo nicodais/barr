@@ -115,6 +115,18 @@ const DUNE_CREST_RED = new THREE.Color(0xa8552c);
  */
 export const AIRBORNE_SAND = new THREE.Color(0xd9a273);
 
+/**
+ * What an occluded hollow's sand is tinted toward. Ambient occlusion is not a
+ * grey multiply: the light a crest loses when it drops into an interdune is
+ * specifically the *sky*, and the sky here is the one blue thing in the world.
+ * Darkening toward indigo rather than toward black is the same move the
+ * hemisphere light makes, baked in where the geometry knows the answer and the
+ * lighting doesn't.
+ */
+const AO_SHADOW = new THREE.Color(0x6b5a72);
+/** Deepest the hollows go, as a fraction of the way to AO_SHADOW. */
+const AO_STRENGTH = 0.22;
+
 const scratchColor = new THREE.Color();
 
 /**
@@ -308,6 +320,15 @@ function writeColor(out: Float32Array, v: number, wx: number, wz: number) {
   // reading as a texture seam.
   const lane = 1 + Math.sin(alongCrest(wx, wz) * 0.021) * 0.03 * s.softness;
   scratchColor.multiplyScalar(lane);
+
+  // Ambient occlusion, baked into vertex colour (§4). Without it every hollow
+  // is lit exactly as brightly as the ridge above it, which is what makes a
+  // flat-shaded dune field read as a folded sheet of paper rather than as a
+  // landscape with depth in it. Curved rather than linear so the darkening
+  // concentrates in the floors and the top two-thirds of every dune stays clean
+  // — an even ramp just lowers the whole scene's key.
+  const sky = clamp01(s.exposure);
+  scratchColor.lerp(AO_SHADOW, AO_STRENGTH * (1 - sky) * (1 - sky));
 
   out[v * 3] = clamp01(scratchColor.r);
   out[v * 3 + 1] = clamp01(scratchColor.g);
