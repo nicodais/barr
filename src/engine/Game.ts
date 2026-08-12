@@ -83,7 +83,12 @@ export class Game {
   private chase: ChaseCamera;
   private input: InputManager;
   private hud: DebugHud;
-  private panel: TuningPanel;
+  /**
+   * Physics sliders. Developer instrumentation, not a player surface — it is
+   * built only in dev, and everything on it that a player actually needs
+   * (audio, quality, steering, the garage) now lives in the hamburger menu.
+   */
+  private panel: TuningPanel | null = null;
   private garage: GaragePanel;
   private carSelect: CarSelect;
   private menu: MenuPanel;
@@ -254,7 +259,7 @@ export class Game {
     this.chase = new ChaseCamera(window.innerWidth / window.innerHeight);
     this.input = new InputManager(this.settings);
     this.hud = new DebugHud();
-    this.panel = new TuningPanel(
+    if (import.meta.env.DEV) this.panel = new TuningPanel(
       this.vehicle.tuning,
       this.settings,
       this.timeOfDay,
@@ -274,7 +279,7 @@ export class Game {
       () => {
         // One panel at a time: they share the same corner, and the garage is
         // worth seeing the truck next to rather than a wall of sliders.
-        this.panel.hide();
+        this.panel?.hide();
         this.garage.show();
       },
     );
@@ -304,6 +309,32 @@ export class Game {
       },
       getStick: () => this.settings.joystickPosition,
       getPressure: () => this.settings.tyrePressure,
+      onSound: (volume) => {
+        this.settings.volume = volume;
+        this.settings.muted = volume <= 0;
+        saveSettings(this.settings);
+        this.audio.setMuted(this.settings.muted);
+        this.audio.setVolume(volume);
+      },
+      getSound: () => (this.settings.muted ? 0 : this.settings.volume),
+      onMusic: (volume) => {
+        this.settings.musicVolume = volume;
+        saveSettings(this.settings);
+        this.audio.setMusicVolume(volume);
+      },
+      getMusic: () => this.settings.musicVolume,
+      onQuality: (q) => {
+        this.settings.quality = q;
+        saveSettings(this.settings);
+        this.applyQuality(q === 'auto' ? detectTier() : q);
+      },
+      getQuality: () => this.settings.quality,
+      onSteering: (mirrored) => {
+        this.settings.invertSteering = mirrored;
+        saveSettings(this.settings);
+      },
+      getSteering: () => this.settings.invertSteering,
+      onGarage: () => this.garage.show(),
       onPressure: (id) => this.setPressure(id),
       getHaptics: () => this.settings.haptics,
       onHaptics: (on) => {
@@ -341,12 +372,12 @@ export class Game {
       this.applyTouchScheme();
     }
 
+    if (this.panel) uiRoot.appendChild(this.panel.element);
     uiRoot.append(
       this.hud.element,
       this.subtitles.element,
       this.input.touch.element,
       this.photoBar.element,
-      this.panel.element,
       this.garage.element,
       this.boundary.element,
       this.compass.element,
@@ -566,7 +597,8 @@ export class Game {
 
     this.view.root.position.copy(this.renderPos);
     this.view.root.quaternion.copy(this.renderQuat);
-    this.view.update(this.vehicle.wheels);
+    // Speed feeds the two-wheeler lean; the closed bodies ignore it.
+    this.view.update(this.vehicle.wheels, this.vehicle.telemetry.speed);
 
     if (this.choosing) {
       this.orbitPreview(frameDt);
@@ -763,7 +795,7 @@ export class Game {
   };
 
   private handleHotkeys() {
-    if (this.input.keyboard.consumePress('KeyT')) this.panel.toggle();
+    if (this.input.keyboard.consumePress('KeyT')) this.panel?.toggle();
     if (this.input.keyboard.consumePress('KeyG')) this.garage.toggle();
     // Bracket keys, because pressure is an axis and direction matters — a
     // single cycling key makes you tap through road to get back to sand.
@@ -787,7 +819,7 @@ export class Game {
     this.photo.enter(this.renderQuat);
     this.photoBar.show();
     // Photo mode is for looking at the truck, so nothing may sit over it.
-    this.panel.hide();
+    this.panel?.hide();
     this.garage.hide();
     document.body.classList.add('photo-mode');
     this.hud.element.hidden = true;

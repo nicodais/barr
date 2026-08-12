@@ -57,7 +57,10 @@ export const DEFAULT_SETTINGS: GameSettings = {
   effectsVolume: 0.7,
   touchScheme: 'joystick',
   handedness: 'left',
-  joystickPosition: 'left',
+  // Right by default: most people hold a phone one-handed in their right hand,
+  // and the stick is the control you never let go of. Anyone who prefers it on
+  // the left has a stored value already and keeps it — only fresh installs move.
+  joystickPosition: 'right',
   touchPickerSeen: false,
   quality: 'auto',
   // On by default: it only ever fires on devices that have a motor, the cues

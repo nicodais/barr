@@ -3,6 +3,49 @@ import { REGIONS, REGION_ORDER, type RegionId } from '../terrain/regions';
 import type { JoystickPosition } from '../input/TouchSource';
 import { haptics } from '../input/Haptics';
 import { PRESSURE_STEPS, type PressureId } from '../vehicle/tyrePressure';
+import type { QualityTier } from '../engine/Quality';
+
+export type QualityChoice = QualityTier | 'auto';
+
+/**
+ * Master volume as three named steps rather than a slider.
+ *
+ * The tuning panel had continuous sliders for master, music and effects, and
+ * it is gone from player builds — so these have to carry the same job in a
+ * chip row. Three points is enough: the carefully-set default, something quiet
+ * enough for a room with other people in it, and off.
+ */
+const SOUND: Array<{ label: string; volume: number }> = [
+  { label: 'Off', volume: 0 },
+  { label: 'Low', volume: 0.45 },
+  { label: 'Full', volume: 0.9 },
+];
+
+/** The score's own trim, kept separate because it is the balance people
+ *  actually complain about — the oud sitting under the engine. */
+const MUSIC: Array<{ label: string; volume: number }> = [
+  { label: 'Low', volume: 0.4 },
+  { label: 'Mid', volume: 0.7 },
+  { label: 'Full', volume: 1 },
+];
+
+const QUALITIES: Array<{ label: string; value: QualityChoice }> = [
+  { label: 'Auto', value: 'auto' },
+  { label: 'Low', value: 'low' },
+  { label: 'Med', value: 'medium' },
+  { label: 'High', value: 'high' },
+];
+
+/**
+ * Named for what they feel like, not for the flag behind them. The stored key
+ * is `invertSteering` and it defaults to *true*, so a chip row labelled
+ * "Normal / Inverted" would show a fresh install sitting on "Inverted" — which
+ * reads as something being wrong rather than as the tuned default it is.
+ */
+const STEERING: Array<{ label: string; mirrored: boolean }> = [
+  { label: 'Standard', mirrored: true },
+  { label: 'Mirrored', mirrored: false },
+];
 
 /**
  * The hamburger, top-left.
@@ -35,6 +78,15 @@ interface MenuCallbacks {
   getStick(): JoystickPosition;
   onPressure(id: PressureId): void;
   getPressure(): PressureId;
+  onSound(volume: number): void;
+  getSound(): number;
+  onMusic(volume: number): void;
+  getMusic(): number;
+  onQuality(q: QualityChoice): void;
+  getQuality(): QualityChoice;
+  onSteering(mirrored: boolean): void;
+  getSteering(): boolean;
+  onGarage(): void;
   onHaptics(on: boolean): void;
   getHaptics(): boolean;
   /** False on a keyboard, or on touch under a scheme with no thumbstick. */
@@ -72,6 +124,10 @@ export class MenuPanel {
   private stickRow: HTMLElement;
   private pressureRow: HTMLElement;
   private hapticRow: HTMLElement;
+  private soundRow: HTMLElement;
+  private musicRow: HTMLElement;
+  private qualityRow: HTMLElement;
+  private steerRow: HTMLElement;
   private open = false;
   /** Set while a region swap is in flight, so it can't be started twice. */
   private busy = false;
@@ -100,6 +156,10 @@ export class MenuPanel {
     // and the rows below it are preferences you set once.
     this.pressureRow = this.section('Tyres');
     this.hapticRow = this.section('Vibration');
+    this.soundRow = this.section('Sound');
+    this.musicRow = this.section('Music');
+    this.qualityRow = this.section('Quality');
+    this.steerRow = this.section('Steering');
 
     for (const id of REGION_ORDER) {
       this.regionRow.appendChild(this.chip(REGIONS[id].name, () => {
@@ -137,6 +197,31 @@ export class MenuPanel {
         this.sync();
       }));
     }
+    for (const o of SOUND) {
+      this.soundRow.appendChild(this.chip(o.label, () => {
+        this.cb.onSound(o.volume);
+        this.sync();
+      }));
+    }
+    for (const o of MUSIC) {
+      this.musicRow.appendChild(this.chip(o.label, () => {
+        this.cb.onMusic(o.volume);
+        this.sync();
+      }));
+    }
+    for (const o of QUALITIES) {
+      this.qualityRow.appendChild(this.chip(o.label, () => {
+        this.cb.onQuality(o.value);
+        this.sync();
+      }));
+    }
+    for (const o of STEERING) {
+      this.steerRow.appendChild(this.chip(o.label, () => {
+        this.cb.onSteering(o.mirrored);
+        this.sync();
+      }));
+    }
+
     for (const v of VIBRATION) {
       this.hapticRow.appendChild(this.chip(v.label, () => {
         this.cb.onHaptics(v.on);
@@ -151,6 +236,11 @@ export class MenuPanel {
       this.pressureRow.parentElement!,
       this.stickRow.parentElement!,
       this.hapticRow.parentElement!,
+      this.soundRow.parentElement!,
+      this.musicRow.parentElement!,
+      this.qualityRow.parentElement!,
+      this.steerRow.parentElement!,
+      this.garageButton(),
     );
   }
 
@@ -212,6 +302,15 @@ export class MenuPanel {
     // Same reasoning, one step stronger: on a device with no vibration motor
     // — every iPhone, and every desktop — this isn't a setting that's turned
     // off, it's a setting that doesn't exist.
+    const sound = this.cb.getSound();
+    mark(this.soundRow, (i) => nearest(SOUND.map((o) => o.volume), sound) === i);
+    const music = this.cb.getMusic();
+    mark(this.musicRow, (i) => nearest(MUSIC.map((o) => o.volume), music) === i);
+    const quality = this.cb.getQuality();
+    mark(this.qualityRow, (i) => QUALITIES[i].value === quality);
+    const mirrored = this.cb.getSteering();
+    mark(this.steerRow, (i) => STEERING[i].mirrored === mirrored);
+
     const on = this.cb.getHaptics();
     this.hapticRow.parentElement!.hidden = !haptics.supported;
     mark(this.hapticRow, (i) => VIBRATION[i].on === on);
@@ -229,6 +328,24 @@ export class MenuPanel {
     return row;
   }
 
+  /** Paint and wheels live in the garage; G reaches it on a keyboard and
+   *  nothing did on a phone. */
+  private garageButton(): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'menu-group';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'menu-link';
+    b.textContent = 'Garage — paint and wheels';
+    b.onclick = () => {
+      haptics.tick();
+      this.close();
+      this.cb.onGarage();
+    };
+    wrap.appendChild(b);
+    return wrap;
+  }
+
   private chip(label: string, onClick: () => void): HTMLButtonElement {
     const b = document.createElement('button');
     b.type = 'button';
@@ -242,6 +359,16 @@ export class MenuPanel {
     };
     return b;
   }
+}
+
+/** Index of the closest option, so a stored value that isn't exactly on a step
+ *  still lights one up rather than leaving the row looking unset. */
+function nearest(values: number[], v: number): number {
+  let best = 0;
+  for (let i = 1; i < values.length; i++) {
+    if (Math.abs(values[i] - v) < Math.abs(values[best] - v)) best = i;
+  }
+  return best;
 }
 
 function mark(row: HTMLElement, isActive: (i: number) => boolean) {

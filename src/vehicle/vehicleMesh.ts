@@ -35,7 +35,8 @@ import {
 export interface VehicleView {
   root: THREE.Group;
   wheels: THREE.Group[];
-  update(wheels: WheelState[]): void;
+  /** @param speed m/s, used only by two-wheelers for lean. */
+  update(wheels: WheelState[], speed?: number): void;
   /**
    * Every geometry and material here is built per view, because paint is baked
    * into the materials and bodywork into the merged geometry. Rebuilding on a
@@ -245,6 +246,11 @@ function disc(radius: number, width: number, segments: number): THREE.BufferGeom
 // flares and the tailgate spare all stick out past it, exactly as they would on
 // the real thing. The physics box is unchanged.
 const BODY_HALF_W = 0.92;
+/** Ground line relative to the body origin: static hub height less the tyre. */
+const GROUND_Y = AXLE_HEIGHT - 0.4 - WHEEL_RADIUS;
+/** Radians of lean at full lock and speed. About 27 degrees — enough to read
+ *  from the chase camera, short of the angle that looks like a crash. */
+const MAX_LEAN = 0.48;
 
 /**
  * A body is now just its builder. The bolt-on accessories this used to carry
@@ -255,6 +261,21 @@ const BODY_HALF_W = 0.92;
  */
 interface BodySpec {
   build(b: PartBuilder): void;
+  /**
+   * Draw two wheels on the centreline instead of four at the corners.
+   *
+   * The *physics* stays on four raycasts either way — the collider and the
+   * wheel hard-points are fixed in VehicleTuning and never rebuilt on a body
+   * change. So a two-wheeler here is a visual treatment of the same chassis:
+   * each drawn wheel sits at the average of its axle pair, which keeps
+   * articulation readable (the wheel still rises and falls) and quietly buys
+   * the thing car-like stability it has no business having. That trade is the
+   * only reason a bike is possible at all inside this footprint, and it is
+   * worth being honest that it is a trade.
+   */
+  twoWheeled?: boolean;
+  /** Lateral squash on the drawn wheel. A bike tyre is not a truck tyre. */
+  wheelWidth?: number;
 }
 
 export function createVehicleView(config: VehicleConfig = DEFAULT_VEHICLE): VehicleView {
@@ -262,17 +283,34 @@ export function createVehicleView(config: VehicleConfig = DEFAULT_VEHICLE): Vehi
   const materials = createMaterials(paintColor(config.paint));
   const b = new PartBuilder(materials);
   const spec = BODIES[config.body];
+  const twoWheeled = spec.twoWheeled === true;
 
   spec.build(b);
 
+  /**
+   * Everything hangs off a pivot at ground level so a two-wheeler can lean.
+   *
+   * A bike rolls about its contact patch, not about its centre of mass — lean
+   * it about the body origin and the wheels swing sideways out from under it.
+   * So `lean` sits on the ground line and `hull` puts its children back into
+   * body space. Four-wheelers get the same two groups and simply never rotate
+   * them, which is cheaper than branching every transform below.
+   */
+  const lean = new THREE.Group();
+  lean.position.y = GROUND_Y;
+  const hull = new THREE.Group();
+  hull.position.y = -GROUND_Y;
+  lean.add(hull);
+  root.add(lean);
+
   const bodyMeshes = b.build();
-  for (const mesh of bodyMeshes) root.add(mesh);
+  for (const mesh of bodyMeshes) hull.add(mesh);
 
   // --- wheels ---------------------------------------------------------------
   const wheelGeos = buildWheelGeometry(config.wheels);
 
   const wheels: THREE.Group[] = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < (twoWheeled ? 2 : 4); i++) {
     // Outer group carries steering + suspension position, inner carries spin.
     const steerGroup = new THREE.Group();
     const spinGroup = new THREE.Group();
@@ -285,32 +323,55 @@ export function createVehicleView(config: VehicleConfig = DEFAULT_VEHICLE): Vehi
     rim.castShadow = true;
     spinGroup.add(rim);
 
+    if (spec.wheelWidth !== undefined) spinGroup.scale.x = spec.wheelWidth;
     steerGroup.add(spinGroup);
     steerGroup.userData.spin = spinGroup;
-    root.add(steerGroup);
+    hull.add(steerGroup);
     wheels.push(steerGroup);
   }
 
-  // Live axles, visible under the truck when it articulates.
+  // Live axles, visible under the truck when it articulates. A bike has none,
+  // and drawing a beam across a chassis whose width it does not admit to would
+  // give the whole trick away.
   const axleGeo = box(HALF_TRACK * 2 - 0.12, 0.13, 0.13);
-  const axles = [0, 1].map(() => {
+  const axles = twoWheeled ? [] : [0, 1].map(() => {
     const m = new THREE.Mesh(axleGeo, materials.trim);
-    root.add(m);
+    hull.add(m);
     return m;
   });
 
   return {
     root,
     wheels,
-    update(wheelStates: WheelState[]) {
-      for (let i = 0; i < wheels.length && i < wheelStates.length; i++) {
-        const s = wheelStates[i];
-        const g = wheels[i];
-        g.position.set(s.x, s.y, s.z);
-        g.rotation.y = s.steer;
-        (g.userData.spin as THREE.Group).rotation.x = s.spin;
+    update(wheelStates: WheelState[], speed = 0) {
+      if (twoWheeled) {
+        // Each drawn wheel is the mean of its axle pair, pulled onto x=0.
+        for (let i = 0; i < wheels.length; i++) {
+          const a = wheelStates[i * 2];
+          const c = wheelStates[i * 2 + 1];
+          if (!a || !c) continue;
+          const g = wheels[i];
+          g.position.set(0, (a.y + c.y) / 2, (a.z + c.z) / 2);
+          g.rotation.y = (a.steer + c.steer) / 2;
+          (g.userData.spin as THREE.Group).rotation.x = a.spin;
+        }
+        // Lean into the corner, scaled by speed so a bike stood still with the
+        // bars turned doesn't lie down. Positive steer is a left turn and +X is
+        // the left side, so the roll has to be negative to go with it.
+        const steer = wheelStates[0] ? wheelStates[0].steer : 0;
+        const want = -steer * Math.min(1, speed / 11) * MAX_LEAN;
+        lean.rotation.z += (want - lean.rotation.z) * 0.16;
+      } else {
+        for (let i = 0; i < wheels.length && i < wheelStates.length; i++) {
+          const s = wheelStates[i];
+          const g = wheels[i];
+          g.position.set(s.x, s.y, s.z);
+          g.rotation.y = s.steer;
+          (g.userData.spin as THREE.Group).rotation.x = s.spin;
+        }
       }
       const pairs: Array<[number, number]> = [[0, 1], [2, 3]];
+      if (twoWheeled) return;
       for (let a = 0; a < axles.length; a++) {
         const [l, r] = pairs[a];
         const ls = wheelStates[l];
@@ -910,6 +971,99 @@ function buildSoftTop(b: PartBuilder) {
 }
 
 /**
+ * The bike — a desert sled, stretched.
+ *
+ * ## The proportion problem, stated plainly
+ *
+ * Every body shares one footprint, and its wheelbase is 2.9m. A real dirt bike
+ * is about 1.5m. So this is drawn at nearly twice the wheelbase of the thing it
+ * is named after, which is exactly the reason the quad was abandoned rather
+ * than built — a quad at this size is a monster truck and there is no reading
+ * of it that isn't wrong.
+ *
+ * A bike survives the stretch where a quad didn't, because long-wheelbase bikes
+ * are a real thing people build: desert sleds, drag bikes, anything set up to
+ * stay planted at speed rather than turn quickly. Leaning into it — long, low,
+ * a stretched swingarm, a tank well forward of the seat — turns the constraint
+ * into the design instead of fighting it. It is still a compromise and the
+ * silhouette is the place it shows.
+ *
+ * ## What makes it read as a bike rather than a thin car
+ *
+ * Two things, and neither is bodywork. **Two wheels on the centreline** (see
+ * BodySpec.twoWheeled) and **lean** — a bike that stays bolt upright through a
+ * corner reads as broken no matter how good the model is, and one that lays
+ * over reads as a bike even in silhouette. Everything below is detail hung on
+ * those two.
+ *
+ * No rider, deliberately: the soft top has empty seats and the closed bodies
+ * have empty cabins, so a lone modelled human on this one would be the odd
+ * thing out rather than the missing thing found.
+ */
+function buildMoto(b: PartBuilder) {
+  const FRONT_Z = HALF_WHEELBASE;
+  const REAR_Z = -HALF_WHEELBASE;
+  /** Static hub height, the same one the arches are drawn against. */
+  const HUB_Y = AXLE_HEIGHT - 0.4;
+  /** Steering head: where the forks meet the frame. */
+  const HEAD: [number, number, number] = [0, 0.42, 1.18];
+  const PIVOT: [number, number, number] = [0, -0.34, -0.28];
+
+  // --- frame ----------------------------------------------------------------
+  // Stated as struts between named joints, the rule the buggy's cage had to
+  // learn the hard way: a tube placed by centre-plus-angle drifts out of step
+  // with the things it is supposed to connect and ends up in mid-air.
+  b.strut('trim', HEAD, [0, 0.06, 0.1], 0.055);          // top tube
+  b.strut('trim', HEAD, [0, -0.3, 0.62], 0.05);          // down tube
+  b.strut('trim', [0, 0.06, 0.1], PIVOT, 0.05);          // seat tube
+  b.strut('trim', [0, -0.3, 0.62], PIVOT, 0.045);        // cradle
+
+  // Forks, as a pair either side of the wheel, raked back about 14 degrees.
+  b.strutPair('steel', [0.12, 0.5, 1.1], [0.12, HUB_Y, FRONT_Z], 0.045);
+  b.add(box(0.3, 0.16, 0.2), 'trim', [0, 0.5, 1.14]);    // triple clamp
+  // Swingarm out to the rear hub. Long, which is the whole conceit.
+  b.strutPair('steel', [0.1, -0.34, -0.28], [0.1, HUB_Y, REAR_Z], 0.05);
+  // Rear shock, laid down along the swingarm the way a long one has to be.
+  b.strut('amber', [0, 0.04, -0.2], [0, HUB_Y + 0.12, -1.0], 0.055);
+
+  // --- engine, tank, seat ---------------------------------------------------
+  b.add(box(0.4, 0.46, 0.62), 'bodyDark', [0, -0.22, 0.24]);
+  b.add(box(0.3, 0.3, 0.34), 'trim', [0, 0.02, 0.12]);   // barrel and head
+  // Tank: the widest painted thing on it, and most of what carries the colour.
+  shell(b, 'body', [
+    { z: 0.18, hw: 0.15, y0: 0.06, y1: 0.4, c: 0.05 },
+    { z: 0.46, hw: 0.22, y0: 0.04, y1: 0.46, c: 0.07 },
+    { z: 0.86, hw: 0.2, y0: 0.06, y1: 0.42, c: 0.07 },
+    { z: 1.06, hw: 0.12, y0: 0.12, y1: 0.34, c: 0.05 },
+  ]);
+  // Seat, long and flat — a stretched frame gives you nowhere else to put it.
+  b.add(box(0.28, 0.12, 0.92), 'rubber', [0, 0.3, -0.42]);
+  b.add(box(0.24, 0.1, 0.32), 'body', [0, 0.38, -0.94]);
+  // Subframe under it, so the seat is held up by something.
+  b.strutPair('trim', [0.1, 0.08, -0.1], [0.1, 0.26, -0.92], 0.035);
+  b.addPair(() => box(0.05, 0.16, 0.3), 'trim', [0.15, 0.4, -1.0]);
+
+  // --- bars, lamp, plate ----------------------------------------------------
+  b.add(tube(0.76, 0.035), 'steel', [0, 0.74, 1.1], [0, 0, Math.PI / 2]);
+  b.addPair(() => box(0.11, 0.05, 0.05), 'rubber', [0.33, 0.74, 1.1]);
+  b.strut('steel', [0, 0.5, 1.14], [0, 0.74, 1.1], 0.035);
+  b.add(box(0.26, 0.24, 0.1), 'trim', [0, 0.58, 1.28]);
+  b.add(box(0.2, 0.18, 0.06), 'lamp', [0, 0.58, 1.34]);
+  b.add(box(0.3, 0.26, 0.04), 'body', [0, 0.24, 1.3]);   // number plate
+
+  // --- fenders --------------------------------------------------------------
+  // High and short at the front, the way anything meant for sand is set up:
+  // a close-fitting fender packs solid within a minute of real use.
+  b.add(box(0.3, 0.06, 0.62), 'body', [0, 0.12, 1.42], [-0.16, 0, 0]);
+  b.add(box(0.34, 0.06, 0.66), 'body', [0, -0.06, -1.32], [0.12, 0, 0]);
+  b.add(box(0.13, 0.1, 0.12), 'brake', [0, 0.16, -1.46]);
+
+  // Exhaust, up and over the swingarm on one side so it clears the tyre.
+  b.strut('chrome', [0.16, -0.24, 0.3], [0.2, 0.06, -1.02], 0.055);
+  b.add(box(0.13, 0.13, 0.34), 'trim', [0.2, 0.08, -1.16]);
+}
+
+/**
  * Sand rail — a dragster built for dunes: long, low, rear-engined, and mostly
  * air.
  *
@@ -1194,6 +1348,7 @@ const BODIES: Record<BodyId, BodySpec> = {
   gwagon: { build: buildGWagon },
   singlecab: { build: buildSingleCab },
   softtop: { build: buildSoftTop },
+  moto: { build: buildMoto, twoWheeled: true, wheelWidth: 0.42 },
   buggy: { build: buildBuggy },
 };
 

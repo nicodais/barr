@@ -15,7 +15,7 @@
  * without dragging Three.js into the settings path.
  */
 
-export type BodyId = 'wagon' | 'pickup' | 'gwagon' | 'singlecab' | 'softtop' | 'buggy';
+export type BodyId = 'wagon' | 'pickup' | 'gwagon' | 'singlecab' | 'softtop' | 'moto' | 'buggy';
 export type WheelStyleId = 'steel' | 'alloy' | 'beadlock';
 export type PaintId =
   | 'safari'
@@ -85,6 +85,12 @@ export const BODY_OPTIONS: BodyOption[] = [
     label: 'Soft Top',
     blurb: 'Roof off, doors off. Wonderful right up until you cross a slope.',
     stats: { speed: 0.66, grip: 0.7, weight: 0.38, agility: 0.8 },
+  },
+  {
+    id: 'moto',
+    label: 'Desert Bike',
+    blurb: 'Two wheels and no excuses. Quickest thing here, and the twitchiest.',
+    stats: { speed: 0.99, grip: 0.34, weight: 0.04, agility: 1 },
   },
   {
     id: 'buggy',
@@ -215,6 +221,44 @@ export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
     sandSideGrip: 0.42,
     sinkDrag: 820,
     climbBleed: 0.7,
+  },
+
+  // A tenth of the pickup's mass, which changes what every other number means.
+  // Engine force looks tiny and isn't: at 240kg it is a far better power-to-
+  // weight ratio than anything else here, which is why it climbs faces the
+  // heavy bodies stall on despite having no traction to speak of.
+  //
+  // The honest caveat is that the physics still runs on four raycasts at the
+  // shared hard-points, so it is far more stable than two wheels have any right
+  // to be. That is the compromise that lets it exist at all (vehicleMesh's
+  // BodySpec.twoWheeled) and it shows up as a bike that refuses to fall over.
+  moto: {
+    mass: 240,
+    comHeight: 0.26,
+    rollInertia: 170,
+    pitchInertia: 620,
+    yawInertia: 380,
+    engineForce: 1450,
+    topSpeed: 43,
+    brakeForce: 820,
+    handbrakeForce: 1500,
+    steerRate: 5.8,
+    maxSteerAngle: 0.82,
+    suspensionRest: 0.56,
+    suspensionTravel: 0.52,
+    suspensionStiffness: 11,
+    // Almost no lateral bite: one narrow contact patch per end, and stepping
+    // out is the whole character. It slides where the buggy drifts.
+    hardpackGrip: 0.92,
+    sandGrip: 0.86,
+    hardpackSideGrip: 0.42,
+    sandSideGrip: 0.2,
+    // Light enough to skate over what buries a truck, narrow enough to knife
+    // in the moment it stops — hence the lowest sink drag here and a stuck
+    // bike that stays stuck.
+    sinkDrag: 300,
+    climbBleed: 0.42,
+    yawAssist: 1.6,
   },
 
   // Light enough to stay on top of sand that swallows the others, and low
