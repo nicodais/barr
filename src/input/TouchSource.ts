@@ -27,6 +27,7 @@ export class TouchSource implements InputSource {
   private steer = 0;
   private throttle = 0;
   private brake = 0;
+  private handbrake = 0;
   private active = false;
 
   private stickZone: HTMLElement;
@@ -36,6 +37,8 @@ export class TouchSource implements InputSource {
   private pedals: HTMLElement;
   private throttlePad: HTMLElement;
   private brakePad: HTMLElement;
+  private actions: HTMLElement;
+  private handPad: HTMLElement;
 
   private stickTouch: number | null = null;
   private stickOrigin = { x: 0, y: 0 };
@@ -44,6 +47,12 @@ export class TouchSource implements InputSource {
   private wheelAngle = 0;
   private throttleTouch: number | null = null;
   private brakeTouch: number | null = null;
+  private handTouch: number | null = null;
+
+  /** Set by Game. The two one-shot buttons aren't input axes — they're the
+   *  touch equivalent of R and P, which had no equivalent at all. */
+  private onReset: (() => void) | null = null;
+  private onPhoto: (() => void) | null = null;
 
   private tiltZero: number | null = null;
   private tiltSteer = 0;
@@ -75,9 +84,25 @@ export class TouchSource implements InputSource {
     this.brakePad.textContent = 'STOP';
     this.pedals.append(this.brakePad, this.throttlePad);
 
-    this.element.append(this.stickZone, this.wheel, this.pedals);
+    // Opposite thumb from the stick. Everything here was keyboard-only until
+    // now: Space, R and P have no touch equivalent, which quietly made the
+    // handbrake, the unstick and the whole of photo mode desktop features.
+    this.actions = div('touch-actions');
+    this.handPad = button('touch-action touch-action-hand', 'HOLD', 'Handbrake');
+    const resetPad = button('touch-action', '↺', 'Reset the truck');
+    const photoPad = button('touch-action', '◉', 'Photo mode');
+    resetPad.addEventListener('click', () => this.onReset?.());
+    photoPad.addEventListener('click', () => this.onPhoto?.());
+    this.actions.append(photoPad, resetPad, this.handPad);
+
+    this.element.append(this.stickZone, this.wheel, this.pedals, this.actions);
     this.bind();
     this.applyScheme();
+  }
+
+  setActions(onReset: () => void, onPhoto: () => void) {
+    this.onReset = onReset;
+    this.onPhoto = onPhoto;
   }
 
   setScheme(scheme: TouchScheme) {
@@ -108,11 +133,12 @@ export class TouchSource implements InputSource {
     out.steer = clamp(steer, -1, 1);
     out.throttle = clamp(this.throttle, 0, 1);
     out.brake = clamp(this.brake, 0, 1);
-    out.handbrake = 0;
+    out.handbrake = this.handbrake;
     cam.orbit = 0;
     cam.pitch = 0;
 
-    return this.active || Math.abs(steer) > 0.02 || this.throttle > 0 || this.brake > 0;
+    return this.active || Math.abs(steer) > 0.02 || this.throttle > 0 ||
+      this.brake > 0 || this.handbrake > 0;
   }
 
   private applyScheme() {
@@ -120,6 +146,12 @@ export class TouchSource implements InputSource {
     this.stickZone.hidden = !joystick;
     this.wheel.hidden = this.scheme !== 'wheel';
     this.pedals.hidden = joystick;
+    // The stick is the thumb that never lifts, so the actions go to the other
+    // one. Middle sits under neither thumb, so they default right.
+    this.actions.classList.toggle(
+      'touch-actions-left',
+      joystick && this.joystickPosition === 'right',
+    );
 
     this.element.classList.toggle('touch-right-handed', this.handedness === 'right');
     // The thumbstick's position is its own setting (left/middle/right), separate
@@ -134,11 +166,14 @@ export class TouchSource implements InputSource {
     this.steer = 0;
     this.throttle = 0;
     this.brake = 0;
+    this.handbrake = 0;
     this.wheelAngle = 0;
     this.stickTouch = null;
     this.wheelTouch = null;
     this.throttleTouch = null;
     this.brakeTouch = null;
+    this.handTouch = null;
+    this.handPad.classList.remove('touch-pedal-down');
     this.active = false;
     this.stickKnob.style.transform = 'translate(-50%, -50%)';
   }
@@ -175,6 +210,7 @@ export class TouchSource implements InputSource {
     };
     pad(this.throttlePad, (id) => { this.throttleTouch = id; this.throttle = 1; });
     pad(this.brakePad, (id) => { this.brakeTouch = id; this.brake = 1; });
+    pad(this.handPad, (id) => { this.handTouch = id; this.handbrake = 1; });
 
     window.addEventListener('touchmove', (e) => {
       for (const t of Array.from(e.changedTouches)) {
@@ -226,10 +262,16 @@ export class TouchSource implements InputSource {
           this.brake = 0;
           this.brakePad.classList.remove('touch-pedal-down');
         }
+        if (t.identifier === this.handTouch) {
+          this.handTouch = null;
+          this.handbrake = 0;
+          this.handPad.classList.remove('touch-pedal-down');
+        }
       }
       this.active =
         this.stickTouch !== null || this.wheelTouch !== null ||
-        this.throttleTouch !== null || this.brakeTouch !== null;
+        this.throttleTouch !== null || this.brakeTouch !== null ||
+        this.handTouch !== null;
     };
     window.addEventListener('touchend', end, opts);
     window.addEventListener('touchcancel', end, opts);
@@ -279,6 +321,15 @@ export class TouchSource implements InputSource {
 function div(className: string): HTMLElement {
   const el = document.createElement('div');
   el.className = className;
+  return el;
+}
+
+function button(className: string, label: string, aria: string): HTMLElement {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = className;
+  el.textContent = label;
+  el.setAttribute('aria-label', aria);
   return el;
 }
 

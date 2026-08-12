@@ -43,6 +43,9 @@ export interface GameSettings {
   /** Tyre pressure. Persisted because it is a driving preference, not a
    *  per-session accident — someone who likes it aired down always does. */
   tyrePressure: PressureId;
+  /** Whether the sun moves. Off means it's parked at whatever the player last
+   *  picked from the Time of day row. */
+  dayCycle: boolean;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -70,6 +73,11 @@ export const DEFAULT_SETTINGS: GameSettings = {
   vehicle: DEFAULT_VEHICLE,
   region: 'liwa',
   tyrePressure: DEFAULT_PRESSURE,
+  // On. The 20-minute cycle — blue hour, the moonlit night, the haze curve —
+  // shipped switched off for a while because its only toggle lived on a panel
+  // that stopped being built. A frozen sky in a game about decompression is
+  // most of the atmosphere thrown away.
+  dayCycle: true,
 };
 
 // Joystick only: the wheel and tilt schemes were cut, so any stored value
@@ -151,6 +159,9 @@ export function loadSettings(): GameSettings {
     }
     if (isPressureId(saved.tyrePressure)) {
       settings.tyrePressure = saved.tyrePressure;
+    }
+    if (typeof saved.dayCycle === 'boolean') {
+      settings.dayCycle = saved.dayCycle;
     }
   } catch {
     // Unavailable or corrupt storage: defaults are already in place.

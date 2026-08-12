@@ -29,6 +29,20 @@ const MUSIC: Array<{ label: string; volume: number }> = [
   { label: 'Full', volume: 1 },
 ];
 
+/**
+ * Engine, tyres, wind and impacts.
+ *
+ * This row is here because for a while nothing was: `effectsVolume` was only
+ * ever reachable from the tuning panel, and when that stopped shipping the
+ * setting was pinned at 0.7 forever with no way to move it. The engine note is
+ * how you read the traction model by ear (§2), so this is not a nicety.
+ */
+const EFFECTS: Array<{ label: string; volume: number }> = [
+  { label: 'Low', volume: 0.35 },
+  { label: 'Mid', volume: 0.7 },
+  { label: 'Full', volume: 1 },
+];
+
 const QUALITIES: Array<{ label: string; value: QualityChoice }> = [
   { label: 'Auto', value: 'auto' },
   { label: 'Low', value: 'low' },
@@ -82,6 +96,10 @@ interface MenuCallbacks {
   getSound(): number;
   onMusic(volume: number): void;
   getMusic(): number;
+  onEffects(volume: number): void;
+  getEffects(): number;
+  onDayCycle(moving: boolean): void;
+  getDayCycle(): boolean;
   onQuality(q: QualityChoice): void;
   getQuality(): QualityChoice;
   onSteering(mirrored: boolean): void;
@@ -104,8 +122,17 @@ const STICKS: Array<{ pos: JoystickPosition; label: string }> = [
   { pos: 'right', label: 'Right' },
 ];
 
-/** Times worth jumping to, as fractions of the day cycle (see TimeOfDay). */
-const TIMES: Array<{ label: string; at: number }> = [
+/**
+ * Times worth jumping to, as fractions of the day cycle (see TimeOfDay).
+ *
+ * `Moving` is first and is the default: the 20-minute cycle is the whole
+ * reason the keyframes, the blue hour and the moonlit night exist, and it had
+ * been shipping switched off. Picking any named time freezes the sun there —
+ * which is also the answer to "a moving sun changes the light I framed a photo
+ * in": one tap parks it.
+ */
+const TIMES: Array<{ label: string; at: number | null }> = [
+  { label: 'Moving', at: null },
   { label: 'Dawn', at: 0.09 },
   { label: 'Morning', at: 0.24 },
   { label: 'Midday', at: 0.42 },
@@ -126,6 +153,7 @@ export class MenuPanel {
   private hapticRow: HTMLElement;
   private soundRow: HTMLElement;
   private musicRow: HTMLElement;
+  private effectsRow: HTMLElement;
   private qualityRow: HTMLElement;
   private steerRow: HTMLElement;
   private open = false;
@@ -158,6 +186,7 @@ export class MenuPanel {
     this.hapticRow = this.section('Vibration');
     this.soundRow = this.section('Sound');
     this.musicRow = this.section('Music');
+    this.effectsRow = this.section('Vehicle & world');
     this.qualityRow = this.section('Quality');
     this.steerRow = this.section('Steering');
 
@@ -177,7 +206,14 @@ export class MenuPanel {
     }
     for (const t of TIMES) {
       this.timeRow.appendChild(this.chip(t.label, () => {
-        this.cb.onTime(t.at);
+        if (t.at === null) {
+          this.cb.onDayCycle(true);
+        } else {
+          // Freeze first, so the jump isn't immediately walked off by the
+          // cycle still running underneath it.
+          this.cb.onDayCycle(false);
+          this.cb.onTime(t.at);
+        }
         this.sync();
       }));
     }
@@ -206,6 +242,12 @@ export class MenuPanel {
     for (const o of MUSIC) {
       this.musicRow.appendChild(this.chip(o.label, () => {
         this.cb.onMusic(o.volume);
+        this.sync();
+      }));
+    }
+    for (const o of EFFECTS) {
+      this.effectsRow.appendChild(this.chip(o.label, () => {
+        this.cb.onEffects(o.volume);
         this.sync();
       }));
     }
@@ -238,6 +280,7 @@ export class MenuPanel {
       this.hapticRow.parentElement!,
       this.soundRow.parentElement!,
       this.musicRow.parentElement!,
+      this.effectsRow.parentElement!,
       this.qualityRow.parentElement!,
       this.steerRow.parentElement!,
       this.garageButton(),
@@ -280,15 +323,19 @@ export class MenuPanel {
     const time = this.cb.getTime();
     mark(this.regionRow, (i) => REGION_ORDER[i] === region);
     mark(this.bodyRow, (i) => BODY_OPTIONS[i].id === body);
-    // Nearest, wrapped: 0.97 is night, and so is 0.02.
+    // Nearest, wrapped: 0.97 is night, and so is 0.02. Skips the `Moving` chip,
+    // which owns the row outright whenever the cycle is running.
     let best = 0;
     let bestD = Infinity;
     for (let i = 0; i < TIMES.length; i++) {
-      const raw = Math.abs(TIMES[i].at - time);
+      const at = TIMES[i].at;
+      if (at === null) continue;
+      const raw = Math.abs(at - time);
       const d = Math.min(raw, 1 - raw);
       if (d < bestD) { bestD = d; best = i; }
     }
-    mark(this.timeRow, (i) => i === best);
+    const moving = this.cb.getDayCycle();
+    mark(this.timeRow, (i) => (moving ? TIMES[i].at === null : i === best));
 
     const psi = this.cb.getPressure();
     mark(this.pressureRow, (i) => PRESSURE_STEPS[i].id === psi);
@@ -306,6 +353,8 @@ export class MenuPanel {
     mark(this.soundRow, (i) => nearest(SOUND.map((o) => o.volume), sound) === i);
     const music = this.cb.getMusic();
     mark(this.musicRow, (i) => nearest(MUSIC.map((o) => o.volume), music) === i);
+    const effects = this.cb.getEffects();
+    mark(this.effectsRow, (i) => nearest(EFFECTS.map((o) => o.volume), effects) === i);
     const quality = this.cb.getQuality();
     mark(this.qualityRow, (i) => QUALITIES[i].value === quality);
     const mirrored = this.cb.getSteering();

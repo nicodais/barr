@@ -232,6 +232,7 @@ export class Game {
     this.audio.setVolume(this.settings.volume);
     this.audio.setMusicVolume(this.settings.musicVolume);
     this.audio.setEffectsVolume(this.settings.effectsVolume);
+    this.timeOfDay.autoAdvance = this.settings.dayCycle;
     this.director = new Director(
       this.subtitles,
       {
@@ -323,6 +324,18 @@ export class Game {
         this.audio.setMusicVolume(volume);
       },
       getMusic: () => this.settings.musicVolume,
+      onEffects: (volume) => {
+        this.settings.effectsVolume = volume;
+        saveSettings(this.settings);
+        this.audio.setEffectsVolume(volume);
+      },
+      getEffects: () => this.settings.effectsVolume,
+      onDayCycle: (moving) => {
+        this.settings.dayCycle = moving;
+        saveSettings(this.settings);
+        this.timeOfDay.autoAdvance = moving;
+      },
+      getDayCycle: () => this.settings.dayCycle,
       onQuality: (q) => {
         this.settings.quality = q;
         saveSettings(this.settings);
@@ -371,6 +384,18 @@ export class Game {
       this.input.touch.show();
       this.applyTouchScheme();
     }
+    // R and P, for people without an R or a P.
+    this.input.touch.setActions(
+      () => {
+        if (this.photo.active) return;
+        haptics.tick();
+        this.vehicle.recover('manual');
+      },
+      () => {
+        haptics.tick();
+        this.togglePhotoMode();
+      },
+    );
 
     if (this.panel) uiRoot.appendChild(this.panel.element);
     uiRoot.append(

@@ -119,10 +119,63 @@ body.photo-mode #help {
 
 .touch-stick-zone,
 .touch-wheel,
-.touch-pedals {
+.touch-pedals,
+.touch-actions {
   position: absolute;
   pointer-events: auto;
   touch-action: none;
+}
+
+/*
+ * Handbrake, reset and photo — the three things a phone could not do at all.
+ * Stacked rather than in a row so the handbrake sits lowest, under a resting
+ * thumb; the two taps you reach for deliberately sit above it.
+ */
+.touch-actions {
+  right: calc(20px + env(safe-area-inset-right));
+  bottom: calc(26px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Follows the stick to the other side of the screen. */
+.touch-actions-left {
+  right: auto;
+  left: calc(20px + env(safe-area-inset-left));
+}
+
+.touch-action {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-content: center;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 224, 190, 0.24);
+  background: rgba(28, 21, 16, 0.42);
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Held, not tapped — bigger, and labelled with the verb rather than a glyph. */
+.touch-action-hand {
+  width: 76px;
+  height: 76px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  border-color: rgba(255, 224, 190, 0.3);
+}
+
+.touch-action.touch-pedal-down {
+  background: rgba(240, 168, 96, 0.5);
+  border-color: rgba(255, 236, 214, 0.5);
 }
 
 .touch-stick-zone {
@@ -1261,6 +1314,22 @@ body.photo-mode #help {
   .touch-pedal {
     width: 68px;
     height: 74px;
+  }
+
+  .touch-action {
+    width: 44px;
+    height: 44px;
+    font-size: 15px;
+  }
+
+  .touch-action-hand {
+    width: 58px;
+    height: 58px;
+    font-size: 10px;
+  }
+
+  .touch-actions {
+    gap: 7px;
   }
 }
 
