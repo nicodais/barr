@@ -160,6 +160,20 @@ export class TuningPanel {
       }),
     );
     controls.appendChild(
+      this.buildFreeSlider('Music', 0, 1, 0.01, () => this.settings.musicVolume, (v) => {
+        this.settings.musicVolume = v;
+        saveSettings(this.settings);
+        this.onAudioChange();
+      }),
+    );
+    controls.appendChild(
+      this.buildFreeSlider('Vehicle & world', 0, 1, 0.01, () => this.settings.effectsVolume, (v) => {
+        this.settings.effectsVolume = v;
+        saveSettings(this.settings);
+        this.onAudioChange();
+      }),
+    );
+    controls.appendChild(
       buildChoice(
         'Quality',
         plainOptions(['auto', 'low', 'medium', 'high']),

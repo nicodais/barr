@@ -185,6 +185,8 @@ export class Game {
     this.progress = loadProgress();
     this.audio.setMuted(this.settings.muted);
     this.audio.setVolume(this.settings.volume);
+    this.audio.setMusicVolume(this.settings.musicVolume);
+    this.audio.setEffectsVolume(this.settings.effectsVolume);
     this.director = new Director(
       this.subtitles,
       {
@@ -211,6 +213,8 @@ export class Game {
       () => {
         this.audio.setMuted(this.settings.muted);
         this.audio.setVolume(this.settings.volume);
+        this.audio.setMusicVolume(this.settings.musicVolume);
+        this.audio.setEffectsVolume(this.settings.effectsVolume);
       },
       () => {
         this.applyQuality(

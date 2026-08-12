@@ -6,6 +6,12 @@
  * master. Ducking dips world and score together so a call-in cuts through
  * without the engine dropping out entirely.
  *
+ * World and score each carry a trim gain downstream of their bus. The bus is the
+ * *mix* — it moves every frame with speed and intensity — and the trim is the
+ * *player*, set once in options and left alone. Keeping them on separate nodes
+ * is what lets someone turn the music up without the adaptive swell immediately
+ * writing over their choice on the next frame.
+ *
  * Nothing here loads a file. Every sound in the game is synthesised, which keeps
  * the payload at zero bytes and sidesteps the whole streaming-audio problem on
  * mobile (§8).
@@ -16,6 +22,8 @@ export class AudioEngine {
   readonly world: GainNode;
   readonly score: GainNode;
   readonly radio: GainNode;
+  private worldTrim: GainNode;
+  private scoreTrim: GainNode;
   readonly reverb: ConvolverNode;
   readonly reverbSend: GainNode;
 
@@ -29,14 +37,19 @@ export class AudioEngine {
       window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.ctx = new Ctor();
 
-    // A limiter on the way out. Everything here is synthesised, several voices
-    // can stack, and one of them is a feedback loop — a hard ceiling means a
-    // tuning mistake is a dull moment rather than a painful one in someone's
-    // headphones.
+    // A limiter on the way out. Several synthesised voices can stack and one of
+    // them is a feedback loop, so a hard ceiling means a tuning mistake is a
+    // dull moment rather than a painful one in someone's headphones.
+    //
+    // Backed off from -6/12:1 once the score came up to where you can hear it.
+    // At -6 the threshold sat *below* a mastered track's peaks, so the limiter
+    // stopped being a safety net and became a mix-bus compressor — the music
+    // pumped every time the engine loaded up. -3 clears the loudest thing in
+    // the mix by a hair and only acts when something genuinely stacks.
     this.limiter = this.ctx.createDynamicsCompressor();
-    this.limiter.threshold.value = -6;
-    this.limiter.knee.value = 6;
-    this.limiter.ratio.value = 12;
+    this.limiter.threshold.value = -3;
+    this.limiter.knee.value = 4;
+    this.limiter.ratio.value = 8;
     this.limiter.attack.value = 0.004;
     this.limiter.release.value = 0.18;
     this.limiter.connect(this.ctx.destination);
@@ -50,13 +63,21 @@ export class AudioEngine {
     this.duckGain.gain.value = 1;
     this.duckGain.connect(this.master);
 
+    this.worldTrim = this.ctx.createGain();
+    this.worldTrim.gain.value = 1;
+    this.worldTrim.connect(this.duckGain);
+
+    this.scoreTrim = this.ctx.createGain();
+    this.scoreTrim.gain.value = 1;
+    this.scoreTrim.connect(this.duckGain);
+
     this.world = this.ctx.createGain();
     this.world.gain.value = 1;
-    this.world.connect(this.duckGain);
+    this.world.connect(this.worldTrim);
 
     this.score = this.ctx.createGain();
     this.score.gain.value = 0;
-    this.score.connect(this.duckGain);
+    this.score.connect(this.scoreTrim);
 
     this.radio = this.ctx.createGain();
     // The squelch is a punctuation mark, not an event. It sits under the mix
@@ -119,6 +140,16 @@ export class AudioEngine {
 
   setMasterVolume(v: number) {
     this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
+  }
+
+  /** Player trim on the score, independent of the adaptive swell. */
+  setMusicVolume(v: number) {
+    this.scoreTrim.gain.setTargetAtTime(v, this.ctx.currentTime, 0.08);
+  }
+
+  /** Player trim on engine, tyres, wind and impacts. */
+  setEffectsVolume(v: number) {
+    this.worldTrim.gain.setTargetAtTime(v, this.ctx.currentTime, 0.08);
   }
 }
 

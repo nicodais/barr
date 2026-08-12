@@ -20,6 +20,8 @@ export class GameAudio {
   private cue: RadioCue | null = null;
   private muted = false;
   private volume = 0.9;
+  private music = 1;
+  private effects = 0.7;
   /** Smoothed "how much is happening", which drives the score's presence. */
   private intensity = 0;
 
@@ -46,6 +48,12 @@ export class GameAudio {
       this.cue = new RadioCue(engine);
       this.score.start();
       engine.setMasterVolume(this.muted ? 0 : this.volume);
+      // The trims are set before the first frame, not on the next options
+      // change — the graph is built here, so anything stored has to be applied
+      // here or the player's saved balance is silently ignored until they open
+      // the panel and touch a slider.
+      engine.setMusicVolume(this.music);
+      engine.setEffectsVolume(this.effects);
     } catch (err) {
       // Audio is a nice-to-have; a browser refusing it must not stop the drive.
       console.warn('[dune] audio unavailable', err);
@@ -86,5 +94,15 @@ export class GameAudio {
   setVolume(v: number) {
     this.volume = v;
     if (!this.muted) this.engine?.setMasterVolume(v);
+  }
+
+  setMusicVolume(v: number) {
+    this.music = v;
+    this.engine?.setMusicVolume(v);
+  }
+
+  setEffectsVolume(v: number) {
+    this.effects = v;
+    this.engine?.setEffectsVolume(v);
   }
 }

@@ -20,6 +20,10 @@ export interface GameSettings {
   muted: boolean;
   /** Master volume, 0..1. */
   volume: number;
+  /** Trim on the score, 0..1. Independent of the adaptive swell. */
+  musicVolume: number;
+  /** Trim on engine, tyres, wind and impacts, 0..1. */
+  effectsVolume: number;
   touchScheme: TouchScheme;
   handedness: Handedness;
   /** Where the on-screen thumbstick sits on touch devices. */
@@ -36,6 +40,12 @@ export const DEFAULT_SETTINGS: GameSettings = {
   invertSteering: true,
   muted: false,
   volume: 0.9,
+  // The score sits forward and the vehicle sits back, because the brief is
+  // decompression (§1) and the oud is doing most of that work. The vehicle
+  // still has to be legible — the engine note is how you read the traction
+  // model by ear — so it is trimmed rather than pushed under.
+  musicVolume: 1,
+  effectsVolume: 0.7,
   touchScheme: 'joystick',
   handedness: 'left',
   joystickPosition: 'left',
@@ -54,7 +64,13 @@ const QUALITIES: Array<QualityTier | 'auto'> = ['auto', 'low', 'medium', 'high']
 // Bumped v1 -> v2 so the inverted-steering default reaches returning players:
 // a v1 blob saved before that default flipped would otherwise pin steering to
 // its old, non-inverted value. The bump resets every persisted setting once.
-const STORAGE_KEY = 'dune.settings.v2';
+//
+// v2 -> v3 for the music/effects split. Not strictly required — the two new
+// keys are simply absent from a v2 blob and fall back to their defaults — but
+// the old mix had the score 10-20dB under the vehicle, and anyone who dragged
+// the master volume up to compensate has a stored value that is now much too
+// loud. Resetting once is kinder than shipping them a wall of noise.
+const STORAGE_KEY = 'dune.settings.v3';
 
 export function loadSettings(): GameSettings {
   // The spread is shallow, so `vehicle` would otherwise be the *same object* as
@@ -75,6 +91,12 @@ export function loadSettings(): GameSettings {
     }
     if (typeof saved.volume === 'number' && Number.isFinite(saved.volume)) {
       settings.volume = Math.min(1, Math.max(0, saved.volume));
+    }
+    if (typeof saved.musicVolume === 'number' && Number.isFinite(saved.musicVolume)) {
+      settings.musicVolume = Math.min(1, Math.max(0, saved.musicVolume));
+    }
+    if (typeof saved.effectsVolume === 'number' && Number.isFinite(saved.effectsVolume)) {
+      settings.effectsVolume = Math.min(1, Math.max(0, saved.effectsVolume));
     }
     // Enum-valued settings are checked against the allowed set rather than just
     // their type, so a stale or hand-edited blob can't put the game into a
