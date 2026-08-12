@@ -636,17 +636,22 @@ body.photo-mode #help {
 
 /*
  * The POI arrival card: a small plaque with a real-world photo and a few lines
- * of heritage context. Pointer-transparent and driven purely by proximity.
+ * of heritage context, which folds down to a title bar once it has been read.
+ *
+ * Everything here is sized to lose an argument with the view. A POI radius takes
+ * a while to drive across, so anything that stays on screen for the whole of it
+ * has to be small, translucent and out of the sight line — the previous version
+ * was an opaque block covering a third of a phone screen for the entire visit.
  */
 .poi-card {
   position: fixed;
   top: 44px;
   left: 14px;
-  width: min(300px, 62vw);
-  border-radius: 14px;
-  background: rgba(30, 22, 17, 0.92);
+  width: min(268px, 46vw);
+  border-radius: 13px;
+  background: rgba(30, 22, 17, 0.82);
   border: 1px solid var(--panel-line);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(9px);
   overflow: hidden;
   opacity: 0;
   transform: translateY(-8px);
@@ -660,10 +665,74 @@ body.photo-mode #help {
   transform: none;
 }
 
+/* The one interactive element in the HUD. `#ui > .poi-card` forces the card
+   itself pointer-transparent, so the tap target has to opt back in here. */
+.poi-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.poi-card h3 {
+  margin: 0;
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+/* A chevron drawn from a rotated border, so there's no icon asset and no font
+   dependency for a 6px triangle. */
+.poi-card-chevron {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-right: 1.5px solid var(--accent);
+  border-bottom: 1.5px solid var(--accent);
+  opacity: 0.55;
+  transform: rotate(45deg);
+  transition: transform 0.3s ease;
+}
+
+.poi-card-folded .poi-card-chevron {
+  margin-top: 2px;
+  transform: rotate(-135deg);
+}
+
+/* Folded down to nothing rather than hidden, so the collapse animates and the
+   card doesn't pop out of the layout. grid-template-rows 1fr -> 0fr is the only
+   way to transition to a content-derived height without measuring it in JS. */
+.poi-card-details {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.34s ease, opacity 0.28s ease;
+  opacity: 1;
+}
+
+.poi-card-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.poi-card-folded .poi-card-details {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
 .poi-card img {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 2.4 / 1;
   object-fit: cover;
 }
 
@@ -671,26 +740,19 @@ body.photo-mode #help {
   display: none;
 }
 
-.poi-card h3 {
-  margin: 10px 13px 5px;
-  font-size: 14px;
-  font-weight: 650;
-  color: var(--accent);
-}
-
 .poi-card p {
-  margin: 0 13px 10px;
-  font-size: 12px;
-  line-height: 1.5;
-  opacity: 0.88;
+  margin: 9px 12px 10px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  opacity: 0.86;
 }
 
 .poi-card small {
   display: block;
-  margin: 0 13px 9px;
+  margin: 0 12px 9px;
   font-size: 8.5px;
   line-height: 1.3;
-  opacity: 0.42;
+  opacity: 0.38;
 }
 
 .poi-card small[hidden] {
@@ -698,22 +760,24 @@ body.photo-mode #help {
 }
 
 /* Touch layouts stack the HUD top-centre, so the card sits lower-left, clear
-   of both the compass row and the thumb zone; short viewports drop the photo. */
+   of both the compass row and the thumb zone. */
 @media (pointer: coarse) {
   .poi-card {
     top: auto;
     bottom: calc(230px + env(safe-area-inset-bottom));
     left: calc(10px + env(safe-area-inset-left));
-    width: min(240px, 58vw);
+    width: min(230px, 52vw);
   }
 
-  /* Compact type so the card and Ahmed's frame can coexist on a phone. */
+  /* The photo is the single biggest thing the card puts over the view, so on a
+     phone it is a letterbox strip: enough to say "this is a real place",
+     nowhere near enough to be a picture you stop and look at. */
   .poi-card img {
-    aspect-ratio: 2.2 / 1;
+    aspect-ratio: 3.4 / 1;
   }
 
   .poi-card h3 {
-    font-size: 13px;
+    font-size: 12.5px;
   }
 
   .poi-card p {
