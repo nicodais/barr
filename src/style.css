@@ -776,6 +776,20 @@ body.photo-mode #help {
   display: none;
 }
 
+/* Dash readout under the speed. Quiet by default — it changes rarely — and
+   only picks up the accent colour once the tyres are actually aired down,
+   which makes "am I on sand pressure?" answerable at a glance. */
+.hud-psi {
+  margin-top: -2px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: rgba(243, 228, 210, 0.45);
+}
+
+.hud-psi.is-low {
+  color: var(--accent);
+}
+
 .hud-speed {
   display: flex;
   align-items: baseline;

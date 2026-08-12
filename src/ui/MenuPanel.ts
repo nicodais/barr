@@ -2,6 +2,7 @@ import { BODY_OPTIONS, type BodyId } from '../vehicle/vehicleConfig';
 import { REGIONS, REGION_ORDER, type RegionId } from '../terrain/regions';
 import type { JoystickPosition } from '../input/TouchSource';
 import { haptics } from '../input/Haptics';
+import { PRESSURE_STEPS, type PressureId } from '../vehicle/tyrePressure';
 
 /**
  * The hamburger, top-left.
@@ -32,6 +33,8 @@ interface MenuCallbacks {
   getBody(): BodyId;
   getTime(): number;
   getStick(): JoystickPosition;
+  onPressure(id: PressureId): void;
+  getPressure(): PressureId;
   onHaptics(on: boolean): void;
   getHaptics(): boolean;
   /** False on a keyboard, or on touch under a scheme with no thumbstick. */
@@ -67,6 +70,7 @@ export class MenuPanel {
   private bodyRow: HTMLElement;
   private timeRow: HTMLElement;
   private stickRow: HTMLElement;
+  private pressureRow: HTMLElement;
   private hapticRow: HTMLElement;
   private open = false;
   /** Set while a region swap is in flight, so it can't be started twice. */
@@ -92,6 +96,9 @@ export class MenuPanel {
     this.bodyRow = this.section('Truck');
     this.timeRow = this.section('Time of day');
     this.stickRow = this.section('Thumbstick');
+    // Above the thumbstick, not below: this one changes how the truck drives,
+    // and the rows below it are preferences you set once.
+    this.pressureRow = this.section('Tyres');
     this.hapticRow = this.section('Vibration');
 
     for (const id of REGION_ORDER) {
@@ -115,6 +122,15 @@ export class MenuPanel {
       }));
     }
 
+    for (const step of PRESSURE_STEPS) {
+      const chip = this.chip(`${step.psi}`, () => {
+        this.cb.onPressure(step.id);
+        this.sync();
+      });
+      chip.title = `${step.label} — ${step.hint}`;
+      this.pressureRow.appendChild(chip);
+    }
+
     for (const s of STICKS) {
       this.stickRow.appendChild(this.chip(s.label, () => {
         this.cb.onStick(s.pos);
@@ -132,6 +148,7 @@ export class MenuPanel {
       this.regionRow.parentElement!,
       this.bodyRow.parentElement!,
       this.timeRow.parentElement!,
+      this.pressureRow.parentElement!,
       this.stickRow.parentElement!,
       this.hapticRow.parentElement!,
     );
@@ -182,6 +199,9 @@ export class MenuPanel {
       if (d < bestD) { bestD = d; best = i; }
     }
     mark(this.timeRow, (i) => i === best);
+
+    const psi = this.cb.getPressure();
+    mark(this.pressureRow, (i) => PRESSURE_STEPS[i].id === psi);
 
     // Hidden rather than disabled: on a keyboard there is no thumbstick to
     // place, and a greyed-out row would just be a question nobody asked.

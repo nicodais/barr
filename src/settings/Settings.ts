@@ -9,6 +9,7 @@
 import type { Handedness, JoystickPosition, TouchScheme } from '../input/TouchSource';
 import type { QualityTier } from '../engine/Quality';
 import { isRegionId, type RegionId } from '../terrain/regions';
+import { DEFAULT_PRESSURE, isPressureId, type PressureId } from '../vehicle/tyrePressure';
 import {
   DEFAULT_VEHICLE,
   sanitizeVehicleConfig,
@@ -39,6 +40,9 @@ export interface GameSettings {
   vehicle: VehicleConfig;
   /** Which desert. Restored on load so you come back where you left off. */
   region: RegionId;
+  /** Tyre pressure. Persisted because it is a driving preference, not a
+   *  per-session accident — someone who likes it aired down always does. */
+  tyrePressure: PressureId;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -62,6 +66,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   haptics: true,
   vehicle: DEFAULT_VEHICLE,
   region: 'liwa',
+  tyrePressure: DEFAULT_PRESSURE,
 };
 
 // Joystick only: the wheel and tilt schemes were cut, so any stored value
@@ -140,6 +145,9 @@ export function loadSettings(): GameSettings {
     }
     if (isRegionId(saved.region)) {
       settings.region = saved.region;
+    }
+    if (isPressureId(saved.tyrePressure)) {
+      settings.tyrePressure = saved.tyrePressure;
     }
   } catch {
     // Unavailable or corrupt storage: defaults are already in place.

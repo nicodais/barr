@@ -4,7 +4,7 @@ import { SceneRig } from './Scene';
 import { ChaseCamera } from './ChaseCamera';
 import { TimeOfDay } from './TimeOfDay';
 import { TerrainStreamer } from '../terrain/TerrainStreamer';
-import { heightAt } from '../terrain/height';
+import { heightAt, softnessAt } from '../terrain/height';
 import { Vehicle } from '../vehicle/Vehicle';
 import { createVehicleView, type VehicleView } from '../vehicle/vehicleMesh';
 import { DustSystem } from '../vehicle/DustSystem';
@@ -20,6 +20,10 @@ import { GaragePanel } from '../ui/GaragePanel';
 import { CarSelect } from '../ui/CarSelect';
 import { MenuPanel } from '../ui/MenuPanel';
 import { BODY_TUNING } from '../vehicle/vehicleConfig';
+import {
+  PRESSURE_RATE, PRESSURE_STEPS, pressureAxis, pressureTuning, psiAt, softnessScale,
+  type PressureId,
+} from '../vehicle/tyrePressure';
 import { loadSettings, saveSettings, type GameSettings } from '../settings/Settings';
 import { GameAudio } from '../audio/GameAudio';
 import { Director } from '../narrative/Director';
@@ -89,6 +93,13 @@ export class Game {
   private choosing = true;
   private baseTuning: Record<string, number>;
   private previewAngle = 2.1;
+  /**
+   * Where the tyres actually are on the sand..road axis right now, which chases
+   * the chosen setting rather than snapping to it. A compressor takes time, and
+   * that pause is most of what makes airing down feel like an act you performed
+   * rather than a menu item you toggled.
+   */
+  private pressureAxisNow = 1;
   private settings: GameSettings;
   private audio = new GameAudio();
   private subtitles = new RadioSubtitles();
@@ -142,6 +153,9 @@ export class Game {
     // field: the region decides what `heightAt` *is*, so loading it later would
     // spawn the truck at Liwa's ground level in Fossil Rock's terrain.
     this.settings = loadSettings();
+    // Before the first applyBodyTuning: the tyres start where the player left
+    // them, rather than at road pressure and audibly deflating on load.
+    this.pressureAxisNow = pressureAxis(this.settings.tyrePressure);
     setActiveRegion(this.settings.region);
     refreshRegion();
 
@@ -286,6 +300,8 @@ export class Game {
         this.input.touch.setJoystickPosition(pos);
       },
       getStick: () => this.settings.joystickPosition,
+      getPressure: () => this.settings.tyrePressure,
+      onPressure: (id) => this.setPressure(id),
       getHaptics: () => this.settings.haptics,
       onHaptics: (on) => {
         this.settings.haptics = on;
@@ -418,10 +434,52 @@ export class Game {
     cam.lookAt(target.x, target.y + 0.55, target.z);
   }
 
+  /**
+   * Rebuilds the live tuning from three layers: the tuned baseline, the body's
+   * overrides, then tyre pressure on top of both.
+   *
+   * Always from the baseline, never patched in place. Pressure is now a
+   * continuously-moving multiplier, so applying it cumulatively would compound
+   * a few percent every frame while the tyres are changing and quietly leave
+   * the truck with a top speed of nothing.
+   */
   private applyBodyTuning() {
     Object.assign(this.vehicle.tuning, this.baseTuning);
     Object.assign(this.vehicle.tuning, BODY_TUNING[this.settings.vehicle.body]);
+    Object.assign(this.vehicle.tuning, pressureTuning(this.vehicle.tuning, this.pressureAxisNow));
+    this.vehicle.tyreSoftnessScale = softnessScale(this.pressureAxisNow);
     this.vehicle.applyTuning();
+  }
+
+  /** Step the tyres one notch toward sand (-1) or road (+1). */
+  setPressureStep(delta: number) {
+    const i = PRESSURE_STEPS.findIndex((s) => s.id === this.settings.tyrePressure);
+    const next = PRESSURE_STEPS[Math.max(0, Math.min(PRESSURE_STEPS.length - 1, i + delta))];
+    this.setPressure(next.id);
+  }
+
+  setPressure(id: PressureId) {
+    if (id === this.settings.tyrePressure) return;
+    this.settings.tyrePressure = id;
+    saveSettings(this.settings);
+    this.director.onTyrePressure(id);
+    haptics.tyres();
+  }
+
+  /** Walks the live axis toward the chosen setting, re-tuning as it goes. */
+  private updatePressure(dt: number) {
+    const target = pressureAxis(this.settings.tyrePressure);
+    if (this.pressureAxisNow === target) return;
+    const step = (dt / PRESSURE_RATE) * (PRESSURE_STEPS.length - 1);
+    const delta = target - this.pressureAxisNow;
+    this.pressureAxisNow =
+      Math.abs(delta) <= step ? target : this.pressureAxisNow + Math.sign(delta) * step;
+    this.applyBodyTuning();
+  }
+
+  /** Live psi, for the dash readout. Read-only. */
+  get psi(): number {
+    return psiAt(this.pressureAxisNow);
   }
 
   /**
@@ -634,6 +692,13 @@ export class Game {
       }
     }
 
+    this.updatePressure(frameDt);
+    // Arms Ahmed's one instructional line, which he only ever gets to use if
+    // the player is genuinely bogged *and* has never aired down.
+    const tel = this.vehicle.telemetry;
+    if (!this.choosing && tel.speedKph < 4 && tel.wheelsOnGround >= 3 && tel.surfaceSoftness > 0.3) {
+      this.director.noteBogged(this.settings.tyrePressure);
+    }
     this.audio.update(this.vehicle.telemetry, controls.throttle, frameDt);
     // Fed the same telemetry and the same landing number the dust is, so what
     // you feel and what you see are one event rather than two systems agreeing.
@@ -670,12 +735,17 @@ export class Game {
       this.terrain.stats,
       this.rig.renderer.info.render.calls,
       frameDt,
+      this.psi,
     );
   };
 
   private handleHotkeys() {
     if (this.input.keyboard.consumePress('KeyT')) this.panel.toggle();
     if (this.input.keyboard.consumePress('KeyG')) this.garage.toggle();
+    // Bracket keys, because pressure is an axis and direction matters — a
+    // single cycling key makes you tap through road to get back to sand.
+    if (this.input.keyboard.consumePress('BracketLeft')) this.setPressureStep(-1);
+    if (this.input.keyboard.consumePress('BracketRight')) this.setPressureStep(1);
     if (this.input.keyboard.consumePress('KeyP')) this.togglePhotoMode();
     if (this.input.keyboard.consumePress('Escape') && this.photo.active) this.exitPhotoMode();
     // Recovering while composing a shot would yank the subject out of frame.
@@ -873,6 +943,11 @@ export class Game {
   /** Terrain height at a world point. Read-only, for tooling. */
   groundAt(x: number, z: number): number {
     return heightAt(x, z);
+  }
+
+  /** Surface softness at a world point, 0..1. Read-only, for tooling. */
+  softnessAt(x: number, z: number): number {
+    return softnessAt(x, z);
   }
 
   private respawnTowardCentre() {

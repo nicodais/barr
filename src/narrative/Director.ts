@@ -4,6 +4,7 @@ import { activeRegion } from '../terrain/regions';
 import { DISCOVERIES, DISCOVERY_RADIUS } from '../world/Discoveries';
 import type { VehicleTelemetry } from '../vehicle/Vehicle';
 import type { RadioSubtitles } from './RadioSubtitles';
+import type { PressureId } from '../vehicle/tyrePressure';
 
 /**
  * Decides when Ahmed keys up (§5).
@@ -45,6 +46,13 @@ export class Director {
   private ambientTimer = 0;
   private signedOn = false;
   private pendingSignOff = 0;
+  /** Tyre pressure as of the last change, so he can react to the direction. */
+  private pressure: PressureId | null = null;
+  /** Set when the player bogs down at road pressure; consumed by the next
+   *  ambient slot so the hint lands just after the sand has made the point. */
+  private pressureHintDue = false;
+  /** He only ever explains this once. After that it is on you. */
+  private hintedPressure = false;
 
   constructor(
     private subtitles: RadioSubtitles,
@@ -126,7 +134,15 @@ export class Director {
     if (this.stuckTimer >= STUCK_TIME) {
       this.stuckTimer = 0;
       this.ambientTimer = AMBIENT_COOLDOWN;
-      this.call(this.take('stuck'));
+      // The hint outranks the ordinary stuck line, and only the first time.
+      // Being told twice how tyres work is being told once too often.
+      if (this.pressureHintDue) {
+        this.pressureHintDue = false;
+        this.hintedPressure = true;
+        this.call(this.take('pressureHint'));
+      } else {
+        this.call(this.take('stuck'));
+      }
       return;
     }
 
@@ -141,6 +157,32 @@ export class Director {
       this.ambientTimer = AMBIENT_COOLDOWN;
       this.call(this.take('fast'));
     }
+  }
+
+  /**
+   * The player airing up or down. Not held behind the ambient timer: it is a
+   * direct response to something they just did, and a reply that arrives
+   * seventy-five seconds later is not a reply.
+   */
+  onTyrePressure(id: PressureId) {
+    const previous = this.pressure;
+    this.pressure = id;
+    if (previous === null || this.subtitles.busy || !this.signedOn) return;
+    const down = axisOf(id) < axisOf(previous);
+    // Airing down answers the hint, so retire it either way — he has had his say.
+    this.pressureHintDue = false;
+    this.hintedPressure = true;
+    this.ambientTimer = AMBIENT_COOLDOWN;
+    this.call(this.take(down ? 'airedDown' : 'airedUp'));
+  }
+
+  /**
+   * Called by Game while the player is bogged down. The hint is armed here and
+   * spoken later so it lands *after* the struggle rather than over it.
+   */
+  noteBogged(pressure: PressureId) {
+    if (this.hintedPressure || pressure === 'sand') return;
+    this.pressureHintDue = true;
   }
 
   /**
@@ -224,4 +266,9 @@ export class Director {
     seen.add(pick);
     return lines[pick];
   }
+}
+
+/** Ordering only, so 'aired up' and 'aired down' can be told apart. */
+function axisOf(id: PressureId): number {
+  return id === 'sand' ? 0 : id === 'mixed' ? 1 : 2;
 }

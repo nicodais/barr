@@ -11,6 +11,7 @@ export class DebugHud {
   readonly element: HTMLElement;
 
   private speedEl: HTMLElement;
+  private psiEl: HTMLElement;
   private barsEl: HTMLElement;
   private statsEl: HTMLElement;
   private flagsEl: HTMLElement;
@@ -26,6 +27,11 @@ export class DebugHud {
 
     this.speedEl = document.createElement('div');
     this.speedEl.className = 'hud-speed';
+
+    // Under the speed, where a dash readout belongs. It changes rarely, so it
+    // has to be *there* when you go looking rather than shout for attention.
+    this.psiEl = document.createElement('div');
+    this.psiEl.className = 'hud-psi';
 
     this.barsEl = document.createElement('div');
     this.barsEl.className = 'hud-bars';
@@ -44,7 +50,7 @@ export class DebugHud {
     this.flagsEl = document.createElement('div');
     this.flagsEl.className = 'hud-flags';
 
-    this.element.append(this.speedEl, this.barsEl, this.statsEl, this.flagsEl);
+    this.element.append(this.speedEl, this.psiEl, this.barsEl, this.statsEl, this.flagsEl);
   }
 
   update(
@@ -53,7 +59,12 @@ export class DebugHud {
     terrain: TerrainStats,
     drawCalls: number,
     dt: number,
+    psi: number,
   ) {
+    // Rounded, and it moves while the tyres are still changing — watching the
+    // number walk down is the confirmation that something is happening.
+    this.psiEl.textContent = `${Math.round(psi)} psi`;
+    this.psiEl.classList.toggle('is-low', psi < 19);
     this.frameAccum += dt;
     this.frameCount++;
     if (this.frameAccum >= 0.4) {

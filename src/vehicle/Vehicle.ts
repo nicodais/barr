@@ -184,6 +184,15 @@ export class Vehicle {
   }
 
   /** Pushes tuning values into Rapier. Safe to call every frame while tuning. */
+  /**
+   * How soft the sand feels to these tyres, 0.42 (aired down) .. 1 (road).
+   *
+   * Set by Game from the pressure control. It multiplies the terrain's own
+   * softness rather than any single handling number, which is what makes one
+   * value produce four consistent effects at once — see tyrePressure.ts.
+   */
+  tyreSoftnessScale = 1;
+
   applyTuning() {
     const t = this.tuning;
     // Gravity is a world property but very much a vehicle *feel* parameter, so
@@ -248,7 +257,9 @@ export class Vehicle {
       if (contact) {
         contactCount++;
         const cp = this.controller.wheelContactPoint(i);
-        if (cp) softness = softnessAt(cp.x, cp.z);
+        // A wider contact patch does not change what the sand is, it changes
+        // how soft the sand is *to this tyre*.
+        if (cp) softness = softnessAt(cp.x, cp.z) * this.tyreSoftnessScale;
         const n = this.controller.wheelContactNormal(i);
         if (n) {
           // Steeper face -> less of the tyre's load turns into usable grip.

@@ -165,6 +165,15 @@ export class Haptics {
     this.fire([18, 45, 32], P.event);
   }
 
+  /**
+   * Tyres changing pressure. The longest cue here, and the only one that is a
+   * *sustain* rather than an impact — air moving, not something hitting
+   * something. Nothing else in the set would be mistaken for it.
+   */
+  tyres() {
+    this.fire([30, 60, 30, 60, 55], P.event);
+  }
+
   /** A photo taken. Mirrors a camera's mirror-slap: hard, then closed. */
   shutter() {
     this.fire([22, 30, 10], P.event);
