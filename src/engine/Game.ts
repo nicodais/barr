@@ -21,7 +21,8 @@ import { CarSelect } from '../ui/CarSelect';
 import { MenuPanel } from '../ui/MenuPanel';
 import { BODY_TUNING } from '../vehicle/vehicleConfig';
 import {
-  PRESSURE_RATE, PRESSURE_STEPS, pressureAxis, pressureTuning, psiAt, softnessScale,
+  DEFAULT_PRESSURE, PRESSURE_RATE, PRESSURE_STEPS,
+  pressureAxis, pressureTuning, psiAt, softnessScale,
   type PressureId,
 } from '../vehicle/tyrePressure';
 import { loadSettings, saveSettings, type GameSettings } from '../settings/Settings';
@@ -47,6 +48,7 @@ import { GAME_NAME, GAME_TAGLINE, GAME_URL } from '../brand';
 import { PhotoBar } from '../ui/PhotoBar';
 import { Compass } from '../ui/Compass';
 import { PoiCard } from '../ui/PoiCard';
+import { FirstRun } from '../ui/FirstRun';
 import { loadProgress, saveProgress, type Progress } from '../settings/Progress';
 import type { PoiKind } from '../data/pois';
 import { activeRegion, setActiveRegion, type RegionId } from '../terrain/regions';
@@ -109,6 +111,7 @@ export class Game {
   private boundary = new WorldBoundary();
   private compass = new Compass();
   private poiCard = new PoiCard();
+  private firstRun = new FirstRun();
   private activePoi: PoiKind | null = null;
   private progress: Progress;
   private forward = new THREE.Vector3();
@@ -348,6 +351,7 @@ export class Game {
       this.boundary.element,
       this.compass.element,
       this.poiCard.element,
+      this.firstRun.element,
       this.carSelect.element,
       this.menu.button,
       this.menu.element,
@@ -667,6 +671,25 @@ export class Game {
     }
     this.compass.update(heading, targetBearing, this.progress.discovered.size, activeRegion().pois.length);
 
+    // Reuses the compass's own target rather than recomputing one: the hint
+    // says "the compass leans toward somewhere", and it should only say it when
+    // the compass in front of the player is actually doing that.
+    if (!this.choosing && !this.photo.active && !this.firstRun.done) {
+      this.firstRun.update(
+        frameDt,
+        {
+          touch: matchMedia('(pointer: coarse)').matches,
+          hasTarget: targetBearing !== null,
+          found: this.progress.discovered.size,
+          defaultTyres: this.settings.tyrePressure === DEFAULT_PRESSURE,
+          tel: this.vehicle.telemetry,
+        },
+        this.renderPos.x,
+        this.renderPos.z,
+        this.subtitles.busy,
+      );
+    }
+
     // The arrival card: fades in inside a POI's radius, fades out on the way
     // off it. The exit edge is wider than the entry edge so idling right on the
     // boundary can't flicker the card.
@@ -771,6 +794,7 @@ export class Game {
     this.input.touch.element.hidden = true;
     this.compass.hide();
     this.menu.setVisible(false);
+    this.firstRun.setVisible(false);
   }
 
   private exitPhotoMode() {
