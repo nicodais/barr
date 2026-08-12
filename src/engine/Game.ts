@@ -17,6 +17,8 @@ import { DebugHud } from '../ui/DebugHud';
 import { TuningPanel } from '../ui/TuningPanel';
 import { GaragePanel } from '../ui/GaragePanel';
 import { CarSelect } from '../ui/CarSelect';
+import { MapSelect } from '../ui/MapSelect';
+import { MenuPanel } from '../ui/MenuPanel';
 import { BODY_TUNING } from '../vehicle/vehicleConfig';
 import { loadSettings, saveSettings, type GameSettings } from '../settings/Settings';
 import { GameAudio } from '../audio/GameAudio';
@@ -76,6 +78,8 @@ export class Game {
   private panel: TuningPanel;
   private garage: GaragePanel;
   private carSelect: CarSelect;
+  private mapSelect: MapSelect;
+  private menu: MenuPanel;
   /**
    * True until the player has picked a truck. Gates input rather than the
    * render loop, so the world is live and lit behind the picker and the car
@@ -84,6 +88,8 @@ export class Game {
   private choosing = true;
   private baseTuning: Record<string, number>;
   private previewAngle = 2.1;
+  /** True when a region swap was started from the pre-drive picker. */
+  private mapSelectOpen = false;
   private settings: GameSettings;
   private audio = new GameAudio();
   private subtitles = new RadioSubtitles();
@@ -247,6 +253,27 @@ export class Game {
       },
     );
     this.garage = new GaragePanel(this.settings, () => this.rebuildVehicleView());
+    this.mapSelect = new MapSelect(this.settings.region);
+    this.menu = new MenuPanel({
+      getRegion: () => activeRegion().id,
+      getBody: () => this.settings.vehicle.body,
+      getTime: () => this.timeOfDay.time,
+      onRegion: (id) => {
+        void this.changeRegion(id).then(() => this.menu.regionSettled());
+      },
+      onBody: (id) => {
+        if (id === this.settings.vehicle.body) return;
+        this.settings.vehicle.body = id;
+        saveSettings(this.settings);
+        this.applyBodyTuning();
+        this.rebuildVehicleView();
+      },
+      onTime: (t) => {
+        this.timeOfDay.time = t;
+        this.timeOfDay.evaluate();
+      },
+    });
+    this.menu.setVisible(false);
     this.carSelect = new CarSelect(this.settings.vehicle, () => {
       this.rebuildVehicleView();
       this.applyBodyTuning();
@@ -291,6 +318,9 @@ export class Game {
       this.compass.element,
       this.poiCard.element,
       this.carSelect.element,
+      this.mapSelect.element,
+      this.menu.button,
+      this.menu.element,
     );
 
     // Browsers only allow audio to start from a real gesture, so the first
@@ -385,12 +415,18 @@ export class Game {
    * vehicle in real light. Input stays frozen throughout (see `choosing`).
    */
   async chooseCar(): Promise<void> {
+    // Region first: it decides what the height field is, so choosing it before
+    // the truck means one teardown rather than a rebuild a second later — and
+    // it reads in the right order too, where you're going before what you take.
+    const region = await this.mapSelect.open();
+    if (region !== activeRegion().id) await this.changeRegion(region);
     await this.carSelect.open();
     this.choosing = false;
     saveSettings(this.settings);
 
     this.hud.element.hidden = false;
     this.compass.show();
+    this.menu.setVisible(true);
     document.body.classList.remove('choosing-car');
     // The camera has been sitting on a parked truck; hand it over cleanly rather
     // than letting the follow spring unwind from wherever the preview left it.
@@ -761,6 +797,8 @@ export class Game {
    */
   async changeRegion(id: RegionId) {
     if (id === activeRegion().id) return;
+    const wasChoosing = this.choosing;
+    this.mapSelectOpen = wasChoosing;
     this.choosing = true;
 
     setActiveRegion(id);
@@ -798,7 +836,10 @@ export class Game {
 
     this.settings.region = id;
     saveSettings(this.settings);
-    this.choosing = false;
+    // Only hand control back if nothing else is holding it — this runs from the
+    // pre-drive picker too, and unfreezing there would let the player drive off
+    // while the car select is still up.
+    this.choosing = this.mapSelectOpen;
   }
 
   private respawnTowardCentre() {

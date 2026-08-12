@@ -170,7 +170,12 @@ export class TimeOfDay {
     ).normalize();
   }
 
-  private evaluate() {
+  /**
+   * Recomputes the sky state from `time`. Public because setting the time is
+   * something the menu does directly — `update` only re-evaluates on the next
+   * frame, and a jump to sunset that takes a frame to land looks like a bug.
+   */
+  evaluate() {
     const t = ((this.time % 1) + 1) % 1;
 
     let a = KEYFRAMES[KEYFRAMES.length - 1];

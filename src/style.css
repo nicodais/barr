@@ -1429,3 +1429,187 @@ body.photo-mode #help {
   background: rgba(232, 167, 107, 0.75);
 }
 .carselect-card.is-active .carselect-bar > i { background: #e8a76b; }
+
+/* --- map picker ----------------------------------------------------------- */
+/* Reuses the car picker's overlay, panel, title and go button; only the cards
+   differ, because a region is a place rather than a spec sheet. */
+
+.mapselect-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 4px 0 16px;
+}
+
+.mapselect-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 0 13px;
+  overflow: hidden;
+  border: 1px solid var(--panel-line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.mapselect-card:hover { background: rgba(255, 255, 255, 0.07); }
+
+.mapselect-card.is-active {
+  border-color: var(--accent);
+  background: rgba(224, 154, 100, 0.14);
+}
+
+/*
+ * The thumbnail, drawn in CSS rather than shipped as an image.
+ *
+ * Two gradients each: a sky and a ground, with the ground's shape carrying the
+ * idea — a warm unbroken sweep for the sand sea, a hard grey wedge cutting into
+ * red for the jebel. Nothing here is a photograph on purpose: the game is
+ * flat-shaded, and a photo on the front of it sets an expectation the world
+ * then fails to meet.
+ */
+.mapselect-art {
+  display: block;
+  height: 86px;
+  margin-bottom: 9px;
+}
+
+.mapselect-art-liwa {
+  background:
+    radial-gradient(120% 150% at 50% 118%, #c2683a 0%, #a9522c 45%, transparent 46%),
+    linear-gradient(#a99ec2 0%, #e6b48b 78%, #dda877 100%);
+}
+
+.mapselect-art-fossilrock {
+  background:
+    linear-gradient(112deg, transparent 0 46%, #6e6a63 46% 62%, transparent 62%),
+    radial-gradient(140% 120% at 30% 125%, #b6552b 0%, #9c4523 55%, transparent 56%),
+    linear-gradient(#a89dc0 0%, #e3a97f 74%, #d79b6d 100%);
+}
+
+.mapselect-name {
+  margin: 0 13px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.mapselect-where {
+  margin: 0 13px;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+.mapselect-blurb {
+  margin: 4px 13px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.82;
+}
+
+/* --- menu ----------------------------------------------------------------- */
+/*
+ * Top-left hamburger. Desktop already reaches all of this through G, T and the
+ * time slider; a phone reaches none of it, which is what this exists for. It is
+ * shown on every input type anyway — a discoverable button beats three
+ * undocumented shortcuts on any device.
+ */
+.menu-button {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top));
+  left: calc(10px + env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 42px;
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 11px;
+  background: rgba(30, 22, 17, 0.72);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  z-index: 22;
+}
+
+.menu-button[hidden] { display: none; }
+
+.menu-button span {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0.85;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+/* Into an X, so the button says what it will do next rather than what it is. */
+.menu-button.is-open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.menu-button.is-open span:nth-child(2) { opacity: 0; }
+.menu-button.is-open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+.menu-panel {
+  position: fixed;
+  top: calc(60px + env(safe-area-inset-top));
+  left: calc(10px + env(safe-area-inset-left));
+  width: min(288px, calc(100vw - 20px));
+  padding: 13px 14px 15px;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background: rgba(30, 22, 17, 0.93);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.24s ease, transform 0.24s ease;
+  z-index: 21;
+}
+
+.menu-panel.is-open { opacity: 1; transform: none; }
+.menu-panel[hidden] { display: none; }
+
+/* A region swap tears the world down and rebuilds it, which takes a visible
+   moment. Dimming the panel is the only feedback there is that anything is
+   happening, since the world behind it is mid-teardown. */
+.menu-panel.is-busy { opacity: 0.55; pointer-events: none; }
+
+.menu-group { margin-bottom: 12px; }
+.menu-group:last-child { margin-bottom: 0; }
+
+.menu-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
+
+.menu-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.menu-chip {
+  padding: 7px 11px;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.menu-chip:hover { background: rgba(255, 255, 255, 0.09); }
+
+.menu-chip.is-active {
+  border-color: var(--accent);
+  background: rgba(224, 154, 100, 0.18);
+  color: var(--accent);
+}
