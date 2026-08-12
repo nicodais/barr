@@ -22,6 +22,22 @@ const SHADOW_EXTENT = 55;
 /** How far up-sun the light sits. Must exceed anything it needs to cast from. */
 const SUN_DISTANCE = 220;
 
+/**
+ * Fraction of the draw distance at which fog must already be opaque.
+ *
+ * Terrain chunks stop being drawn at the tier's `viewDistance`, but fog is
+ * authored in TimeOfDay against no particular draw distance at all — it runs
+ * 560m at night to 1010m at midday. On the low tier, which only draws to 520m,
+ * midday fog leaves the cutoff edge just 36% hazed, so chunks visibly appear
+ * out of clear air. Pulling the curve in so it finishes just inside the cutoff
+ * means whatever arrives is already the colour of the sky it arrived from.
+ *
+ * Slightly under 1 rather than exactly at it: a chunk that reaches full fog on
+ * the very frame it is culled still flickers, since the two tests disagree by
+ * the chunk's own radius.
+ */
+const FOG_REACH = 0.94;
+
 export class SceneRig {
   readonly scene = new THREE.Scene();
   readonly renderer: THREE.WebGLRenderer;
@@ -33,6 +49,8 @@ export class SceneRig {
   private sunDir = new THREE.Vector3();
   private maxPixelRatio = 2;
   private shadowsAllowed = true;
+  /** Distance the fog must be fully opaque by. Set from the quality tier. */
+  private fogLimit = Infinity;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -129,8 +147,13 @@ export class SceneRig {
     // Aerial perspective has to agree with the sky it fades into, or the
     // horizon prints a seam where the fogged terrain meets the dome.
     this.fog.color.copy(state.fog).lerp(state.hazeColor, state.haze * 0.7);
-    this.fog.near = state.fogNear;
-    this.fog.far = state.fogFar;
+    // Near and far are scaled together rather than far alone being clipped, so
+    // a tier that can't draw as far gets the authored *shape* of the aerial
+    // perspective compressed into the distance it does have, instead of a thin
+    // band of fog slammed against an otherwise clear view.
+    const squeeze = Math.min(1, this.fogLimit / state.fogFar);
+    this.fog.near = state.fogNear * squeeze;
+    this.fog.far = state.fogFar * squeeze;
 
     this.sky.update(state, this.sunDir, camera);
   }
@@ -141,6 +164,7 @@ export class SceneRig {
   }
 
   applyQuality(profile: QualityProfile) {
+    this.fogLimit = profile.viewDistance * FOG_REACH;
     this.maxPixelRatio = profile.maxPixelRatio;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, profile.maxPixelRatio));
 
