@@ -46,6 +46,12 @@ export interface GameSettings {
   /** Whether the sun moves. Off means it's parked at whatever the player last
    *  picked from the Time of day row. */
   dayCycle: boolean;
+  /** Multiplier on the in-world reading text — Ahmed's lines, the hints, the
+   *  POI card. Not the whole UI: the chips and the HUD are sized to fit. */
+  textScale: number;
+  /** Raises panel opacity and text strength. The warm low-contrast palette is
+   *  the whole look (§4), so this is opt-in rather than a compromise baked in. */
+  highContrast: boolean;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -78,6 +84,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
   // that stopped being built. A frozen sky in a game about decompression is
   // most of the atmosphere thrown away.
   dayCycle: true,
+  textScale: 1,
+  highContrast: false,
 };
 
 // Joystick only: the wheel and tilt schemes were cut, so any stored value
@@ -162,6 +170,12 @@ export function loadSettings(): GameSettings {
     }
     if (typeof saved.dayCycle === 'boolean') {
       settings.dayCycle = saved.dayCycle;
+    }
+    if (typeof saved.textScale === 'number' && Number.isFinite(saved.textScale)) {
+      settings.textScale = Math.min(1.6, Math.max(0.8, saved.textScale));
+    }
+    if (typeof saved.highContrast === 'boolean') {
+      settings.highContrast = saved.highContrast;
     }
   } catch {
     // Unavailable or corrupt storage: defaults are already in place.

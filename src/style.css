@@ -5,7 +5,36 @@
   --panel-line: rgba(255, 224, 190, 0.16);
   --text: #f6e7d4;
   --accent: #f0a860;
+  /* Multiplier on the in-world reading text, set from the Text size row. Only
+     the surfaces carrying prose use it — Ahmed's lines, the hints, the POI
+     card. The chips and the HUD are sized to their containers. */
+  --ui-scale: 1;
   color-scheme: dark;
+}
+
+/*
+ * The warm, low-contrast palette is the look (§4), so this is opt-in rather
+ * than a compromise baked into the default. It only ever touches the UI
+ * chrome — the desert itself is never re-graded.
+ */
+body.high-contrast {
+  --panel: rgba(12, 9, 7, 0.95);
+  --panel-line: rgba(255, 236, 214, 0.5);
+  --text: #fffaf3;
+  --accent: #ffc98a;
+}
+
+/* Present to a screen reader, absent from the screen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 * {
@@ -497,7 +526,7 @@ body.photo-mode #help {
   background: var(--panel);
   border: 1px solid var(--panel-line);
   color: var(--text);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale));
   line-height: 1.35;
   text-align: center;
   opacity: 0;
@@ -557,6 +586,11 @@ body.photo-mode #help {
   opacity: 0;
 }
 
+body.high-contrast .radio {
+  background: rgba(10, 7, 5, 0.96);
+  border-color: rgba(255, 236, 214, 0.45);
+}
+
 .radio-name {
   flex: none;
   font-size: 10px;
@@ -567,9 +601,9 @@ body.photo-mode #help {
 }
 
 .radio-line {
-  font-size: 15px;
+  font-size: calc(15px * var(--ui-scale));
   line-height: 1.4;
-  color: #f3e6d6;
+  color: var(--text);
 }
 
 @media (max-width: 720px) {
@@ -582,7 +616,7 @@ body.photo-mode #help {
   }
 
   .radio-line {
-    font-size: 13px;
+    font-size: calc(13px * var(--ui-scale));
   }
 }
 
@@ -785,7 +819,7 @@ body.photo-mode #help {
 
 .poi-card p {
   margin: 9px 12px 10px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-scale));
   line-height: 1.45;
   opacity: 0.86;
 }
@@ -824,7 +858,7 @@ body.photo-mode #help {
   }
 
   .poi-card p {
-    font-size: 11px;
+    font-size: calc(11px * var(--ui-scale));
     line-height: 1.4;
   }
 }

@@ -43,6 +43,22 @@ const EFFECTS: Array<{ label: string; volume: number }> = [
   { label: 'Full', volume: 1 },
 ];
 
+/**
+ * Ahmed's lines, the hints and the POI card. Not the chips or the HUD — those
+ * are sized to their containers and scaling them would break the layout to fix
+ * a problem they don't have.
+ */
+const TEXT_SIZES: Array<{ label: string; scale: number }> = [
+  { label: 'Small', scale: 0.88 },
+  { label: 'Normal', scale: 1 },
+  { label: 'Large', scale: 1.25 },
+];
+
+const CONTRAST: Array<{ label: string; on: boolean }> = [
+  { label: 'Warm', on: false },
+  { label: 'High', on: true },
+];
+
 const TIER_LABELS: Record<QualityTier, string> = {
   low: 'Low',
   medium: 'Medium',
@@ -113,6 +129,10 @@ interface MenuCallbacks {
   getPerf(): { tier: QualityTier; fps: number; draws: number; drops: number };
   onSteering(mirrored: boolean): void;
   getSteering(): boolean;
+  onTextScale(scale: number): void;
+  getTextScale(): number;
+  onContrast(on: boolean): void;
+  getContrast(): boolean;
   onGarage(): void;
   onHaptics(on: boolean): void;
   getHaptics(): boolean;
@@ -166,6 +186,8 @@ export class MenuPanel {
   private qualityRow: HTMLElement;
   private perfNote: HTMLElement;
   private steerRow: HTMLElement;
+  private textRow: HTMLElement;
+  private contrastRow: HTMLElement;
   private open = false;
   /** Ticks the perf line while the panel is up. */
   private perfTimer: number | null = null;
@@ -177,6 +199,7 @@ export class MenuPanel {
     this.button.type = 'button';
     this.button.className = 'menu-button';
     this.button.setAttribute('aria-label', 'Menu');
+    this.button.setAttribute('aria-expanded', 'false');
     // Three bars drawn as spans, so there's no icon font and no SVG to inline.
     for (let i = 0; i < 3; i++) this.button.appendChild(document.createElement('span'));
     this.button.onclick = () => {
@@ -207,6 +230,8 @@ export class MenuPanel {
     this.perfNote.className = 'menu-note';
     this.qualityRow.parentElement!.appendChild(this.perfNote);
     this.steerRow = this.section('Steering');
+    this.textRow = this.section('Text size');
+    this.contrastRow = this.section('Contrast');
 
     for (const id of REGION_ORDER) {
       this.regionRow.appendChild(this.chip(REGIONS[id].name, () => {
@@ -282,6 +307,19 @@ export class MenuPanel {
       }));
     }
 
+    for (const o of TEXT_SIZES) {
+      this.textRow.appendChild(this.chip(o.label, () => {
+        this.cb.onTextScale(o.scale);
+        this.sync();
+      }));
+    }
+    for (const o of CONTRAST) {
+      this.contrastRow.appendChild(this.chip(o.label, () => {
+        this.cb.onContrast(o.on);
+        this.sync();
+      }));
+    }
+
     for (const v of VIBRATION) {
       this.hapticRow.appendChild(this.chip(v.label, () => {
         this.cb.onHaptics(v.on);
@@ -301,6 +339,8 @@ export class MenuPanel {
       this.effectsRow.parentElement!,
       this.qualityRow.parentElement!,
       this.steerRow.parentElement!,
+      this.textRow.parentElement!,
+      this.contrastRow.parentElement!,
       this.garageButton(),
     );
   }
@@ -315,6 +355,7 @@ export class MenuPanel {
   toggle() {
     this.open = !this.open;
     this.button.classList.toggle('is-open', this.open);
+    this.button.setAttribute('aria-expanded', String(this.open));
     if (this.open) {
       this.sync();
       this.element.hidden = false;
@@ -385,6 +426,10 @@ export class MenuPanel {
     this.syncPerf();
     const mirrored = this.cb.getSteering();
     mark(this.steerRow, (i) => STEERING[i].mirrored === mirrored);
+    const scale = this.cb.getTextScale();
+    mark(this.textRow, (i) => nearest(TEXT_SIZES.map((o) => o.scale), scale) === i);
+    const contrast = this.cb.getContrast();
+    mark(this.contrastRow, (i) => CONTRAST[i].on === contrast);
 
     const on = this.cb.getHaptics();
     this.hapticRow.parentElement!.hidden = !haptics.supported;

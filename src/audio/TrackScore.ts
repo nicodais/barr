@@ -20,7 +20,21 @@ export class TrackScore {
   constructor(private engine: AudioEngine) {
     this.el = new Audio(trackUrl);
     this.el.loop = true;
-    this.el.preload = 'auto';
+    // 'metadata' rather than 'auto', for safety rather than for a saving.
+    //
+    // Measured against the real build: nothing is fetched at page load or at
+    // the map picker, because the graph is only built on a gesture and the
+    // unlock listeners don't exist until Game has loaded. Once driving starts,
+    // 2.8-4.2MB of the 11.79MB arrives in the first 30 seconds under *either*
+    // setting — the spread across four runs is noise, not the flag. `preload`
+    // stops mattering the moment `play()` is called, which happens immediately
+    // after construction here.
+    //
+    // It stays 'metadata' so a future refactor that builds the element without
+    // playing it doesn't quietly pull twelve megabytes. The real lever on this
+    // asset is the asset: 11.79MB is a 16-minute track at ~98kbps, and only a
+    // shorter loop or a lower bitrate moves it.
+    this.el.preload = 'metadata';
 
     this.gain = engine.ctx.createGain();
     this.gain.gain.value = 0;

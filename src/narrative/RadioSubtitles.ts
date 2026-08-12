@@ -13,10 +13,22 @@ const FADE = 0.7;
 
 type Phase = 'idle' | 'typing' | 'holding' | 'fading';
 
+/**
+ * Someone who has asked for less motion has asked not to watch text crawl
+ * across the screen either. The line still holds and fades on the same
+ * schedule — only the typing goes.
+ */
+function typingWanted(): boolean {
+  return !matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export class RadioSubtitles {
   readonly element: HTMLElement;
   private nameEl: HTMLElement;
   private lineEl: HTMLElement;
+  /** The whole line at once, for a screen reader. The visible element types
+   *  itself in one character at a time, which announced as a stutter. */
+  private liveEl: HTMLElement;
 
   private phase: Phase = 'idle';
   private full = '';
@@ -34,8 +46,14 @@ export class RadioSubtitles {
 
     this.lineEl = document.createElement('span');
     this.lineEl.className = 'radio-line';
+    this.lineEl.setAttribute('aria-hidden', 'true');
 
-    this.element.append(this.nameEl, this.lineEl);
+    this.liveEl = document.createElement('span');
+    this.liveEl.className = 'sr-only';
+    this.liveEl.setAttribute('role', 'status');
+    this.liveEl.setAttribute('aria-live', 'polite');
+
+    this.element.append(this.nameEl, this.lineEl, this.liveEl);
   }
 
   get busy(): boolean {
@@ -45,11 +63,21 @@ export class RadioSubtitles {
   show(line: string) {
     this.full = line;
     this.shown = 0;
-    this.timer = 0;
-    this.phase = 'typing';
     this.element.hidden = false;
     this.element.classList.remove('radio-out');
-    this.lineEl.textContent = '';
+    if (typingWanted()) {
+      this.timer = 0;
+      this.phase = 'typing';
+      this.lineEl.textContent = '';
+    } else {
+      // Straight to the hold, with the same dwell the typed version would have
+      // ended up with — the line is on screen for as long either way.
+      this.lineEl.textContent = line;
+      this.phase = 'holding';
+      this.timer = Math.max(MIN_HOLD, line.length * HOLD_PER_CHAR);
+    }
+    // Announced once, in full, at the moment he keys up.
+    this.liveEl.textContent = `Ahmed: ${line}`;
   }
 
   update(dt: number) {

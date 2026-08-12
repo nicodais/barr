@@ -363,6 +363,18 @@ export class Game {
         saveSettings(this.settings);
       },
       getSteering: () => this.settings.invertSteering,
+      onTextScale: (scale) => {
+        this.settings.textScale = scale;
+        saveSettings(this.settings);
+        this.applyAccessibility();
+      },
+      getTextScale: () => this.settings.textScale,
+      onContrast: (on) => {
+        this.settings.highContrast = on;
+        saveSettings(this.settings);
+        this.applyAccessibility();
+      },
+      getContrast: () => this.settings.highContrast,
       onGarage: () => this.garage.show(),
       onPressure: (id) => this.setPressure(id),
       getHaptics: () => this.settings.haptics,
@@ -393,6 +405,7 @@ export class Game {
 
     this.tier = this.settings.quality === 'auto' ? detectTier() : this.settings.quality;
     this.applyQuality(this.tier);
+    this.applyAccessibility();
 
     // Touch controls appear on touch-capable viewports; the picker only
     // interrupts once, on the first such session (§7).
@@ -560,6 +573,18 @@ export class Game {
     this.pressureAxisNow =
       Math.abs(delta) <= step ? target : this.pressureAxisNow + Math.sign(delta) * step;
     this.applyBodyTuning();
+  }
+
+  /**
+   * Text size and contrast, both as CSS state on the document root.
+   *
+   * Kept out of the individual components: every surface that carries reading
+   * text would otherwise need to know about the setting, and the next one added
+   * would quietly not.
+   */
+  private applyAccessibility() {
+    document.documentElement.style.setProperty('--ui-scale', String(this.settings.textScale));
+    document.body.classList.toggle('high-contrast', this.settings.highContrast);
   }
 
   /** Live psi, for the dash readout. Read-only. */
