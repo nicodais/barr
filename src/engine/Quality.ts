@@ -28,6 +28,8 @@ export interface QualityProfile {
   scatterDensity: number;
   birds: number;
   gazelles: number;
+  /** Convoy routes running at night. Each is 3-5 vehicles plus their lamps. */
+  convoys: number;
 }
 
 export const PROFILES: Record<QualityTier, QualityProfile> = {
@@ -44,6 +46,7 @@ export const PROFILES: Record<QualityTier, QualityProfile> = {
     scatterDensity: 0.45,
     birds: 5,
     gazelles: 4,
+    convoys: 1,
   },
   medium: {
     maxPixelRatio: 1.5,
@@ -58,6 +61,7 @@ export const PROFILES: Record<QualityTier, QualityProfile> = {
     scatterDensity: 0.72,
     birds: 9,
     gazelles: 6,
+    convoys: 2,
   },
   high: {
     maxPixelRatio: 2,
@@ -72,6 +76,7 @@ export const PROFILES: Record<QualityTier, QualityProfile> = {
     scatterDensity: 1,
     birds: 14,
     gazelles: 9,
+    convoys: 3,
   },
 };
 
