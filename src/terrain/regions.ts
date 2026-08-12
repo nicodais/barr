@@ -227,13 +227,15 @@ const LIWA: RegionSpec = {
   },
   pois: LIWA_POIS,
   padFootprints: {
-    falaj: { lengthR: 14, widthR: 5, angle: 0.5 },
+    falaj: { lengthR: 26, widthR: 6, angle: 0.5 },
     ghaf: { lengthR: 5, widthR: 5, angle: 0 },
-    watchtower: { lengthR: 8, widthR: 8, angle: 0 },
-    majlis: { lengthR: 7, widthR: 7, angle: 0 },
-    pylons: { lengthR: 5, widthR: 5, angle: 0 },
+    watchtower: { lengthR: 11, widthR: 11, angle: 0 },
+    majlis: { lengthR: 9, widthR: 9, angle: 0 },
+    // No pad: the pylon line is 140m long and each tower is sited on its own
+    // ground on purpose. Grading that flat would erase the dunes it crosses,
+    // which are most of why the line is worth looking at.
     teastand: { lengthR: 4.5, widthR: 4.5, angle: 0 },
-    falconry: { lengthR: 7, widthR: 5, angle: 0 },
+    falconry: { lengthR: 8, widthR: 6, angle: 0 },
     cameltrack: { lengthR: 42, widthR: 8, angle: 0 },
     coffeehearth: { lengthR: 3, widthR: 3, angle: 0 },
     oasis: { lengthR: 16, widthR: 14, angle: 0 },
@@ -320,9 +322,9 @@ const FOSSIL_ROCK: RegionSpec = {
   },
   pois: FOSSIL_ROCK_POIS,
   padFootprints: {
-    watchtower: { lengthR: 8, widthR: 8, angle: 0 },
+    watchtower: { lengthR: 11, widthR: 11, angle: 0 },
     coffeehearth: { lengthR: 3, widthR: 3, angle: 0 },
-    falaj: { lengthR: 14, widthR: 5, angle: 0.5 },
+    falaj: { lengthR: 26, widthR: 6, angle: 0.5 },
     ghaf: { lengthR: 5, widthR: 5, angle: 0 },
     teastand: { lengthR: 4.5, widthR: 4.5, angle: 0 },
     fossilbed: { lengthR: 12, widthR: 9, angle: 0.7 },

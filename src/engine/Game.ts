@@ -836,6 +836,16 @@ export class Game {
     this.choosing = this.mapSelectOpen;
   }
 
+  /** The active region's points of interest. Read-only, for tooling. */
+  regionPois() {
+    return activeRegion().pois;
+  }
+
+  /** Terrain height at a world point. Read-only, for tooling. */
+  groundAt(x: number, z: number): number {
+    return heightAt(x, z);
+  }
+
   private respawnTowardCentre() {
     const p = this.curPos;
     const d = Math.hypot(p.x, p.z) || 1;
