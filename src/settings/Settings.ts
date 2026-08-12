@@ -33,6 +33,8 @@ export interface GameSettings {
   touchPickerSeen: boolean;
   /** 'auto' lets the device heuristic and watchdog decide. */
   quality: QualityTier | 'auto';
+  /** Phone vibration on landings, rollovers and radio calls. Mobile only. */
+  haptics: boolean;
   /** Body, paint and fitted accessories. Cosmetic only — never handling. */
   vehicle: VehicleConfig;
   /** Which desert. Restored on load so you come back where you left off. */
@@ -54,6 +56,10 @@ export const DEFAULT_SETTINGS: GameSettings = {
   joystickPosition: 'left',
   touchPickerSeen: false,
   quality: 'auto',
+  // On by default: it only ever fires on devices that have a motor, the cues
+  // are short, and someone who dislikes it will find the switch in the menu
+  // faster than someone who'd enjoy it would go looking for one that's off.
+  haptics: true,
   vehicle: DEFAULT_VEHICLE,
   region: 'liwa',
 };
@@ -123,6 +129,9 @@ export function loadSettings(): GameSettings {
     }
     if (saved.quality && QUALITIES.includes(saved.quality)) {
       settings.quality = saved.quality;
+    }
+    if (typeof saved.haptics === 'boolean') {
+      settings.haptics = saved.haptics;
     }
     // Per-field validation lives with the catalogue it validates against, since
     // that's what has to be edited when a body or swatch is added or retired.

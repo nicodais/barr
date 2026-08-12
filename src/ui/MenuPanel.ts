@@ -1,6 +1,7 @@
 import { BODY_OPTIONS, type BodyId } from '../vehicle/vehicleConfig';
 import { REGIONS, REGION_ORDER, type RegionId } from '../terrain/regions';
 import type { JoystickPosition } from '../input/TouchSource';
+import { haptics } from '../input/Haptics';
 
 /**
  * The hamburger, top-left.
@@ -31,9 +32,16 @@ interface MenuCallbacks {
   getBody(): BodyId;
   getTime(): number;
   getStick(): JoystickPosition;
+  onHaptics(on: boolean): void;
+  getHaptics(): boolean;
   /** False on a keyboard, or on touch under a scheme with no thumbstick. */
   stickAvailable(): boolean;
 }
+
+const VIBRATION: Array<{ on: boolean; label: string }> = [
+  { on: true, label: 'On' },
+  { on: false, label: 'Off' },
+];
 
 const STICKS: Array<{ pos: JoystickPosition; label: string }> = [
   { pos: 'left', label: 'Left' },
@@ -59,6 +67,7 @@ export class MenuPanel {
   private bodyRow: HTMLElement;
   private timeRow: HTMLElement;
   private stickRow: HTMLElement;
+  private hapticRow: HTMLElement;
   private open = false;
   /** Set while a region swap is in flight, so it can't be started twice. */
   private busy = false;
@@ -70,7 +79,10 @@ export class MenuPanel {
     this.button.setAttribute('aria-label', 'Menu');
     // Three bars drawn as spans, so there's no icon font and no SVG to inline.
     for (let i = 0; i < 3; i++) this.button.appendChild(document.createElement('span'));
-    this.button.onclick = () => this.toggle();
+    this.button.onclick = () => {
+      haptics.tick();
+      this.toggle();
+    };
 
     this.element = document.createElement('div');
     this.element.className = 'menu-panel';
@@ -80,6 +92,7 @@ export class MenuPanel {
     this.bodyRow = this.section('Truck');
     this.timeRow = this.section('Time of day');
     this.stickRow = this.section('Thumbstick');
+    this.hapticRow = this.section('Vibration');
 
     for (const id of REGION_ORDER) {
       this.regionRow.appendChild(this.chip(REGIONS[id].name, () => {
@@ -108,12 +121,19 @@ export class MenuPanel {
         this.sync();
       }));
     }
+    for (const v of VIBRATION) {
+      this.hapticRow.appendChild(this.chip(v.label, () => {
+        this.cb.onHaptics(v.on);
+        this.sync();
+      }));
+    }
 
     this.element.append(
       this.regionRow.parentElement!,
       this.bodyRow.parentElement!,
       this.timeRow.parentElement!,
       this.stickRow.parentElement!,
+      this.hapticRow.parentElement!,
     );
   }
 
@@ -168,6 +188,13 @@ export class MenuPanel {
     const stick = this.cb.getStick();
     this.stickRow.parentElement!.hidden = !this.cb.stickAvailable();
     mark(this.stickRow, (i) => STICKS[i].pos === stick);
+
+    // Same reasoning, one step stronger: on a device with no vibration motor
+    // — every iPhone, and every desktop — this isn't a setting that's turned
+    // off, it's a setting that doesn't exist.
+    const on = this.cb.getHaptics();
+    this.hapticRow.parentElement!.hidden = !haptics.supported;
+    mark(this.hapticRow, (i) => VIBRATION[i].on === on);
   }
 
   private section(label: string): HTMLElement {
@@ -187,7 +214,12 @@ export class MenuPanel {
     b.type = 'button';
     b.className = 'menu-chip';
     b.textContent = label;
-    b.onclick = onClick;
+    b.onclick = () => {
+      // Before the handler rather than after, so the "On" chip's own
+      // confirmation buzz pre-empts this tick instead of queueing behind it.
+      haptics.tick();
+      onClick();
+    };
     return b;
   }
 }

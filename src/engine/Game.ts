@@ -12,6 +12,7 @@ import { ContactShadow } from '../vehicle/ContactShadow';
 import { TrackSystem } from '../vehicle/TrackSystem';
 import { Headlights } from '../vehicle/Headlights';
 import { InputManager } from '../input/InputManager';
+import { haptics } from '../input/Haptics';
 import { emptyInput } from '../input/types';
 import { DebugHud } from '../ui/DebugHud';
 import { TuningPanel } from '../ui/TuningPanel';
@@ -205,6 +206,7 @@ export class Game {
     for (let i = 0; i < 24; i++) this.scatter.update(spawn.x, spawn.z);
 
     this.progress = loadProgress();
+    haptics.setEnabled(this.settings.haptics);
     this.audio.setMuted(this.settings.muted);
     this.audio.setVolume(this.settings.volume);
     this.audio.setMusicVolume(this.settings.musicVolume);
@@ -212,8 +214,17 @@ export class Game {
     this.director = new Director(
       this.subtitles,
       {
-        onKeyUp: () => this.audio.radioKeyUp(),
-        onSignOff: () => this.audio.radioSignOff(),
+        // Ahmed has no voice (§6), so the static cue is the whole of his
+        // presence — worth putting in the hand as well as the ear, since on a
+        // phone in a noisy room the audio is the part most likely to be missed.
+        onKeyUp: () => {
+          this.audio.radioKeyUp();
+          haptics.radioKeyUp();
+        },
+        onSignOff: () => {
+          this.audio.radioSignOff();
+          haptics.radioSignOff();
+        },
       },
       (poi) => {
         // Discovery persists across sessions (§3); the compass stops nudging
@@ -277,6 +288,12 @@ export class Game {
         this.input.touch.setJoystickPosition(pos);
       },
       getStick: () => this.settings.joystickPosition,
+      getHaptics: () => this.settings.haptics,
+      onHaptics: (on) => {
+        this.settings.haptics = on;
+        saveSettings(this.settings);
+        haptics.setEnabled(on);
+      },
       stickAvailable: () =>
         matchMedia('(pointer: coarse)').matches && this.settings.touchScheme === 'joystick',
     });
@@ -333,7 +350,10 @@ export class Game {
     window.addEventListener('touchend', unlock);
 
     this.vehicle.onRecover = (reason) => {
-      if (reason === 'rollover') this.director.onRollover();
+      if (reason === 'rollover') {
+        this.director.onRollover();
+        haptics.rollover();
+      }
       // Camera snaps with the truck so the flip reads as a beat, not a cutaway.
       this.syncTransforms(true);
       this.chase.reset(this.curPos, this.curQuat);
@@ -479,6 +499,7 @@ export class Game {
     // where the truck is parked and the free camera can roam.
     if (!this.photo.active && this.boundary.update(this.curPos.x, this.curPos.z, frameDt)) {
       this.respawnTowardCentre();
+      haptics.boundary();
     }
 
     const alpha = Math.min(1, this.accumulator / FIXED_DT);
@@ -604,11 +625,20 @@ export class Game {
         if (Math.hypot(poi.x - this.renderPos.x, poi.z - this.renderPos.z) > poi.radius) continue;
         this.activePoi = poi.id;
         this.poiCard.show(poi);
+        // A nudge to look up. On a phone the card arrives in the corner of a
+        // screen you're steering with, and this is what makes it noticed. If
+        // Ahmed is keying up about the same place in the same instant, the
+        // priority check drops one of the two rather than stacking them.
+        haptics.arrive();
         break;
       }
     }
 
     this.audio.update(this.vehicle.telemetry, controls.throttle, frameDt);
+    // Fed the same telemetry and the same landing number the dust is, so what
+    // you feel and what you see are one event rather than two systems agreeing.
+    haptics.land(landingImpact);
+    haptics.update(this.vehicle.telemetry, this.vehicle.wheels, controls.throttle, frameDt);
     // Ahmed holds off until the player is actually driving. His sign-on is a
     // greeting to someone who has just set out, and firing it over a menu spends
     // the one line that establishes him on a moment nobody is in yet.

@@ -1,4 +1,5 @@
 import { REGIONS, REGION_ORDER, type RegionId } from '../terrain/regions';
+import { haptics } from '../input/Haptics';
 
 /**
  * Where you're driving today.
@@ -67,6 +68,7 @@ export class MapSelect {
 
       card.append(art, name, where, blurb);
       card.onclick = () => {
+        haptics.tick();
         this.picked = id;
         this.sync();
       };
@@ -77,7 +79,10 @@ export class MapSelect {
     go.type = 'button';
     go.className = 'carselect-go';
     go.textContent = 'Drive there';
-    go.onclick = () => this.confirm();
+    go.onclick = () => {
+      haptics.tick();
+      this.confirm();
+    };
 
     panel.append(title, sub, this.cards, go);
     this.element.appendChild(panel);

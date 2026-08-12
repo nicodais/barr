@@ -1,4 +1,5 @@
 import { FILTERS, PhotoMode, type PhotoFilter } from '../engine/PhotoMode';
+import { haptics } from '../input/Haptics';
 
 /**
  * Photo mode's controls. Appears only while photo mode is active, and stays out
@@ -25,6 +26,7 @@ export class PhotoBar {
       btn.textContent = PhotoMode.label(f);
       btn.dataset.filter = f;
       btn.onclick = () => {
+        haptics.tick();
         this.photo.filter = f;
         this.syncFilters(filters);
       };
@@ -45,18 +47,28 @@ export class PhotoBar {
 
     const save = document.createElement('button');
     save.textContent = 'Save';
-    save.onclick = onSave;
+    // A shutter, not a tick: this is the one button here that produces a thing.
+    save.onclick = () => {
+      haptics.shutter();
+      onSave();
+    };
 
     const share = document.createElement('button');
     share.textContent = 'Share';
     // Only offered where the platform can actually do something with it.
     share.hidden = typeof navigator.share !== 'function';
-    share.onclick = onShare;
+    share.onclick = () => {
+      haptics.shutter();
+      onShare();
+    };
 
     const exit = document.createElement('button');
     exit.textContent = 'Done';
     exit.className = 'photobar-exit';
-    exit.onclick = onExit;
+    exit.onclick = () => {
+      haptics.tick();
+      onExit();
+    };
 
     actions.append(save, share, exit);
 

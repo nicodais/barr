@@ -4,6 +4,7 @@ import {
   WHEEL_OPTIONS,
   type VehicleConfig,
 } from '../vehicle/vehicleConfig';
+import { haptics } from '../input/Haptics';
 
 
 /**
@@ -86,6 +87,7 @@ export class CarSelect {
 
       card.append(name, blurb, stats);
       card.onclick = () => {
+        haptics.tick();
         this.config.body = option.id;
         this.sync();
         this.onChange();
@@ -110,6 +112,7 @@ export class CarSelect {
       dot.title = paint.label;
       dot.style.background = `#${paint.color.toString(16).padStart(6, '0')}`;
       dot.onclick = () => {
+        haptics.tick();
         this.config.paint = paint.id;
         this.sync();
         this.onChange();
@@ -126,7 +129,10 @@ export class CarSelect {
     go.type = 'button';
     go.className = 'carselect-go';
     go.textContent = 'Head out';
-    go.onclick = () => this.confirm();
+    go.onclick = () => {
+      haptics.tick();
+      this.confirm();
+    };
 
     const hint = document.createElement('p');
     hint.className = 'carselect-hint';
@@ -151,6 +157,7 @@ export class CarSelect {
       btn.dataset.value = wheel.id;
       btn.textContent = wheel.label;
       btn.onclick = () => {
+        haptics.tick();
         this.config.wheels = wheel.id;
         this.sync();
         this.onChange();
