@@ -8,6 +8,7 @@
  */
 import type { Handedness, JoystickPosition, TouchScheme } from '../input/TouchSource';
 import type { QualityTier } from '../engine/Quality';
+import { isRegionId, type RegionId } from '../terrain/regions';
 import {
   DEFAULT_VEHICLE,
   sanitizeVehicleConfig,
@@ -34,6 +35,8 @@ export interface GameSettings {
   quality: QualityTier | 'auto';
   /** Body, paint and fitted accessories. Cosmetic only — never handling. */
   vehicle: VehicleConfig;
+  /** Which desert. Restored on load so you come back where you left off. */
+  region: RegionId;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -52,6 +55,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   touchPickerSeen: false,
   quality: 'auto',
   vehicle: DEFAULT_VEHICLE,
+  region: 'liwa',
 };
 
 // Joystick only: the wheel and tilt schemes were cut, so any stored value
@@ -124,6 +128,9 @@ export function loadSettings(): GameSettings {
     // that's what has to be edited when a body or swatch is added or retired.
     if (saved.vehicle) {
       settings.vehicle = sanitizeVehicleConfig(saved.vehicle);
+    }
+    if (isRegionId(saved.region)) {
+      settings.region = saved.region;
     }
   } catch {
     // Unavailable or corrupt storage: defaults are already in place.

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { alongCrest, clamp01, heightAt, surfaceAt } from './height';
+import { alongCrest, clamp01, heightAt, rockAt, surfaceAt } from './height';
+import { activeRegion } from './regions';
 
 export const CHUNK_SIZE = 128;
 
@@ -90,30 +91,35 @@ function buildIndices(n: number): Uint16Array | Uint32Array {
 // interdune. So the map runs red along its ridges and grey-buff in its hollows,
 // and the terrain shader doesn't decide that — `surfaceAt` does, from the same
 // exposure term the dune geometry is built out of.
-/** Iron-stained crest sand. This is the colour the corridor is known for. */
-const SAND_IRON = new THREE.Color(0xba6b3e);
-/** Coarse, pale, carbonate-rich interdune sand. */
-const SAND_PALE = new THREE.Color(0xcaa887);
-/** Serir — the wind-scoured gravel that shows through where sand runs thin. */
-const GRAVEL = new THREE.Color(0xa1907c);
-/** Salt crust on a pan floor: near-white, and the palest thing in the world. */
-const SABKHA = new THREE.Color(0xd8cec0);
-/**
- * The great dune's own faces, and the most saturated thing in the world.
- *
- * Tal Moreeb is the reddest sand in the region for the reason the grain-sorting
- * model already encodes — it is the highest and most exposed sand here, so it
- * collects the finest, most heavily iron-stained grains. Giving it a colour of
- * its own rather than leaning on the iron term alone is what lets it read as a
- * landmark from the far side of the map instead of as a big dune.
- */
-const DUNE_CREST_RED = new THREE.Color(0xa8552c);
+//
+// Every entry is per-region (see regions.ts): Liwa is deep-sand-sea red over
+// pale carbonate, Fossil Rock a redder sand against cool grey limestone. Held
+// as scratch Colors refilled once per chunk build rather than per vertex — a
+// chunk is 4225 vertices and these cannot change inside one build.
+const SAND_IRON = new THREE.Color();
+const SAND_PALE = new THREE.Color();
+const GRAVEL = new THREE.Color();
+const SABKHA = new THREE.Color();
+const DUNE_CREST_RED = new THREE.Color();
+const ROCK = new THREE.Color();
+
+function loadPalette() {
+  const p = activeRegion().palette;
+  SAND_IRON.setHex(p.sandIron);
+  SAND_PALE.setHex(p.sandPale);
+  GRAVEL.setHex(p.gravel);
+  SABKHA.setHex(p.sabkha);
+  DUNE_CREST_RED.setHex(p.duneCrest);
+  ROCK.setHex(p.rock);
+}
 
 /**
  * What the dust and the crest plumes should be tinted toward, so airborne sand
  * belongs to the ground it came off rather than being a generic beige puff.
  */
-export const AIRBORNE_SAND = new THREE.Color(0xd9a273);
+export function airborneSand(out: THREE.Color): THREE.Color {
+  return out.setHex(activeRegion().palette.airborne);
+}
 
 /**
  * What an occluded hollow's sand is tinted toward. Ambient occlusion is not a
@@ -128,6 +134,9 @@ const AO_SHADOW = new THREE.Color(0x6b5a72);
 const AO_STRENGTH = 0.22;
 
 const scratchColor = new THREE.Color();
+const scratchRock = new THREE.Color();
+/** Shadowed, freshly broken limestone: cool and desaturated. */
+const ROCK_COOL = new THREE.Color(0x59606b);
 
 /**
  * Ratio of this chunk's resolution to each neighbour's (1 when the neighbour is
@@ -162,6 +171,7 @@ export function buildChunkGeometry(
   const originX = chunkX * CHUNK_SIZE;
   const originZ = chunkZ * CHUNK_SIZE;
   const cell = CHUNK_SIZE / n;
+  loadPalette();
   const verts = (n + 1) * (n + 1);
   const total = verts + 8 * (n + 1);
 
@@ -308,11 +318,16 @@ function writeColor(out: Float32Array, v: number, wx: number, wz: number) {
   scratchColor.copy(SAND_PALE).lerp(SAND_IRON, s.iron);
   // Where the sand runs thin the gravel underneath shows through. Partial on
   // purpose — hardpack here is sand *over* serir, not bare serir.
-  scratchColor.lerp(GRAVEL, (1 - s.softness) * 0.45);
+  scratchColor.lerp(GRAVEL, (1 - s.softness) * activeRegion().gravelAmount);
   // Then the salt pan, and the great dune over the top of everything — nothing
   // buries it, because it is 120 m of sand standing on the lot.
   scratchColor.lerp(SABKHA, s.sabkha);
   scratchColor.lerp(DUNE_CREST_RED, s.greatDune * 0.5);
+
+  // Bare limestone, where a region has any. Applied after everything else and
+  // at full strength: the sand/rock boundary is the single strongest read in a
+  // region built around a jebel, and blending it would throw that away.
+  const rock = rockAt(wx, wz);
 
   // Wind lanes: faint streaking drawn out along the crest lines, the direction
   // the sand is actually travelling. Kept to a few percent — at any strength
@@ -320,6 +335,27 @@ function writeColor(out: Float32Array, v: number, wx: number, wz: number) {
   // reading as a texture seam.
   const lane = 1 + Math.sin(alongCrest(wx, wz) * 0.021) * 0.03 * s.softness;
   scratchColor.multiplyScalar(lane);
+
+  if (rock > 0) {
+    // Rock gets its own mottling instead of the wind lanes, which would be
+    // nonsense on stone. Steep faces go darker: a limestone cliff is freshly
+    // broken and unweathered where it is vertical, and pale and sun-bleached
+    // where it lies flat enough to hold dust. That difference is most of what
+    // makes a scarp read as a scarp from a distance.
+    const e = 1.5;
+    const gx = (heightAt(wx + e, wz) - heightAt(wx - e, wz)) / (2 * e);
+    const gz = (heightAt(wx, wz + e) - heightAt(wx, wz - e)) / (2 * e);
+    const steep = clamp01((Math.hypot(gx, gz) - 0.45) / 0.9);
+    const mottle = 1 + Math.sin(wx * 0.19) * Math.sin(wz * 0.23) * 0.07;
+    scratchRock.copy(ROCK).multiplyScalar(mottle * (1 - 0.42 * steep));
+    // Cool the steep faces as well as darkening them. Hue is what separates
+    // stone from sand here — under a low warm sun any albedo renders warm, so a
+    // rock that differs only in value still reads as dark sand. Pushing the
+    // faces toward blue is the same trick the hemisphere light plays on the
+    // dune shadows, and it is the thing that makes a scarp look like rock.
+    scratchRock.lerp(ROCK_COOL, steep * 0.5);
+    scratchColor.lerp(scratchRock, rock);
+  }
 
   // Ambient occlusion, baked into vertex colour (§4). Without it every hollow
   // is lit exactly as brightly as the ridge above it, which is what makes a

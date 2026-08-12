@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { POIS, type Poi, type PoiKind } from '../data/pois';
+import type { Poi, PoiKind } from '../data/pois';
+import { activeRegion } from '../terrain/regions';
 import { heightAt } from '../terrain/height';
 
 /**
@@ -27,6 +28,8 @@ const FOLIAGE = new THREE.MeshLambertMaterial({ color: 0x6b7f4a, flatShading: tr
 const FOLIAGE_DARK = new THREE.MeshLambertMaterial({ color: 0x566b3c, flatShading: true });
 const CANVAS = new THREE.MeshLambertMaterial({ color: 0xc4b49a, flatShading: true });
 const METAL = new THREE.MeshLambertMaterial({ color: 0xa9a49b, flatShading: true });
+/** Fossil shell against the rock it sits in — paler and warmer than limestone. */
+const BONE_STONE = new THREE.MeshLambertMaterial({ color: 0xcabfa4, flatShading: true });
 // The oasis palette. Date palms are a colder, greyer green than the ghaf and
 // the scrub — that difference is most of what makes a garden read as irrigated
 // rather than as more desert vegetation.
@@ -41,7 +44,7 @@ const WATER = new THREE.MeshLambertMaterial({ color: 0x3d5a5c, flatShading: true
 
 export function createLandmarks(): THREE.Group {
   const group = new THREE.Group();
-  for (const poi of POIS) {
+  for (const poi of activeRegion().pois) {
     const built = buildLandmark(poi);
     const baseY = heightAt(poi.x, poi.z);
     built.position.set(poi.x, baseY, poi.z);
@@ -126,6 +129,8 @@ function buildLandmark(poi: Poi): THREE.Group {
     case 'cameltrack': return buildCamelTrack();
     case 'coffeehearth': return buildCoffeeHearth();
     case 'oasis': return buildOasis();
+    case 'fossilbed': return buildFossilBed();
+    case 'tomb': return buildTomb();
   }
 }
 
@@ -513,8 +518,18 @@ function groupRotationY(id: PoiKind): number {
  * the truck bumps the landmark without small dressing snagging it. Colliders are
  * standalone (no rigid body), exactly like the terrain heightfield.
  */
-export function createLandmarkColliders(rapier: typeof RAPIER, world: RAPIER.World): void {
-  for (const poi of POIS) {
+/**
+ * @returns every collider created, so a region change can take them back out.
+ * Handing back the handles is the only way to remove them: Rapier has no notion
+ * of "the colliders that belong to landmarks", and searching the world for them
+ * afterwards would mean tagging them anyway.
+ */
+export function createLandmarkColliders(
+  rapier: typeof RAPIER,
+  world: RAPIER.World,
+): RAPIER.Collider[] {
+  const made: RAPIER.Collider[] = [];
+  for (const poi of activeRegion().pois) {
     const gRot = groupRotationY(poi.id);
     const c = Math.cos(gRot);
     const s = Math.sin(gRot);
@@ -533,9 +548,10 @@ export function createLandmarkColliders(rapier: typeof RAPIER, world: RAPIER.Wor
         .setRotation({ x: 0, y: Math.sin(ry), z: 0, w: Math.cos(ry) })
         .setFriction(0.7)
         .setRestitution(0.05);
-      world.createCollider(desc);
+      made.push(world.createCollider(desc));
     }
   }
+  return made;
 }
 
 function box(x: number, y: number, z: number, hx: number, hy: number, hz: number, rotY = 0): ColliderSpec {
@@ -600,6 +616,20 @@ function colliderSpecs(id: PoiKind): ColliderSpec[] {
     case 'coffeehearth':
       // The hearth ring and the log seat; the pot and cups are too small to matter.
       return [cyl(0, 0.1, 0, 0.14, 0.62), box(-1.1, 0.16, 0.5, 0.16, 0.16, 0.55)];
+    case 'fossilbed':
+      // The two big slabs. The loose fossils and the marker post are small
+      // enough that a collider on them would read as an invisible snag.
+      return [box(-1.4, 0.35, 0.8, 2.6, 0.4, 1.7, 0.24), box(2.2, 0.28, -1.1, 2.1, 0.32, 1.5, -0.5)];
+    case 'tomb': {
+      // The ring wall, as eight boxes round the circumference. Driving into it
+      // stops you; driving round it is the whole point of it being circular.
+      const specs: ColliderSpec[] = [];
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        specs.push(box(Math.cos(a) * 4.1, 0.55, Math.sin(a) * 4.1, 1.7, 0.6, 0.5, -a));
+      }
+      return specs;
+    }
     case 'oasis': {
       // Every trunk is solid — a date garden you can drive through is a texture,
       // not a place. The pool and the basin wall stay flat so nothing traps you.
@@ -741,4 +771,126 @@ function buildDatePalm(x: number, z: number, height: number, lean: number): THRE
   p.add(bunch);
 
   return p;
+}
+
+/**
+ * The fossil bed: tilted slabs of marine limestone with the shells still in it.
+ *
+ * The fossils have to be legible or the POI is a pile of rocks, so they're
+ * oversized — real ones are a few centimetres and would be invisible from a
+ * truck. Scaled up to something you can see from standing height and left at
+ * that, which is the same licence the whole flat-shaded style already takes.
+ */
+function buildFossilBed(): THREE.Group {
+  const g = new THREE.Group();
+
+  // Two big slabs tilted out of the ground at the dip of the bedding, which is
+  // what a tilted seabed actually looks like where it breaks the surface.
+  for (const [x, z, rot, tilt, len] of [
+    [-1.4, 0.8, 0.24, -0.26, 5.2],
+    [2.2, -1.1, -0.5, 0.2, 4.2],
+  ] as const) {
+    const slab = mesh(new THREE.BoxGeometry(len, 0.7, 3.4), STONE_LIGHT, x, 0.3, z);
+    slab.rotation.set(tilt, rot, 0.06);
+    g.add(slab);
+  }
+
+  // Smaller broken plates scattered off the slabs, half-buried.
+  for (let i = 0; i < 11; i++) {
+    const a = i * 2.4;
+    const d = 3.4 + (i % 4) * 1.5;
+    const plate = mesh(
+      new THREE.BoxGeometry(0.9 + (i % 3) * 0.4, 0.16, 0.7),
+      i % 2 ? STONE : DARK_STONE,
+      Math.cos(a) * d, 0.06, Math.sin(a) * d,
+    );
+    plate.rotation.set((i % 3) * 0.1, a, 0.05);
+    g.add(plate);
+  }
+
+  // The fossils. Ammonites as flat spirals — a torus with few segments reads as
+  // a coiled shell at this poly count — plus urchins as squashed spheres.
+  for (const [x, y, z, r, rot] of [
+    [-1.9, 0.66, 1.4, 0.42, 0.3],
+    [-0.6, 0.68, 0.1, 0.3, 1.1],
+    [2.6, 0.62, -0.6, 0.36, -0.4],
+  ] as const) {
+    const shell = mesh(new THREE.TorusGeometry(r, r * 0.34, 4, 9), BONE_STONE, x, y, z);
+    shell.rotation.set(Math.PI / 2 + 0.2, rot, 0);
+    g.add(shell);
+  }
+  for (const [x, y, z, r] of [
+    [-2.6, 0.64, 0.2, 0.2],
+    [1.6, 0.6, -1.9, 0.16],
+    [3.1, 0.58, -1.6, 0.22],
+  ] as const) {
+    const urchin = mesh(new THREE.IcosahedronGeometry(r, 0), BONE_STONE, x, y, z);
+    urchin.scale.set(1, 0.5, 1);
+    g.add(urchin);
+  }
+
+  // A survey marker: someone recorded this bed, which is what makes it a site
+  // rather than a coincidence.
+  g.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6), METAL, -4.6, 0.75, -2.2));
+  const plate = mesh(new THREE.BoxGeometry(0.42, 0.3, 0.04), METAL, -4.6, 1.42, -2.2);
+  plate.rotation.y = 0.4;
+  g.add(plate);
+
+  return g;
+}
+
+/**
+ * An Umm an-Nar communal tomb: a circular dry-stone ring, partly collapsed.
+ *
+ * The real ones are 6-12m across with a dressed outer facing and internal
+ * dividing walls, and they held whole extended families over generations. Built
+ * here as a ring that is intact on one side and fallen on the other, because a
+ * complete circle reads as a modern fire pit and a rubble pile reads as
+ * nothing.
+ */
+function buildTomb(): THREE.Group {
+  const g = new THREE.Group();
+  const R = 4.1;
+
+  // The ring. Height falls away round the circumference so one arc still
+  // stands to chest height and the opposite arc is down to its foundation.
+  const COURSES = 4;
+  for (let i = 0; i < 26; i++) {
+    const a = (i / 26) * Math.PI * 2;
+    // Intact through the north-east arc, collapsed through the south-west.
+    const standing = 0.35 + 0.65 * (0.5 + 0.5 * Math.cos(a - 1.0));
+    const courses = Math.max(1, Math.round(COURSES * standing));
+    for (let c = 0; c < courses; c++) {
+      const jitter = ((i * 7 + c * 13) % 5) * 0.03;
+      const block = mesh(
+        new THREE.BoxGeometry(1.02, 0.26, 0.52),
+        c % 2 ? STONE_LIGHT : STONE,
+        Math.cos(a) * (R + jitter), 0.13 + c * 0.26, Math.sin(a) * (R + jitter),
+      );
+      block.rotation.y = -a + jitter * 0.4;
+      g.add(block);
+    }
+  }
+
+  // Internal dividing wall, which is the detail that makes it a tomb rather
+  // than a hut: these were partitioned into chambers.
+  for (const off of [-1.3, 1.3]) {
+    for (let i = -2; i <= 2; i++) {
+      g.add(mesh(new THREE.BoxGeometry(0.9, 0.24, 0.44), DARK_STONE, i * 1.0, 0.12, off));
+    }
+  }
+
+  // Fallen facing stones lying where they came off the wall.
+  for (let i = 0; i < 9; i++) {
+    const a = 3.6 + i * 0.42;
+    const d = R + 0.9 + (i % 3) * 0.7;
+    const fallen = mesh(
+      new THREE.BoxGeometry(0.95, 0.22, 0.5), STONE,
+      Math.cos(a) * d, 0.09, Math.sin(a) * d,
+    );
+    fallen.rotation.set(0.04, a + (i % 4) * 0.3, 0.03);
+    g.add(fallen);
+  }
+
+  return g;
 }

@@ -1,10 +1,17 @@
 /**
- * The points of interest for v1 (§5). A curated set that leans into the desert
- * heritage of the UAE — the falaj that carried water, the majlis where a ruler
- * held open council, the ghaf the Sheikhs planted a country out of, falconry and
- * the camel track — plus a couple of playful, present-day spots so the world has
- * texture without becoming a checklist. Nothing here is mandatory and nothing
- * gates movement.
+ * The points of interest (§5).
+ *
+ * `PoiKind` is a shared catalogue rather than a per-region list: the kind is
+ * what decides which landmark gets built and which info card is shown, and both
+ * of those are exhaustive switches. A region picks which kinds it places and
+ * where, so a watchtower can stand in two deserts without either file learning
+ * that regions exist.
+ *
+ * Liwa's set leans into the desert heritage of the UAE — the falaj that carried
+ * water, the majlis where a ruler held open council, the ghaf the Sheikhs
+ * planted a country out of, falconry and the camel track — plus a couple of
+ * playful, present-day spots so the world has texture without becoming a
+ * checklist. Nothing is mandatory and nothing gates movement.
  *
  * Coordinates stay well inside the soft fade-and-respawn boundary (~760 out, see
  * WorldBoundary) so landmarks sit in the curated heart of the region, never out
@@ -25,7 +32,10 @@ export type PoiKind =
   | 'falconry'
   | 'cameltrack'
   | 'coffeehearth'
-  | 'oasis';
+  | 'oasis'
+  // Fossil Rock only.
+  | 'fossilbed'
+  | 'tomb';
 
 export interface Poi {
   id: PoiKind;
@@ -38,7 +48,7 @@ export interface Poi {
   lines: string[];
 }
 
-export const POIS: Poi[] = [
+export const LIWA_POIS: Poi[] = [
   {
     id: 'falaj',
     name: 'The Old Falaj',

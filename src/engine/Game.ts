@@ -33,7 +33,7 @@ import { createOldTracks } from '../world/OldTracks';
 import { Weather } from '../world/Weather';
 import { Camels } from '../world/Camels';
 import { createDiscoveries } from '../world/Discoveries';
-import { AIRBORNE_SAND } from '../terrain/chunkGeometry';
+import { airborneSand } from '../terrain/chunkGeometry';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
 import { PhotoMode } from './PhotoMode';
 import { PhotoBar } from '../ui/PhotoBar';
@@ -41,8 +41,9 @@ import { JoystickBar } from '../ui/JoystickBar';
 import { Compass } from '../ui/Compass';
 import { PoiCard } from '../ui/PoiCard';
 import { loadProgress, saveProgress, type Progress } from '../settings/Progress';
-import { POIS } from '../data/pois';
 import type { PoiKind } from '../data/pois';
+import { activeRegion, setActiveRegion, type RegionId } from '../terrain/regions';
+import { refreshRegion } from '../terrain/height';
 
 const PHYSICS_HZ = 60;
 const FIXED_DT = 1 / PHYSICS_HZ;
@@ -118,11 +119,27 @@ export class Game {
   private sunDir = new THREE.Vector3();
   private dustColor = new THREE.Color();
   private slumpColor = new THREE.Color();
+  private airborneColor = new THREE.Color();
+  /**
+   * Everything built once from the region's data: landmarks, discoverables, old
+   * tracks. Held in one group so a region change is "empty this and refill it"
+   * rather than a list of removals that will be forgotten the next time
+   * something is added to the world.
+   */
+  private worldProps = new THREE.Group();
+  private landmarkColliders: RAPIER.Collider[] = [];
 
   private constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
     this.rig = new SceneRig(canvas);
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.integrationParameters.dt = FIXED_DT;
+
+    // Settings first, and specifically before anything samples the height
+    // field: the region decides what `heightAt` *is*, so loading it later would
+    // spawn the truck at Liwa's ground level in Fossil Rock's terrain.
+    this.settings = loadSettings();
+    setActiveRegion(this.settings.region);
+    refreshRegion();
 
     const spawn = { x: 0, y: heightAt(0, 0) + 2.0, z: 0 };
 
@@ -151,10 +168,9 @@ export class Game {
     // what §2's "tuned by feel" produced, and the per-body deltas are read as
     // departures from it rather than becoming the new normal.
     this.baseTuning = { ...this.vehicle.tuning };
-    // Settings load before the truck is built: the body and paint the player
-    // last chose are part of the very first frame, so there's no moment where
-    // someone's pickup appears as the default wagon and then swaps.
-    this.settings = loadSettings();
+    // The body and paint the player last chose are part of the very first
+    // frame, so there's no moment where someone's pickup appears as the default
+    // wagon and then swaps.
     this.view = createVehicleView(this.settings.vehicle);
     // Parented to the body, so the beams sweep with the truck — including the
     // pitch and roll, which is most of what makes night driving feel different.
@@ -164,20 +180,21 @@ export class Game {
     this.rig.scene.add(this.contactShadow.mesh);
     this.rig.scene.add(this.dust.points);
 
-    this.rig.scene.add(createLandmarks());
+    this.worldProps.add(createLandmarks());
     // Solid, damage-free colliders for those same landmarks (§11).
-    createLandmarkColliders(RAPIER, this.world);
+    this.landmarkColliders = createLandmarkColliders(RAPIER, this.world);
+    this.rig.scene.add(this.worldProps);
     this.rig.scene.add(this.scatter.group);
     this.rig.scene.add(this.birds.mesh);
     this.rig.scene.add(this.wildlife.group);
     this.rig.scene.add(this.camels.group);
     // Junk in the sand. No colliders — small enough that a stop would read as
     // hitting an invisible box rather than as hitting a sandal.
-    this.rig.scene.add(createDiscoveries());
+    this.worldProps.add(createDiscoveries());
     this.rig.scene.add(this.plumes.points);
     this.rig.scene.add(this.avalanche.points);
     // Everyone who came before. Baked once, one draw call, never updated.
-    this.rig.scene.add(createOldTracks());
+    this.worldProps.add(createOldTracks());
     // Fill the ground dressing around spawn before the first frame, so the
     // world doesn't visibly grow plants while the player is looking at it.
     for (let i = 0; i < 24; i++) this.scatter.update(spawn.x, spawn.z);
@@ -485,12 +502,12 @@ export class Game {
     // Airborne sand: lit by the sky, but tinted by the ground it came off.
     // Without the sand term the dust reads as pale smoke against red dunes.
     this.dustColor.copy(this.timeOfDay.state.sunColor).lerp(this.timeOfDay.state.horizon, 0.45);
-    this.dustColor.lerp(AIRBORNE_SAND, 0.4);
+    this.dustColor.lerp(airborneSand(this.airborneColor), 0.4);
     this.dust.setColor(this.dustColor);
     this.plumes.setColor(this.dustColor);
     // Sloughed sand is lit the same way, but it never left the ground, so it
     // keeps more of the dune's own colour and less of the sky's.
-    this.avalanche.setColor(this.slumpColor.copy(this.dustColor).lerp(AIRBORNE_SAND, 0.45));
+    this.avalanche.setColor(this.slumpColor.copy(this.dustColor).lerp(this.airborneColor, 0.45));
     // Same wind that drives the sky's haze, so the weather is one thing (§6).
     this.plumes.setStorm(this.weather.intensity);
     this.plumes.update(
@@ -525,7 +542,7 @@ export class Game {
     const heading = Math.atan2(this.forward.x, this.forward.z);
     let targetBearing: number | null = null;
     let best = Infinity;
-    for (const poi of POIS) {
+    for (const poi of activeRegion().pois) {
       if (this.progress.discovered.has(poi.id)) continue;
       const d = Math.hypot(poi.x - this.renderPos.x, poi.z - this.renderPos.z);
       if (d < best) {
@@ -533,13 +550,13 @@ export class Game {
         targetBearing = Math.atan2(poi.x - this.renderPos.x, poi.z - this.renderPos.z);
       }
     }
-    this.compass.update(heading, targetBearing, this.progress.discovered.size, POIS.length);
+    this.compass.update(heading, targetBearing, this.progress.discovered.size, activeRegion().pois.length);
 
     // The arrival card: fades in inside a POI's radius, fades out on the way
     // off it. The exit edge is wider than the entry edge so idling right on the
     // boundary can't flicker the card.
     if (this.activePoi !== null) {
-      const cur = POIS.find((p) => p.id === this.activePoi)!;
+      const cur = activeRegion().pois.find((p) => p.id === this.activePoi)!;
       const d = Math.hypot(cur.x - this.renderPos.x, cur.z - this.renderPos.z);
       if (d > cur.radius * 1.35 || this.photo.active) {
         this.poiCard.hide();
@@ -547,7 +564,7 @@ export class Game {
       }
     }
     if (this.activePoi === null && !this.photo.active) {
-      for (const poi of POIS) {
+      for (const poi of activeRegion().pois) {
         if (Math.hypot(poi.x - this.renderPos.x, poi.z - this.renderPos.z) > poi.radius) continue;
         this.activePoi = poi.id;
         this.poiCard.show(poi);
@@ -697,7 +714,9 @@ export class Game {
     this.dust.setMaxParticles(profile.maxDust);
     this.plumes.setMaxParticles(profile.maxPlumes);
     this.avalanche.setMaxGrains(profile.maxAvalanche);
-    this.scatter.setDensity(profile.scatterDensity);
+    // Region bias on top of the quality tier: gravel plain carries noticeably
+    // more scrub than deep sand does.
+    this.scatter.setDensity(profile.scatterDensity * activeRegion().scatterBias);
     this.birds.setCount(profile.birds);
     this.wildlife.setCount(profile.gazelles);
     this.watchdog.reset();
@@ -730,6 +749,58 @@ export class Game {
    * facing the centre, so driving off the edge loops you gently back in. The full
    * haze is covering the screen at this instant, so the reposition is unseen.
    */
+  /**
+   * Tears the world down and rebuilds it in another region.
+   *
+   * There is no incremental path here and there shouldn't be: the height field
+   * is a different function afterwards, so every chunk, collider, landmark,
+   * baked track and cached scatter cell is describing a place that no longer
+   * exists. The honest version is to drop all of it. That costs a visible
+   * second, which is why the picker runs before the drive starts — this path is
+   * for the menu, where a pause is expected.
+   */
+  async changeRegion(id: RegionId) {
+    if (id === activeRegion().id) return;
+    this.choosing = true;
+
+    setActiveRegion(id);
+    refreshRegion();
+
+    // Props first: they hold colliders, and removing a collider after the world
+    // has been stepped with it gone is a crash rather than a glitch.
+    for (const c of this.landmarkColliders) this.world.removeCollider(c, false);
+    this.landmarkColliders = [];
+    disposeTree(this.worldProps);
+    this.worldProps.clear();
+
+    this.terrain.reset();
+    this.scatter.reset();
+    this.tracks.clear();
+    this.progress = loadProgress();
+    this.activePoi = null;
+    this.poiCard.hide();
+    this.director.reset();
+
+    const spawn = { x: 0, z: 0 };
+    this.terrain.preload(spawn.x, spawn.z);
+    this.world.queryPipeline.update(this.world.colliders);
+
+    this.worldProps.add(createLandmarks());
+    this.landmarkColliders = createLandmarkColliders(RAPIER, this.world);
+    this.worldProps.add(createDiscoveries());
+    this.worldProps.add(createOldTracks());
+    for (let i = 0; i < 24; i++) this.scatter.update(spawn.x, spawn.z);
+
+    this.vehicle.warpTo(spawn.x, spawn.z, 0);
+    this.syncTransforms(true);
+    this.chase.reset(this.curPos, this.curQuat);
+    this.applyQuality(this.tier);
+
+    this.settings.region = id;
+    saveSettings(this.settings);
+    this.choosing = false;
+  }
+
   private respawnTowardCentre() {
     const p = this.curPos;
     const d = Math.hypot(p.x, p.z) || 1;
@@ -768,4 +839,22 @@ export class Game {
     this.chase.setAspect(w / h);
     this.photo?.setSize(w, h, this.rig.renderer.getPixelRatio());
   };
+}
+
+/**
+ * Frees every geometry and material under a node before it is discarded.
+ *
+ * Removing a group from the scene does not free its GPU buffers — three has no
+ * finaliser and the driver keeps them alive as long as the JS objects exist. A
+ * region change that skipped this would leak a whole world of terrain props on
+ * every swap, which on a phone is a couple of swaps before the tab dies.
+ */
+function disposeTree(root: THREE.Object3D) {
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    obj.geometry.dispose();
+    const mat = obj.material;
+    if (Array.isArray(mat)) for (const m of mat) m.dispose();
+    else mat.dispose();
+  });
 }

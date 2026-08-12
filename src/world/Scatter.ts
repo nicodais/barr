@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { duneFieldMask, hash2, heightAt, softnessAt, surfaceAt } from '../terrain/height';
+import { duneFieldMask, hash2, heightAt, rockAt, softnessAt, surfaceAt } from '../terrain/height';
 
 /**
  * Ground dressing — scrub, tussock grass and rocks — scattered across the
@@ -95,6 +95,13 @@ export class Scatter {
     };
     for (const s of SPECIES) this.group.add(this.meshes[s]);
     this.group.matrixAutoUpdate = false;
+  }
+
+  /** Drops every cached cell. The ground under all of them has been replaced. */
+  reset() {
+    this.cells.clear();
+    this.lastCx = Infinity;
+    this.lastCz = Infinity;
   }
 
   /** Lower tiers thin the scatter out rather than shrinking its radius. */
@@ -199,8 +206,12 @@ export class Scatter {
       // Nothing holds on the great dune. Its faces are live sand being moved
       // constantly, and a bush halfway up a 120 m slip face would say the slope
       // is stable — which is the opposite of what the climb is about.
+      //
+      // Bare limestone is the same argument for the opposite reason: nothing
+      // roots in rock, and a bush on the massif would undo the one hard-surface
+      // read the region has.
       const surface = surfaceAt(x, z);
-      const stony = surface.greatDune;
+      const stony = Math.max(surface.greatDune, rockAt(x, z));
       const h3 = hash2(cx * 7 + i * 3, cz * 11 + i * 5);
       let species: Species;
       if (h3 < lerp(0.55, 0, stony)) species = 'bush';

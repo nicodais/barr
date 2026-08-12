@@ -1,5 +1,6 @@
 import { AHMED_LINES, type LinePool } from '../data/ahmedLines';
-import { POIS, type Poi } from '../data/pois';
+import type { Poi } from '../data/pois';
+import { activeRegion } from '../terrain/regions';
 import { DISCOVERIES, DISCOVERY_RADIUS } from '../world/Discoveries';
 import type { VehicleTelemetry } from '../vehicle/Vehicle';
 import type { RadioSubtitles } from './RadioSubtitles';
@@ -91,7 +92,7 @@ export class Director {
     }
 
     // --- points of interest, the only thing worth interrupting silence for ---
-    for (const poi of POIS) {
+    for (const poi of activeRegion().pois) {
       if (this.visited.has(poi.id)) continue;
       if (Math.hypot(poi.x - x, poi.z - z) > poi.radius) continue;
       this.visited.add(poi.id);
@@ -152,6 +153,19 @@ export class Director {
     if (this.subtitles.busy || !this.signedOn) return;
     this.ambientTimer = AMBIENT_COOLDOWN;
     this.call(this.take(event === 'arriving' ? 'stormIn' : 'stormOut'));
+  }
+
+  /**
+   * Forgets which POIs and finds have been seen, for a region change. The line
+   * pools are deliberately *not* reset: Ahmed shouldn't repeat his sign-on
+   * because you drove somewhere else.
+   */
+  reset() {
+    this.visited.clear();
+    this.found.clear();
+    this.pendingLines.length = 0;
+    this.pendingSignOff = 0;
+    this.cooldown = 6;
   }
 
   /** Hooked to the vehicle's damage-free auto-flip. */

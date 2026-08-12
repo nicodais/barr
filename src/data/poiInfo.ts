@@ -98,6 +98,22 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
     photo: '/photos/cameltrack.jpg',
     credit: 'https://www.usatoday.com/picture-gallery/tech/2017/01/03/centuries-old-tradition-changed-by-technology/96116762/'
   },
+  fossilbed: {
+    title: 'Fossil Rock',
+    body:
+      'Jebel Maleihah is a slab of Cretaceous seabed tilted out of the desert — the ' +
+      'shells and sea urchins in it are around 65 million years old. The dunes ' +
+      'banked against its western flank are one of the best-known 4x4 runs in the ' +
+      'Emirates.',
+  },
+  tomb: {
+    title: 'Umm an-Nar Tombs',
+    body:
+      'Mleiha holds one of the richest archaeological records in the Gulf: circular ' +
+      'Umm an-Nar communal tombs from around 2000 BC, an Iron Age settlement, and a ' +
+      'pre-Islamic fort. The same water that made the desert liveable made it worth ' +
+      'burying your family here.',
+  },
   oasis: {
     title: 'The Liwa Oases',
     body:

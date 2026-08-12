@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { WIND_X, WIND_Z } from './height';
 
 /**
  * The terrain's material: flat-shaded vertex-coloured Lambert, with three
@@ -12,6 +11,13 @@ import { WIND_X, WIND_Z } from './height';
  * value structure. Not repeating that.
  */
 export interface SandUniforms {
+  /**
+   * The wind axis, xz. A uniform rather than a constant baked into the source:
+   * the crest bearing is per-region now, and baking it would mean recompiling
+   * the terrain shader on every map change — which recompiles every material in
+   * the scene along with it.
+   */
+  uWind: { value: THREE.Vector2 };
   uRippleStrength: { value: number };
   uSunDirection: { value: THREE.Vector3 };
   uSheenColor: { value: THREE.Color };
@@ -23,6 +29,7 @@ export function createSandMaterial(): {
   uniforms: SandUniforms;
 } {
   const uniforms: SandUniforms = {
+    uWind: { value: new THREE.Vector2(1, 0) },
     // Ripples fade out with distance and with wind — see the fragment code.
     uRippleStrength: { value: 1 },
     uSunDirection: { value: new THREE.Vector3(0, 1, 0) },
@@ -71,8 +78,8 @@ export function createSandMaterial(): {
          uniform vec3 uSunDirection;
          uniform vec3 uSheenColor;
          uniform float uSheen;
-
-         const vec2 WIND = vec2( ${WIND_X.toFixed(6)}, ${WIND_Z.toFixed(6)} );
+         uniform vec2 uWind;
+         #define WIND uWind
 
          // Wind ripples.
          //

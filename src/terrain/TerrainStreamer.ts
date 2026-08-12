@@ -11,6 +11,7 @@ import {
   type EdgeRatios,
 } from './chunkGeometry';
 import { createSandMaterial, type SandUniforms } from './sandMaterial';
+import { WIND_X, WIND_Z } from './height';
 
 /** Extra slack before eviction, so chunks don't thrash on the boundary. */
 const EVICT_SLACK = 160;
@@ -65,6 +66,7 @@ export class TerrainStreamer {
     const sand = createSandMaterial();
     this.material = sand.material;
     this.sand = sand.uniforms;
+    this.sand.uWind.value.set(WIND_X, WIND_Z);
     this.group.matrixAutoUpdate = false;
   }
 
@@ -129,6 +131,25 @@ export class TerrainStreamer {
    */
   setQuality(profile: QualityProfile) {
     this.profile = profile;
+  }
+
+  /**
+   * Throws away every chunk and collider. Called on a region change — the
+   * height field under all of them has been replaced, so there is nothing here
+   * worth keeping and a stale chunk would render a slice of the old map.
+   */
+  reset() {
+    for (const chunk of this.chunks.values()) {
+      if (chunk.mesh) {
+        this.group.remove(chunk.mesh);
+        chunk.mesh.geometry.dispose();
+      }
+      if (chunk.collider) this.world.removeCollider(chunk.collider, false);
+    }
+    this.chunks.clear();
+    this.pending.length = 0;
+    this.sand.uWind.value.set(WIND_X, WIND_Z);
+    this.updateStats();
   }
 
   /** Reconciles the desired chunk set against what's resident. */
