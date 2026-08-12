@@ -15,7 +15,7 @@
  * without dragging Three.js into the settings path.
  */
 
-export type BodyId = 'wagon' | 'pickup' | 'gwagon' | 'singlecab' | 'buggy';
+export type BodyId = 'wagon' | 'pickup' | 'gwagon' | 'singlecab' | 'softtop' | 'buggy';
 export type WheelStyleId = 'steel' | 'alloy' | 'beadlock';
 export type PaintId =
   | 'safari'
@@ -81,6 +81,12 @@ export const BODY_OPTIONS: BodyOption[] = [
     stats: { speed: 0.42, grip: 0.8, weight: 0.66, agility: 0.46 },
   },
   {
+    id: 'softtop',
+    label: 'Soft Top',
+    blurb: 'Roof off, doors off. Wonderful right up until you cross a slope.',
+    stats: { speed: 0.66, grip: 0.7, weight: 0.38, agility: 0.8 },
+  },
+  {
     id: 'buggy',
     label: 'Dune Buggy',
     blurb: 'Half a tonne. Floats over soft sand and changes its mind instantly.',
@@ -136,7 +142,7 @@ export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
     climbBleed: 0.86,
   },
 
-  // Short, tall and grippy. Best mechanical traction of the four, but the tall
+  // Short, tall and grippy. Best mechanical traction of the six, but the tall
   // body and high COM mean a sidehill is genuinely tense.
   gwagon: {
     mass: 2250,
@@ -165,7 +171,7 @@ export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
     brakeForce: 1950,
     steerRate: 3.0,
     maxSteerAngle: 0.55,
-    // Leaf springs: the stiffest and shortest-travel setup of the five. It
+    // Leaf springs: the stiffest and shortest-travel setup of the six. It
     // skitters over corrugations the coil-sprung bodies absorb, and lands hard
     // — which is most of what separates it from the wagon by feel.
     suspensionStiffness: 38,
@@ -178,6 +184,37 @@ export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
     sinkDrag: 1500,
     // The trade, and the reason to pick it: low gearing barely notices a climb.
     climbBleed: 0.6,
+  },
+
+  // Open, light and sat up high. The only body here whose grip and whose
+  // stability point in opposite directions: it holds a line across a face
+  // better than anything except the box wagon, and having held it, tips. That
+  // tension is the whole reason to drive it, and it costs nothing (§2 — a
+  // rollover is a beat, never a penalty).
+  softtop: {
+    mass: 1680,
+    // Highest of the six. No roof to lower the mass, and you sit on the tub
+    // rather than down in it.
+    comHeight: 0.46,
+    rollInertia: 880,
+    pitchInertia: 3100,
+    yawInertia: 2000,
+    engineForce: 3300,
+    topSpeed: 34,
+    brakeForce: 2100,
+    steerRate: 4.0,
+    maxSteerAngle: 0.66,
+    suspensionRest: 0.52,
+    suspensionTravel: 0.44,
+    suspensionStiffness: 20,
+    hardpackGrip: 1.24,
+    sandGrip: 0.95,
+    // Above baseline, deliberately. Grip is what lets it get far enough over
+    // to be in trouble; a body that just slid away would never tip at all.
+    hardpackSideGrip: 0.74,
+    sandSideGrip: 0.42,
+    sinkDrag: 820,
+    climbBleed: 0.7,
   },
 
   // Light enough to stay on top of sand that swallows the others, and low

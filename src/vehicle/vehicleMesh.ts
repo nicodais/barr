@@ -784,6 +784,132 @@ function buildSingleCab(b: PartBuilder) {
 }
 
 /**
+ * The soft top — roof off, doors off, cage up.
+ *
+ * The one thing none of the other closed bodies can do is let you see *through*
+ * the vehicle, and that is the whole brief here. A gap of sky between the sill
+ * and the cage, with two seats and a steering wheel visible inside it, is a
+ * silhouette nothing else in the picker comes near — far more distinguishing at
+ * chase distance than any amount of panel detail would be.
+ *
+ * Which means the interior is load-bearing for the first time. Every other body
+ * hides its cabin behind glass and can leave it empty; strip the sides off and
+ * an empty tub reads as an unfinished model. Hence seats, headrests, a wheel on
+ * a column, and a rolled canvas stowed behind the rear bench.
+ *
+ * Built the same way as the pickup bed — floor plate with walls standing on it,
+ * never a solid loft with a hollow implied inside it, because there is no CSG
+ * here and an "inset" volume is just geometry buried where nobody can see it.
+ * The sill deliberately steps down 18cm through the door aperture: that drop is
+ * what says the doors are *off* rather than that the body was moulded without
+ * them, and it is also why this is the one body that skips `sideDetails` — no
+ * doors, no door seams.
+ */
+function buildSoftTop(b: PartBuilder) {
+  const NOSE = 2.02;
+  const TAIL = -2.00;
+  /** Tub floor, and the top of the tub sides. */
+  const FLOOR_Y = 0.14;
+  const SILL_Y = 0.66;
+  const SCREEN_TOP = 1.34;
+  const SCREEN_Z = 0.88;
+  const HOOP_Y = 1.42;
+  const HOOP_Z = -0.60;
+
+  // Lower body, closed, from the tail to the bulkhead.
+  shell(b, 'body', [
+    { z: TAIL, hw: 0.86, y0: -0.46, y1: FLOOR_Y, c: 0.10 },
+    { z: -1.80, hw: 0.90, y0: -0.50, y1: FLOOR_Y, c: 0.08 },
+    { z: 1.02, hw: 0.90, y0: -0.50, y1: FLOOR_Y, c: 0.08 },
+  ]);
+  // Bonnet, forward of the scuttle. Flat and low — this is a short vehicle
+  // whose bonnet is the least of it.
+  shell(b, 'body', [
+    { z: 1.02, hw: 0.90, y0: -0.50, y1: 0.52, c: 0.08 },
+    { z: 1.84, hw: 0.88, y0: -0.48, y1: 0.50, c: 0.09 },
+    { z: NOSE, hw: 0.80, y0: -0.44, y1: 0.46, c: 0.07 },
+  ]);
+  b.add(box(1.66, 0.05, 2.86), 'bodyDark', [0, FLOOR_Y + 0.02, -0.42]);
+
+  // --- tub walls ------------------------------------------------------------
+  const wallH = SILL_Y - FLOOR_Y;
+  const wallMid = (FLOOR_Y + SILL_Y) / 2;
+  // Rear quarter: full height, behind where a B-pillar would be.
+  b.addPair(() => box(0.11, wallH, 1.32), 'body', [0.85, wallMid, -1.28]);
+  // Door aperture: the same wall, 18cm lower. The step is the read.
+  const doorH = wallH - 0.18;
+  b.addPair(() => box(0.11, doorH, 1.56), 'body', [0.85, FLOOR_Y + doorH / 2, 0.22]);
+  b.add(box(1.78, wallH, 0.11), 'body', [0, wallMid, TAIL + 0.06]);
+  // Scuttle top, closing the tub against the bonnet.
+  b.add(box(1.78, 0.10, 0.28), 'bodyDark', [0, SILL_Y - 0.02, 0.90]);
+
+  // --- screen and cage ------------------------------------------------------
+  b.strutPair('trim', [0.80, SILL_Y, 1.00], [0.76, SCREEN_TOP, SCREEN_Z], 0.05);
+  b.add(tube(1.54, 0.05), 'trim', [0, SCREEN_TOP, SCREEN_Z], [0, 0, Math.PI / 2]);
+  b.add(
+    box(1.5, SCREEN_TOP - SILL_Y - 0.02, 0.05), 'glass',
+    [0, (SILL_Y + SCREEN_TOP) / 2, SCREEN_Z + 0.05], [-0.14, 0, 0],
+  );
+  // Main hoop, its header, the rails forward to the screen and the rear stays.
+  b.strutPair('trim', [0.80, SILL_Y - 0.06, HOOP_Z], [0.74, HOOP_Y, HOOP_Z], 0.055);
+  b.add(tube(1.5, 0.055), 'trim', [0, HOOP_Y, HOOP_Z], [0, 0, Math.PI / 2]);
+  b.strutPair('trim', [0.74, HOOP_Y, HOOP_Z], [0.76, SCREEN_TOP, SCREEN_Z], 0.048);
+  b.strutPair('trim', [0.74, HOOP_Y, HOOP_Z], [0.80, SILL_Y - 0.02, TAIL + 0.22], 0.045);
+  // The diagonal brace across the hoop — every cage has one, and it is the
+  // detail that stops the hoop reading as a decorative arch.
+  b.strut('trim', [-0.72, HOOP_Y - 0.05, HOOP_Z], [0.74, SILL_Y + 0.04, HOOP_Z], 0.04);
+
+  // --- interior, visible for the first time ---------------------------------
+  // Stacked off the floor plate rather than off FLOOR_Y: the plate is 5cm thick
+  // and sits 2cm proud, so seats placed against the nominal floor hover a
+  // visible 9cm above the one they are supposed to be bolted to. Each piece
+  // below starts where the one under it ends.
+  const PLATE_TOP = FLOOR_Y + 0.045;
+  for (const z of [0.30, -1.02]) {
+    b.addPair(() => box(0.48, 0.12, 0.48), 'rubber', [0.42, PLATE_TOP + 0.06, z]);
+    b.addPair(() => box(0.48, 0.56, 0.12), 'rubber', [0.42, PLATE_TOP + 0.40, z - 0.26]);
+    b.addPair(() => box(0.32, 0.17, 0.11), 'rubber', [0.42, PLATE_TOP + 0.75, z - 0.26]);
+  }
+  // Left-hand drive: +X is the left side with +Z forward, and the UAE drives on
+  // the right. Column first and stated as a strut between two joints, wheel on
+  // the end of it — a wheel floating in front of a seat with nothing behind it
+  // is the same tell the buggy shipped with once already.
+  b.strut('trim', [0.42, 0.60, 0.96], [0.42, 0.70, 0.64], 0.028);
+  b.add(disc(0.17, 0.04, 10), 'trim', [0.42, 0.70, 0.62], [0.6, 0, 0]);
+  // The roof, rolled up and strapped behind the rear seats where it lives.
+  b.add(tube(1.44, 0.13), 'cargo', [0, SILL_Y + 0.08, TAIL + 0.46], [0, 0, Math.PI / 2]);
+  b.addPair(() => box(0.05, 0.3, 0.05), 'trim', [0.5, SILL_Y + 0.02, TAIL + 0.46]);
+
+  buildArchesAndSteps(b);
+
+  // --- face -----------------------------------------------------------------
+  // Vertical slots and round lamps: the open-top idiom, and nothing like the
+  // horizontal-slat faces on the two pickups.
+  b.add(box(1.14, 0.32, 0.06), 'rubber', [0, 0.24, NOSE + 0.01]);
+  for (let i = 0; i < 7; i++) {
+    b.add(box(0.06, 0.26, 0.05), 'trim', [-0.45 + i * 0.15, 0.24, NOSE + 0.04]);
+  }
+  const round = (r: number, d: number) => () => {
+    const g = new THREE.CylinderGeometry(r, r, d, 12);
+    g.rotateX(Math.PI / 2);
+    return g;
+  };
+  b.addPair(round(0.175, 0.05), 'trim', [0.68, 0.26, NOSE + 0.02]);
+  b.addPair(round(0.142, 0.07), 'lamp', [0.68, 0.26, NOSE + 0.05]);
+  b.addPair(() => box(0.13, 0.09, 0.05), 'amber', [0.68, 0.02, NOSE + 0.03]);
+  b.add(box(1.7, 0.15, 0.15), 'steel', [0, -0.3, NOSE + 0.03]);
+
+  buildRearLamps(b, TAIL);
+  // Spare on the tailgate, offset to one side like every one of these.
+  b.add(box(0.1, 0.46, 0.1), 'trim', [0.14, 0.24, TAIL - 0.06]);
+  b.add(disc(0.42, 0.2, 14), 'rubber', [0.14, 0.28, TAIL - 0.2]);
+  b.add(disc(0.24, 0.22, 12), 'steel', [0.14, 0.28, TAIL - 0.21]);
+
+  b.addPair(() => box(0.14, 0.03, 0.03), 'trim', [0.95, 0.86, 1.02]);
+  b.addPair(() => box(0.06, 0.16, 0.11), 'trim', [1.03, 0.86, 1.02]);
+}
+
+/**
  * Sand rail — a dragster built for dunes: long, low, rear-engined, and mostly
  * air.
  *
@@ -1067,6 +1193,7 @@ const BODIES: Record<BodyId, BodySpec> = {
   pickup: { build: buildPickup },
   gwagon: { build: buildGWagon },
   singlecab: { build: buildSingleCab },
+  softtop: { build: buildSoftTop },
   buggy: { build: buildBuggy },
 };
 
