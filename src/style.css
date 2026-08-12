@@ -1324,6 +1324,32 @@ body.photo-mode #help {
 }
 .carselect-go:hover { background: #f2b87e; }
 
+/* Held up after the pick while the engine finishes arriving. Reads as "this is
+   happening", not as a disabled control that refused the tap. */
+.carselect-go:disabled {
+  background: rgba(232, 167, 107, 0.34);
+  color: rgba(243, 228, 210, 0.8);
+  cursor: default;
+  animation: go-waiting 1.5s ease-in-out infinite;
+}
+
+@keyframes go-waiting {
+  50% { background: rgba(232, 167, 107, 0.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carselect-go:disabled { animation: none; }
+}
+
+/* The choice is made; stop it looking like it can still be changed. */
+.mapselect-cards.is-settled {
+  pointer-events: none;
+}
+
+.mapselect-cards.is-settled .mapselect-card:not(.is-active) {
+  opacity: 0.4;
+}
+
 .carselect-hint {
   margin: 0;
   font-size: 0.72rem;
