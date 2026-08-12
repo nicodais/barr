@@ -674,6 +674,116 @@ function buildGWagon(b: PartBuilder) {
 }
 
 /**
+ * The single cab — the working pickup that actually does the driving out here:
+ * short cab forward, long steel tray behind, round lamps, snorkel.
+ * Seventies-utility proportions, built from primitives, no badging (§11).
+ *
+ * It shares a silhouette *class* with the crew-cab pickup above, so the whole
+ * job is making sure nobody confuses the two at chase-camera distance. Three
+ * things do that work, and they are all about where the cab sits:
+ *
+ * - **One door per side.** The crew cab's greenhouse runs most of the
+ *   wheelbase; this one is barely a metre long and stops well short of the rear
+ *   axle, which is what leaves room for a tray half again as long.
+ * - **The bonnet steps down.** The American truck's headline is a nose standing
+ *   nearly as tall as its roof. This is the opposite: a hard 12cm drop off the
+ *   cowl to a flat bonnet, so the cab reads as a box sitting on a lower body.
+ * - **Round lamps in a body-colour face**, against the other's full-width slab
+ *   of grille.
+ */
+function buildSingleCab(b: PartBuilder) {
+  const NOSE = 2.10;
+  const TAIL = -2.16;
+  const WAIST = 0.56;
+  const CAB_BACK = 0.10;
+  const CAB_FRONT = 1.18;
+  const ROOF = 1.40;
+
+  // Hull and bonnet. The station pair either side of CAB_FRONT is the step:
+  // 12cm of drop across 6cm of length, which under flat shading is a hard
+  // horizontal highlight right across the front of the car.
+  shell(b, 'body', [
+    { z: -0.10, hw: 0.90, y0: -0.50, y1: WAIST, c: 0.06 },
+    { z: CAB_FRONT, hw: 0.90, y0: -0.50, y1: WAIST, c: 0.06 },
+    { z: CAB_FRONT + 0.06, hw: 0.89, y0: -0.50, y1: 0.44, c: 0.06 },
+    { z: 1.94, hw: 0.88, y0: -0.48, y1: 0.42, c: 0.07 },
+    { z: NOSE, hw: 0.82, y0: -0.44, y1: 0.40, c: 0.06 },
+  ]);
+  // Bonnet vents, and a flat panel line down the middle of it.
+  b.addPair(() => box(0.24, 0.03, 0.12), 'bodyDark', [0.40, 0.45, 1.56]);
+
+  // --- the tray -------------------------------------------------------------
+  // Same construction as the crew cab's bed — floor with walls standing on it,
+  // never a solid shell with a darker box sunk into it, because there is no CSG
+  // here and a buried block is invisible from outside.
+  const FLOOR_Y = 0.26;
+  const RAIL_Y = WAIST + 0.10;
+  shell(b, 'body', [
+    { z: TAIL, hw: 0.88, y0: -0.44, y1: FLOOR_Y, c: 0.08 },
+    { z: -2.00, hw: 0.90, y0: -0.50, y1: FLOOR_Y, c: 0.07 },
+    { z: -0.06, hw: 0.90, y0: -0.50, y1: FLOOR_Y, c: 0.07 },
+  ]);
+  b.add(box(1.64, 0.05, 1.92), 'bodyDark', [0, FLOOR_Y + 0.02, -1.08]);
+
+  const wallH = RAIL_Y - FLOOR_Y;
+  const wallMid = (FLOOR_Y + RAIL_Y) / 2;
+  b.addPair(() => box(0.12, wallH, 1.96), 'body', [0.84, wallMid, -1.10]);
+  b.add(box(1.78, wallH, 0.11), 'body', [0, wallMid, -0.09]);
+  b.add(box(1.78, wallH + 0.06, 0.10), 'body', [0, wallMid + 0.03, TAIL + 0.05]);
+  // Vertical ribs down the outside of the tray: pressed-steel utility body, and
+  // four hard shadow lines that stop a two-metre flank reading as a blank slab.
+  for (const z of [-0.40, -0.90, -1.40, -1.90]) {
+    b.addPair(() => box(0.05, wallH, 0.07), 'trim', [0.88, wallMid, z]);
+  }
+  b.addPair(() => box(0.16, 0.05, 1.96), 'trim', [0.84, RAIL_Y, -1.10]);
+  b.add(box(1.82, 0.05, 0.13), 'trim', [0, RAIL_Y + 0.06, TAIL + 0.05]);
+
+  // --- cab ------------------------------------------------------------------
+  shell(b, 'body', [
+    { z: CAB_BACK, hw: 0.82, y0: WAIST, y1: ROOF - 0.05, c: 0.06 },
+    { z: CAB_BACK + 0.16, hw: 0.855, y0: WAIST, y1: ROOF, c: 0.06 },
+    { z: 0.90, hw: 0.855, y0: WAIST, y1: ROOF, c: 0.06 },
+    { z: CAB_FRONT, hw: 0.80, y0: WAIST, y1: ROOF - 0.09, c: 0.08 },
+  ], false, true);
+  // One pane per side. Everything else here has two or three.
+  glassBand(b, [CAB_BACK + 0.20, 0.86], 0.865, 0.72, ROOF - 0.10, 1);
+  rakedScreen(b, CAB_FRONT, 0.66, ROOF - 0.09, 0.80);
+  b.add(box(1.14, 0.34, 0.06), 'glass', [0, 1.02, CAB_BACK - 0.02]);
+
+  buildArchesAndSteps(b);
+
+  // --- face -----------------------------------------------------------------
+  // Body colour carried across the nose with the grille as a modest slot in the
+  // middle of it, round lamps in chrome bezels outboard. The crew cab's face is
+  // one full-width slab; this one is a painted panel with holes in it.
+  b.add(box(1.62, 0.34, 0.05), 'body', [0, 0.24, NOSE]);
+  b.add(box(0.84, 0.24, 0.07), 'rubber', [0, 0.22, NOSE + 0.02]);
+  for (let i = 0; i < 4; i++) {
+    b.add(box(0.78, 0.03, 0.04), 'trim', [0, 0.13 + i * 0.06, NOSE + 0.05]);
+  }
+  const round = (r: number, d: number) => () => {
+    const g = new THREE.CylinderGeometry(r, r, d, 12);
+    g.rotateX(Math.PI / 2);
+    return g;
+  };
+  b.addPair(round(0.185, 0.05), 'chrome', [0.60, 0.24, NOSE + 0.02]);
+  b.addPair(round(0.15, 0.07), 'lamp', [0.60, 0.24, NOSE + 0.05]);
+  b.addPair(() => box(0.15, 0.09, 0.05), 'amber', [0.60, 0.02, NOSE + 0.03]);
+  // Plain steel bar on stays, sitting off the body — not a moulded bumper.
+  b.add(box(1.76, 0.15, 0.15), 'steel', [0, -0.28, NOSE + 0.04]);
+  b.addPair(() => box(0.08, 0.2, 0.1), 'steel', [0.60, -0.19, NOSE - 0.02]);
+
+  // Snorkel up the right A-pillar. One part, and it does more for "this thing
+  // actually goes out there" than any amount of bodywork.
+  b.strut('trim', [0.87, 0.40, 1.34], [0.87, 1.24, 1.20], 0.055);
+  b.add(box(0.13, 0.22, 0.15), 'trim', [0.87, 1.34, 1.19]);
+
+  buildRearLamps(b, TAIL);
+  sideDetails(b, [1.14, 0.08], 0.34);
+  buildMirrors(b, 1.10, 0.86);
+}
+
+/**
  * Sand rail — a dragster built for dunes: long, low, rear-engined, and mostly
  * air.
  *
@@ -956,6 +1066,7 @@ const BODIES: Record<BodyId, BodySpec> = {
   wagon: { build: buildWagon },
   pickup: { build: buildPickup },
   gwagon: { build: buildGWagon },
+  singlecab: { build: buildSingleCab },
   buggy: { build: buildBuggy },
 };
 

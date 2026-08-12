@@ -1,15 +1,21 @@
 /**
- * What the player's truck *looks* like. Purely cosmetic by construction: the
- * collider, wheel positions and every tuning number live in VehicleTuning and
- * are shared by all four bodies, because §2 makes the driving feel the game's
- * core value and a garage that quietly changed handling would put that feel
- * behind a menu choice.
+ * What the player's truck is, and how it drives.
+ *
+ * Paint and wheels are cosmetic; the body is not. Each one carries real
+ * handling overrides (BODY_TUNING below), because the point of putting stats on
+ * the picker is that the choice has consequences.
+ *
+ * What every body *does* share is its footprint: the collider half-extents,
+ * wheel positions, track and wheelbase are fixed in VehicleTuning, built once
+ * in the Vehicle constructor and never rebuilt when the body changes. So a body
+ * is free to look like anything that fits a 1.84 x 4.3m box on a 2.9m
+ * wheelbase, and is not free to be a different size.
  *
  * Kept apart from vehicleMesh.ts so Settings can validate a saved config
  * without dragging Three.js into the settings path.
  */
 
-export type BodyId = 'wagon' | 'pickup' | 'gwagon' | 'buggy';
+export type BodyId = 'wagon' | 'pickup' | 'gwagon' | 'singlecab' | 'buggy';
 export type WheelStyleId = 'steel' | 'alloy' | 'beadlock';
 export type PaintId =
   | 'safari'
@@ -67,6 +73,14 @@ export const BODY_OPTIONS: BodyOption[] = [
     stats: { speed: 0.58, grip: 0.82, weight: 0.62, agility: 0.55 },
   },
   {
+    id: 'singlecab',
+    // What these are actually called across the Gulf, and it names the one
+    // thing separating it from the crew cab above — no badge required (§11).
+    label: 'Single Cab',
+    blurb: 'Leaf-sprung and slow. Grinds up whatever you point it at.',
+    stats: { speed: 0.42, grip: 0.8, weight: 0.66, agility: 0.46 },
+  },
+  {
     id: 'buggy',
     label: 'Dune Buggy',
     blurb: 'Half a tonne. Floats over soft sand and changes its mind instantly.',
@@ -88,6 +102,14 @@ export const BODY_OPTIONS: BodyOption[] = [
  * scaled off it, so a per-body value would silently rescale the whole model)
  * and the rollover recovery, which stays damage-free and identical for all of
  * them (§2).
+ *
+ * Every value here is **absolute**, replacing the baseline outright rather than
+ * multiplying it. That is worth stating because getting it wrong is invisible:
+ * `sinkDrag` has a baseline of ~1100 and shipped here as 1.35 and 0.35, which
+ * read perfectly well as "a bit more" and "much less" and in fact set both
+ * bodies to no sink drag at all. The pickup and the buggy — the two whose
+ * blurbs promise the most *different* behaviour in soft sand — were behaving
+ * identically in it. Both are stated in force units below.
  */
 export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
   // The baseline. Empty on purpose.
@@ -108,7 +130,9 @@ export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
     steerRate: 2.4,
     maxSteerAngle: 0.50,
     suspensionStiffness: 26,
-    sinkDrag: 1.35,
+    // Absolute, against a ~1100 baseline: it is heavy and it does sink, and
+    // what stops it bogging is the momentum, not floating over the top.
+    sinkDrag: 1480,
     climbBleed: 0.86,
   },
 
@@ -125,6 +149,35 @@ export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
     hardpackSideGrip: 1.2,
     sandSideGrip: 1.18,
     maxSteerAngle: 0.60,
+  },
+
+  // The working truck. Leaf-sprung, narrow-tyred and geared low: it is the
+  // slowest thing here by a distance and the least comfortable over chop, and
+  // it will crawl up a face that has already stalled two of the others.
+  singlecab: {
+    mass: 2000,
+    comHeight: 0.34,
+    rollInertia: 1150,
+    pitchInertia: 4500,
+    yawInertia: 2900,
+    engineForce: 3250,
+    topSpeed: 26,
+    brakeForce: 1950,
+    steerRate: 3.0,
+    maxSteerAngle: 0.55,
+    // Leaf springs: the stiffest and shortest-travel setup of the five. It
+    // skitters over corrugations the coil-sprung bodies absorb, and lands hard
+    // — which is most of what separates it from the wagon by feel.
+    suspensionStiffness: 38,
+    suspensionTravel: 0.24,
+    suspensionCompression: 4.4,
+    suspensionRelaxation: 5.6,
+    hardpackGrip: 1.5,
+    sandGrip: 0.82,
+    // Narrow tyres on a loaded truck dig in where the wide-tyred bodies float.
+    sinkDrag: 1500,
+    // The trade, and the reason to pick it: low gearing barely notices a climb.
+    climbBleed: 0.6,
   },
 
   // Light enough to stay on top of sand that swallows the others, and low
@@ -149,8 +202,8 @@ export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
     hardpackSideGrip: 0.82,
     sandSideGrip: 0.86,
     // The signature: it barely sinks, so soft slip faces that stall a truck are
-    // just a surface to slide across.
-    sinkDrag: 0.35,
+    // just a surface to slide across. A third of the baseline, not a thousandth.
+    sinkDrag: 385,
     climbBleed: 0.55,
     yawAssist: 1.35,
   },
