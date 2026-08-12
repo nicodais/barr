@@ -20,6 +20,21 @@ export class DebugHud {
   private fps = 0;
   private frameAccum = 0;
   private frameCount = 0;
+  private drawCalls = 0;
+
+  /**
+   * Read by the menu's performance line. The stats grid this normally feeds is
+   * hidden on touch viewports — the exact devices where §8's 60fps target has
+   * never been measured — so the number has to be reachable from somewhere a
+   * phone can actually see.
+   */
+  get framesPerSecond(): number {
+    return this.fps;
+  }
+
+  get draws(): number {
+    return this.drawCalls;
+  }
 
   constructor() {
     this.element = document.createElement('div');
@@ -65,6 +80,7 @@ export class DebugHud {
     // number walk down is the confirmation that something is happening.
     this.psiEl.textContent = `${Math.round(psi)} psi`;
     this.psiEl.classList.toggle('is-low', psi < 19);
+    this.drawCalls = drawCalls;
     this.frameAccum += dt;
     this.frameCount++;
     if (this.frameAccum >= 0.4) {

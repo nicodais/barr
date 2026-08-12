@@ -1708,6 +1708,39 @@ body.photo-mode #help {
 .menu-group { margin-bottom: 12px; }
 .menu-group:last-child { margin-bottom: 0; }
 
+/*
+ * A short, wide viewport. One column of twelve rows leaves roughly two thirds
+ * of the panel below the fold on a landscape phone — measured at 599px hidden
+ * of 894px on a 667x375 screen — so it goes two-up and uses the width that a
+ * landscape screen has spare. The garage link spans both, since it's a
+ * destination rather than one more setting.
+ */
+/*
+ * A short, wide viewport. One column of twelve rows leaves roughly two thirds
+ * of the panel below the fold on a landscape phone — measured at 599px hidden
+ * of 894px on a 667x375 screen — so it goes two-up and uses the width that a
+ * landscape screen has spare.
+ *
+ * Grid, not `columns: 2`. Multi-column inside a max-height scroll container
+ * fragments into as many columns as the content needs and puts the extras off
+ * to the *side* — the panel then reports no vertical overflow while six of its
+ * twelve rows are simply not on screen. Grid pays for that safety in a little
+ * whitespace where a two-chip row sits beside a seven-chip one.
+ */
+@media (orientation: landscape) and (max-height: 500px) {
+  .menu-panel {
+    width: min(500px, calc(100vw - 20px));
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 14px;
+    align-content: start;
+  }
+
+  .menu-group { margin-bottom: 9px; }
+  /* The garage is a destination, not one more setting — it spans both. */
+  .menu-group:last-child { grid-column: 1 / -1; }
+}
+
 .menu-label {
   display: block;
   margin-bottom: 6px;
@@ -1718,6 +1751,17 @@ body.photo-mode #help {
 }
 
 .menu-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* What the game is actually running at, under the Quality chips. Quiet: it is
+   a reading, not a control, and it is the only place a phone can see it. */
+.menu-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.42;
+}
 
 .menu-chip {
   padding: 7px 11px;

@@ -121,6 +121,9 @@ export class Game {
   private progress: Progress;
   private forward = new THREE.Vector3();
   private watchdog = new QualityWatchdog();
+  /** Watchdog downgrades this session. Surfaced in the menu because a tier that
+   *  steps down repeatedly is thrash, and a console is not a thing a phone has. */
+  private qualityDrops = 0;
   private tier: QualityTier;
   private captureNextFrame = false;
   private pendingShare = false;
@@ -342,6 +345,12 @@ export class Game {
         this.applyQuality(q === 'auto' ? detectTier() : q);
       },
       getQuality: () => this.settings.quality,
+      getPerf: () => ({
+        tier: this.tier,
+        fps: this.hud.framesPerSecond,
+        draws: this.hud.draws,
+        drops: this.qualityDrops,
+      }),
       onSteering: (mirrored) => {
         this.settings.invertSteering = mirrored;
         saveSettings(this.settings);
@@ -581,6 +590,7 @@ export class Game {
     const drop = this.watchdog.sample(frameDt, this.tier, this.settings.quality !== 'auto');
     if (drop) {
       console.info(`[dune] frame time sustained above budget — quality ${this.tier} -> ${drop}`);
+      this.qualityDrops++;
       this.applyQuality(drop);
     }
 

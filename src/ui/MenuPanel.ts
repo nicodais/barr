@@ -43,6 +43,12 @@ const EFFECTS: Array<{ label: string; volume: number }> = [
   { label: 'Full', volume: 1 },
 ];
 
+const TIER_LABELS: Record<QualityTier, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+};
+
 const QUALITIES: Array<{ label: string; value: QualityChoice }> = [
   { label: 'Auto', value: 'auto' },
   { label: 'Low', value: 'low' },
@@ -102,6 +108,9 @@ interface MenuCallbacks {
   getDayCycle(): boolean;
   onQuality(q: QualityChoice): void;
   getQuality(): QualityChoice;
+  /** What the game is actually running at right now, for the line under the
+   *  Quality row. `drops` counts watchdog downgrades this session. */
+  getPerf(): { tier: QualityTier; fps: number; draws: number; drops: number };
   onSteering(mirrored: boolean): void;
   getSteering(): boolean;
   onGarage(): void;
@@ -155,8 +164,11 @@ export class MenuPanel {
   private musicRow: HTMLElement;
   private effectsRow: HTMLElement;
   private qualityRow: HTMLElement;
+  private perfNote: HTMLElement;
   private steerRow: HTMLElement;
   private open = false;
+  /** Ticks the perf line while the panel is up. */
+  private perfTimer: number | null = null;
   /** Set while a region swap is in flight, so it can't be started twice. */
   private busy = false;
 
@@ -188,6 +200,12 @@ export class MenuPanel {
     this.musicRow = this.section('Music');
     this.effectsRow = this.section('Vehicle & world');
     this.qualityRow = this.section('Quality');
+    // Sits inside the Quality group, under its chips: "Auto" is a promise and
+    // this is what it actually resolved to. The HUD's stats grid carries the
+    // same numbers but is hidden on touch, which is where they're needed.
+    this.perfNote = document.createElement('span');
+    this.perfNote.className = 'menu-note';
+    this.qualityRow.parentElement!.appendChild(this.perfNote);
     this.steerRow = this.section('Steering');
 
     for (const id of REGION_ORDER) {
@@ -301,8 +319,15 @@ export class MenuPanel {
       this.sync();
       this.element.hidden = false;
       requestAnimationFrame(() => this.element.classList.add('is-open'));
+      // A one-shot reading of fps is a coin toss; watching it settle for a few
+      // seconds is the measurement. Only runs while the panel is up.
+      this.perfTimer = window.setInterval(() => this.syncPerf(), 500);
     } else {
       this.element.classList.remove('is-open');
+      if (this.perfTimer !== null) {
+        clearInterval(this.perfTimer);
+        this.perfTimer = null;
+      }
       setTimeout(() => { if (!this.open) this.element.hidden = true; }, 260);
     }
   }
@@ -357,12 +382,22 @@ export class MenuPanel {
     mark(this.effectsRow, (i) => nearest(EFFECTS.map((o) => o.volume), effects) === i);
     const quality = this.cb.getQuality();
     mark(this.qualityRow, (i) => QUALITIES[i].value === quality);
+    this.syncPerf();
     const mirrored = this.cb.getSteering();
     mark(this.steerRow, (i) => STEERING[i].mirrored === mirrored);
 
     const on = this.cb.getHaptics();
     this.hapticRow.parentElement!.hidden = !haptics.supported;
     mark(this.hapticRow, (i) => VIBRATION[i].on === on);
+  }
+
+  private syncPerf() {
+    const p = this.cb.getPerf();
+    const parts = [TIER_LABELS[p.tier], `${Math.round(p.fps)} fps`, `${p.draws} draws`];
+    // Only once it has happened. A permanent "dropped 0 times" is noise, and
+    // the whole point of the counter is noticing when it isn't zero.
+    if (p.drops > 0) parts.push(`stepped down ${p.drops}×`);
+    this.perfNote.textContent = parts.join(' · ');
   }
 
   private section(label: string): HTMLElement {
