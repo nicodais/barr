@@ -26,6 +26,9 @@
  * to avoid; a fixed name would be wrong for everyone who isn't called it. The
  * rotating address does the warmth the name was wanted for, and costs nothing.
  */
+import type { BodyId } from '../vehicle/vehicleConfig';
+import type { RegionId } from '../terrain/regions';
+
 export type LinePool =
   | 'signOn'
   | 'stuck'
@@ -37,6 +40,10 @@ export type LinePool =
   | 'airedDown'
   | 'airedUp'
   | 'pressureHint'
+  | 'nightfall'
+  | 'dawn'
+  | 'midday'
+  | 'dusk'
   | 'signOff';
 
 export const AHMED_LINES: Record<LinePool, string[]> = {
@@ -124,6 +131,34 @@ export const AHMED_LINES: Record<LinePool, string[]> = {
     "You're at road pressure in deep sand. That's why. That's the whole reason.",
     "Drop your tyres to fifteen and try that again. I'll wait.",
   ],
+  // The day turning over. These only exist because the 20-minute cycle is now
+  // running by default — a frozen sky gave him nothing to notice. Each band is
+  // about what the light does to the *driving*, not about the view, because he
+  // is a man on a radio and not a travel programme.
+  nightfall: [
+    "Dark now. Out here that means properly dark. Watch the crests.",
+    "Night driving. Everything looks flat and none of it is.",
+    'This is the hour people call me. Every single time.',
+    'Headlights on a dune face tell you nothing. Go slow, habibi.',
+  ],
+  dawn: [
+    "Best hour of the day and nobody is ever awake for it.",
+    "Sun's up. The air is the cleanest it will be until tomorrow.",
+    'Dawn. Even the sand looks like it got some sleep.',
+    "Early. Good. You'll have the whole desert to yourself for an hour.",
+  ],
+  midday: [
+    'Midday. Even the camels have found shade. You have not.',
+    "It's hot out there. I'm inside. Just so we understand each other.",
+    'Nothing has a shadow right now, which makes a dune very hard to read.',
+    'High sun. Everything goes flat and white and you drive off a crest you never saw.',
+  ],
+  dusk: [
+    'Golden hour. Every photo ever taken out here was taken in the next twenty minutes.',
+    "Sun's going. Long shadows — the crests get honest about how steep they are.",
+    'That light. Wallah. Even I look up for that one.',
+    "Careful now. Low sun straight in the eyes is how people find the one rock out here.",
+  ],
   signOff: [
     'Ahmed out. Try not to need me again today.',
     'Khalas. Go on then.',
@@ -132,5 +167,66 @@ export const AHMED_LINES: Record<LinePool, string[]> = {
     "Ahmed out. You know where I am. Unfortunately.",
     'Yalla. Enjoy it, my friend.',
     "That's me. Shout if the sand wins.",
+  ],
+};
+
+/**
+ * What he thinks of what you're driving.
+ *
+ * Keyed by body rather than drawn from one pool, because a line that could be
+ * about any vehicle is exactly the generic filler §13's tone guardrails rule
+ * out — the joke has to be about *that* truck. Three each: one on the first
+ * ambient slot after sign-on, and one whenever you change in the garage, so a
+ * player who tries several never hears the same remark twice.
+ */
+export const AHMED_VEHICLE_LINES: Record<BodyId, string[]> = {
+  wagon: [
+    "A safari wagon. Sensible. Boring, but sensible.",
+    'Half the people I recover are driving one of those. The other half wish they were.',
+    "Old wagon. It'll go anywhere you point it. Eventually.",
+  ],
+  pickup: [
+    'That thing weighs more than my station.',
+    "A pickup with an empty bed. You're not fooling anyone, habibi.",
+    'Big truck. Big engine. Big hole, when it finally stops.',
+  ],
+  gwagon: [
+    'The square one. Very expensive way to get sand in everything you own.',
+    "Nice box. It'll climb anything, and roll doing it.",
+    "Third one of those I've seen this month. All the same colour as yours.",
+  ],
+  singlecab: [
+    'A work truck. Someone out here has actually done this before.',
+    'Single cab. No comfort, no speed, goes forever.',
+    "That's a farm truck, my friend. It will out-climb everyone and out-run nobody.",
+  ],
+  softtop: [
+    'No roof. Bold, at this hour.',
+    "Soft top. So when you roll it, you'll really feel involved.",
+    "Open air. Enjoy the sand — you'll be eating it either way.",
+  ],
+  moto: [
+    "A bike. In the dunes. Wallah, I'm keeping this radio close.",
+    "Two wheels. That is half the usual number, habibi.",
+    "Fine. But when I write the report I am not explaining the bike.",
+  ],
+  buggy: [
+    'A buggy. So you came out here to actually enjoy yourself. I see.',
+    'That thing floats over sand that swallows trucks. Try not to look so pleased.',
+    'No doors, no roof, no sense. Perfect.',
+  ],
+};
+
+/** Where you are. Fires on arrival and on a region change. */
+export const AHMED_REGION_LINES: Record<RegionId, string[]> = {
+  liwa: [
+    "Sand in every direction and nothing else. That's Liwa. That's the whole report.",
+    'Out here the only thing to hit is the ground, and you have to work at it.',
+    'Deep sand country. Whatever pressure you are on, it is probably too high.',
+  ],
+  fossilrock: [
+    'Careful here. That rock was a seabed once and it has not softened since.',
+    'Harder ground, tighter lines. You can actually carry speed out here — so people do.',
+    'Red sand up against limestone. Very pretty. Very unforgiving on a rim.',
   ],
 };

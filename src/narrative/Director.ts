@@ -1,6 +1,9 @@
-import { AHMED_LINES, type LinePool } from '../data/ahmedLines';
+import {
+  AHMED_LINES, AHMED_REGION_LINES, AHMED_VEHICLE_LINES, type LinePool,
+} from '../data/ahmedLines';
 import type { Poi } from '../data/pois';
-import { activeRegion } from '../terrain/regions';
+import { activeRegion, type RegionId } from '../terrain/regions';
+import type { BodyId } from '../vehicle/vehicleConfig';
 import { DISCOVERIES, DISCOVERY_RADIUS } from '../world/Discoveries';
 import type { VehicleTelemetry } from '../vehicle/Vehicle';
 import type { RadioSubtitles } from './RadioSubtitles';
@@ -53,6 +56,34 @@ export class Director {
   private pressureHintDue = false;
   /** He only ever explains this once. After that it is on you. */
   private hintedPressure = false;
+  /**
+   * Armed when the vehicle or the region changes, and consumed by the next
+   * ambient slot rather than spoken on the spot.
+   *
+   * These arrive in a cluster — you pick a desert, then a truck, then he signs
+   * on — and firing all three immediately would be a wall of text over the
+   * first ten seconds of a game whose whole brief is decompression (§1).
+   * Arming them instead means the remark lands a minute in, once you have
+   * actually been driving the thing he is talking about.
+   */
+  private vehicleDue: BodyId | null = null;
+  private regionDue: RegionId | null = null;
+  /** Per-body and per-region lines are their own pools, tracked separately so
+   *  trying three trucks gets three different remarks. */
+  private usedVehicle = new Map<BodyId, Set<number>>();
+  private usedRegion = new Map<RegionId, Set<number>>();
+  /**
+   * The band of the day right now, and the last one he actually remarked on.
+   *
+   * Two fields rather than one because they answer different questions. The
+   * first attempt kept only "the band I last saw" and dropped the remark
+   * whenever the crossing happened to land inside a cooldown — which silently
+   * lost that band for the entire cycle. Keeping what he has *said* separately
+   * means a crossing that arrives at a busy moment is simply still owed, and
+   * gets picked up as soon as the radio is quiet.
+   */
+  private band: TimeBand | null = null;
+  private spokenBand: TimeBand | null = null;
 
   constructor(
     private subtitles: RadioSubtitles,
@@ -131,6 +162,35 @@ export class Director {
     this.trackAmbientConditions(tel, dt);
     if (this.ambientTimer > 0) return;
 
+    // Below the driving reactions, above nothing: what you're in and where you
+    // are is texture, and it waits for a genuinely quiet moment.
+    if (this.vehicleDue) {
+      const body = this.vehicleDue;
+      this.vehicleDue = null;
+      this.ambientTimer = AMBIENT_COOLDOWN;
+      this.call(takeFrom(AHMED_VEHICLE_LINES[body], this.usedVehicle, body));
+      return;
+    }
+
+    if (this.regionDue) {
+      const region = this.regionDue;
+      this.regionDue = null;
+      this.ambientTimer = AMBIENT_COOLDOWN;
+      this.call(takeFrom(AHMED_REGION_LINES[region], this.usedRegion, region));
+      return;
+    }
+
+    // The band he's owed a remark on. Read fresh rather than from whenever the
+    // crossing happened, so if the radio was busy through dusk and it is now
+    // dark, he talks about the dark.
+    if (this.band !== null && this.band !== this.spokenBand) {
+      const band = this.band;
+      this.spokenBand = band;
+      this.ambientTimer = AMBIENT_COOLDOWN;
+      this.call(this.take(band));
+      return;
+    }
+
     if (this.stuckTimer >= STUCK_TIME) {
       this.stuckTimer = 0;
       this.ambientTimer = AMBIENT_COOLDOWN;
@@ -183,6 +243,27 @@ export class Director {
   noteBogged(pressure: PressureId) {
     if (this.hintedPressure || pressure === 'sand') return;
     this.pressureHintDue = true;
+  }
+
+  /** The truck you chose, or changed to. Arms a remark for the next quiet slot. */
+  noteVehicle(body: BodyId) {
+    this.vehicleDue = body;
+  }
+
+  /** The desert you're in. Same treatment. */
+  noteRegion(region: RegionId) {
+    this.regionDue = region;
+  }
+
+  /**
+   * The day turning over — dawn, midday, dusk, dark. Handed over every frame;
+   * everything interesting happens when it differs from what he last said.
+   */
+  onTimeBand(band: TimeBand) {
+    // The first reading only establishes where the day started. He doesn't
+    // announce a time nobody has watched change.
+    if (this.spokenBand === null) this.spokenBand = band;
+    this.band = band;
   }
 
   /**
@@ -271,4 +352,47 @@ export class Director {
 /** Ordering only, so 'aired up' and 'aired down' can be told apart. */
 function axisOf(id: PressureId): number {
   return id === 'sand' ? 0 : id === 'mixed' ? 1 : 2;
+}
+
+/** The four bands of the day worth a remark. Named for the light, not the clock. */
+export type TimeBand = 'dawn' | 'midday' | 'dusk' | 'nightfall';
+
+/**
+ * Which band a point in the day cycle falls in. Deliberately gapless — every
+ * `t` belongs to exactly one band, so the crossings are what fire rather than
+ * entering some special zone, and no part of the day is unaccounted for.
+ *
+ * The edges follow TimeOfDay's keyframes rather than clock hours: `dusk` opens
+ * at 0.62 because that is where the light starts going long, and `nightfall`
+ * closes at 0.05 because that is the pre-dawn blue hour, which reads as the
+ * end of the night and not the start of the morning.
+ */
+export function timeBand(t: number): TimeBand {
+  const u = ((t % 1) + 1) % 1;
+  if (u < 0.05) return 'nightfall';
+  if (u < 0.3) return 'dawn';
+  if (u < 0.62) return 'midday';
+  if (u < 0.93) return 'dusk';
+  return 'nightfall';
+}
+
+/**
+ * `take`, but over a keyed table rather than the flat pools — same retire-and-
+ * recycle rule (§13), tracked per key so each truck and each desert keeps its
+ * own history.
+ */
+function takeFrom<K>(lines: string[], seenBy: Map<K, Set<number>>, key: K): string {
+  let seen = seenBy.get(key);
+  if (!seen) {
+    seen = new Set();
+    seenBy.set(key, seen);
+  }
+  if (seen.size >= lines.length) seen.clear();
+
+  const available: number[] = [];
+  for (let i = 0; i < lines.length; i++) if (!seen.has(i)) available.push(i);
+
+  const pick = available[Math.floor(Math.random() * available.length)];
+  seen.add(pick);
+  return lines[pick];
 }

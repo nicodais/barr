@@ -27,7 +27,7 @@ import {
 } from '../vehicle/tyrePressure';
 import { loadSettings, saveSettings, type GameSettings } from '../settings/Settings';
 import { GameAudio } from '../audio/GameAudio';
-import { Director } from '../narrative/Director';
+import { Director, timeBand } from '../narrative/Director';
 import { RadioSubtitles } from '../narrative/RadioSubtitles';
 import { createLandmarks, createLandmarkColliders } from '../world/Landmarks';
 import { WorldBoundary } from './WorldBoundary';
@@ -260,6 +260,11 @@ export class Game {
         saveProgress(this.progress);
       },
     );
+    // Both armed for the first quiet slots after sign-on, so a returning player
+    // who skips the pickers still gets a word about where they are and what
+    // they're in.
+    this.director.noteVehicle(this.settings.vehicle.body);
+    this.director.noteRegion(activeRegion().id);
 
     this.chase = new ChaseCamera(window.innerWidth / window.innerHeight);
     this.input = new InputManager(this.settings);
@@ -302,6 +307,7 @@ export class Game {
         saveSettings(this.settings);
         this.applyBodyTuning();
         this.rebuildVehicleView();
+        this.director.noteVehicle(id);
       },
       onTime: (t) => {
         this.timeOfDay.time = t;
@@ -373,6 +379,8 @@ export class Game {
       this.rebuildVehicleView();
       this.applyBodyTuning();
       saveSettings(this.settings);
+      // Armed, not spoken: the picker is still up and he has not signed on yet.
+      this.director.noteVehicle(this.settings.vehicle.body);
     });
 
     this.photo = new PhotoMode(canvas);
@@ -671,6 +679,9 @@ export class Game {
     const weatherEvent = this.weather.update(frameDt);
     this.weather.apply(this.timeOfDay.state);
     if (weatherEvent && !this.choosing) this.director.onWeather(weatherEvent);
+    // Cheap enough to hand over every frame — the Director drops it unless the
+    // band has actually changed since the last one.
+    if (!this.choosing) this.director.onTimeBand(timeBand(this.timeOfDay.time));
     this.timeOfDay.sunDirection(this.sunDir);
     this.rig.update(this.timeOfDay.state, this.sunDir, this.renderPos, this.chase.camera.position);
 
@@ -1017,6 +1028,7 @@ export class Game {
     this.activePoi = null;
     this.poiCard.hide();
     this.director.reset();
+    this.director.noteRegion(id);
 
     const spawn = { x: 0, z: 0 };
     this.terrain.preload(spawn.x, spawn.z);
