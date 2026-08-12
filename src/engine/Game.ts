@@ -38,6 +38,7 @@ import { createDiscoveries } from '../world/Discoveries';
 import { airborneSand } from '../terrain/chunkGeometry';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
 import { PhotoMode } from './PhotoMode';
+import { GAME_NAME, GAME_TAGLINE, GAME_URL } from '../brand';
 import { PhotoBar } from '../ui/PhotoBar';
 import { Compass } from '../ui/Compass';
 import { PoiCard } from '../ui/PoiCard';
@@ -696,12 +697,21 @@ export class Game {
       this.photoBar.say('Could not capture');
       return;
     }
-    const filename = `dune-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const filename = `${GAME_NAME.toLowerCase()}-${stamp}.png`;
     const file = new File([blob], filename, { type: 'image/png' });
 
     if (share && navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: 'DUNE' });
+        // Text and URL alongside the file, not just the file. Several share
+        // targets drop one and keep the other, and a photo that arrives
+        // somewhere with no way back to the game is the whole point missed.
+        await navigator.share({
+          files: [file],
+          title: GAME_NAME,
+          text: `${GAME_NAME} — ${GAME_TAGLINE}`,
+          url: GAME_URL,
+        });
         this.photoBar.say('Shared');
       } catch {
         // Includes the user dismissing the sheet, which isn't an error.

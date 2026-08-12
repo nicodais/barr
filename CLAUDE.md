@@ -1,4 +1,10 @@
-# Project: DUNE (working title)
+# Project: Shamal (شمال)
+
+Named for the north-westerly wind that builds these dunes — a word the Gulf
+already owns, and one that survives a Western reading intact. "DUNE" was the
+working title and could never have shipped: it is an active Herbert/Legendary
+franchise with current games, so it is both a trademark problem and completely
+unsearchable.
 
 A relaxing open-world dune-bashing driving game for the browser (desktop and mobile web, responsive), in the visual and tonal tradition of *Firewatch* — but set in the UAE desert. No combat, no fail states, no timers. The player drives across a vast stylized dune landscape while an oud-led ambient score plays and an occasional radio call-in from Ahmed — a good-natured, weary local police officer — gives the world texture. The goal is decompression, not challenge.
 

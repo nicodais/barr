@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GAME_NAME, GAME_URL_SHORT } from '../brand';
 import { minCameraY } from './cameraClearance';
 
 /**
@@ -171,8 +172,21 @@ export class PhotoMode {
    * later comes back blank.
    */
   capture(): Promise<Blob | null> {
+    // Signed on the way out. A screenshot of this game is the most likely thing
+    // anyone ever shares of it, and an unsigned one is a beautiful picture with
+    // no way back to the thing that made it — the single cheapest piece of
+    // distribution there is, and it costs one 2D canvas blit.
+    const signed = document.createElement('canvas');
+    signed.width = this.canvas.width;
+    signed.height = this.canvas.height;
+    const ctx = signed.getContext('2d');
+    if (!ctx) {
+      return new Promise((resolve) => this.canvas.toBlob((b) => resolve(b), 'image/png'));
+    }
+    ctx.drawImage(this.canvas, 0, 0);
+    drawWatermark(ctx, signed.width, signed.height);
     return new Promise((resolve) => {
-      this.canvas.toBlob((blob) => resolve(blob), 'image/png');
+      signed.toBlob((blob) => resolve(blob), 'image/png');
     });
   }
 
@@ -210,4 +224,36 @@ export class PhotoMode {
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
+}
+
+/**
+ * The mark burned into the bottom-right of every saved photo.
+ *
+ * Scaled off the image height rather than fixed, so a phone capture and a 4K
+ * desktop one carry the same *proportion* of mark. Deliberately small and warm
+ * — this has to survive being posted without looking like a stock-photo
+ * watermark slapped across someone's picture. A shadow behind it because the
+ * corner it sits in could be bright sand or a night sky, and text with only one
+ * of those in mind disappears against the other.
+ */
+function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const scale = h / 1080;
+  const pad = Math.round(28 * scale);
+  const size = Math.max(11, Math.round(22 * scale));
+
+  ctx.save();
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+  ctx.shadowBlur = Math.round(6 * scale);
+  ctx.shadowOffsetY = Math.round(1 * scale);
+
+  ctx.font = `600 ${size}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
+  ctx.fillStyle = 'rgba(255, 235, 214, 0.92)';
+  ctx.fillText(GAME_NAME, w - pad, h - pad - Math.round(size * 0.95));
+
+  ctx.font = `400 ${Math.max(9, Math.round(size * 0.68))}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
+  ctx.fillStyle = 'rgba(255, 235, 214, 0.66)';
+  ctx.fillText(GAME_URL_SHORT, w - pad, h - pad);
+  ctx.restore();
 }
