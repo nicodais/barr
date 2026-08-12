@@ -235,6 +235,7 @@ export class Game {
     this.audio.setVolume(this.settings.volume);
     this.audio.setMusicVolume(this.settings.musicVolume);
     this.audio.setEffectsVolume(this.settings.effectsVolume);
+    this.audio.setBody(this.settings.vehicle.body);
     this.timeOfDay.autoAdvance = this.settings.dayCycle;
     this.director = new Director(
       this.subtitles,
@@ -533,6 +534,13 @@ export class Game {
     saveSettings(this.settings);
     this.director.onTyrePressure(id);
     haptics.tyres();
+    // Over the same window the axis will actually take to walk there, so the
+    // hiss stops when the dash readout does — a two-step change sounds like
+    // twice the work because it is.
+    const target = pressureAxis(id);
+    const steps = Math.abs(target - this.pressureAxisNow) * (PRESSURE_STEPS.length - 1);
+    // Axis 0 is 15 psi and axis 1 is 35, so a *falling* axis is airing down.
+    this.audio.tyreChange(target < this.pressureAxisNow, steps * PRESSURE_RATE);
   }
 
   /** Walks the live axis toward the chosen setting, re-tuning as it goes. */
@@ -926,6 +934,10 @@ export class Game {
    * here, which is fine once per click and would be ruinous per frame.
    */
   private rebuildVehicleView() {
+    // Here rather than in applyBodyTuning: this runs exactly when the visible
+    // body changes, where that also runs every frame a tyre-pressure change is
+    // in flight. Paint-only rebuilds from the garage make it a no-op.
+    this.audio.setBody(this.settings.vehicle.body);
     this.rig.scene.remove(this.view.root);
     this.view.dispose();
     this.view = createVehicleView(this.settings.vehicle);

@@ -1,5 +1,7 @@
 import type { AudioEngine } from './AudioEngine';
 import type { VehicleTelemetry } from '../vehicle/Vehicle';
+import type { BodyId } from '../vehicle/vehicleConfig';
+import { ENGINE_VOICES, type EngineVoice } from './engineVoices';
 
 /**
  * Diegetic vehicle audio (§6): engine note tied to RPM, tyre foley whose tone
@@ -10,8 +12,11 @@ import type { VehicleTelemetry } from '../vehicle/Vehicle';
  * is no gearbox in the physics, so RPM is derived from speed through a fake set
  * of ratios — the shift points are audible, and that's the point: they're what
  * makes acceleration read as effort rather than a siren.
+ *
+ * Everything about the note's *character* comes from the current body's
+ * `EngineVoice` (engineVoices.ts). This class owns how the synth behaves; that
+ * table owns what each vehicle sounds like.
  */
-const GEAR_RATIOS = [3.4, 2.0, 1.35, 1.0, 0.78];
 const IDLE_RPM = 0.14;
 
 export class DrivingSound {
@@ -34,6 +39,7 @@ export class DrivingSound {
 
   /** Smoothed so gear changes glide instead of stepping. */
   private rpm = IDLE_RPM;
+  private voice: EngineVoice = ENGINE_VOICES.wagon;
 
   constructor(private engine: AudioEngine) {
     const ctx = engine.ctx;
@@ -92,14 +98,23 @@ export class DrivingSound {
     this.windSource.start();
   }
 
+  /**
+   * Swap the engine's character. Called on every body change, including from
+   * the pre-drive picker, so the truck you chose is the one you hear.
+   */
+  setBody(body: BodyId) {
+    this.voice = ENGINE_VOICES[body] ?? ENGINE_VOICES.wagon;
+  }
+
   update(tel: VehicleTelemetry, throttle: number, dt: number) {
     const ctx = this.engine.ctx;
     const t = ctx.currentTime;
     const speed = Math.abs(tel.forwardSpeed);
+    const v = this.voice;
 
     // Pick a gear from speed, then derive RPM within it.
-    const gearSpan = 33 / GEAR_RATIOS.length;
-    const gearIndex = Math.min(GEAR_RATIOS.length - 1, Math.floor(speed / gearSpan));
+    const gearSpan = v.gearTop / v.gears;
+    const gearIndex = Math.min(v.gears - 1, Math.floor(speed / gearSpan));
     const withinGear = (speed - gearIndex * gearSpan) / gearSpan;
     let targetRpm = IDLE_RPM + withinGear * 0.85 + throttle * 0.12;
     // Airborne or wheelspinning on soft sand, revs flare — no load on the engine.
@@ -108,18 +123,22 @@ export class DrivingSound {
 
     this.rpm += (targetRpm - this.rpm) * Math.min(1, dt * 7);
 
-    const base = 38 + this.rpm * 118;
+    const base = v.idleHz + this.rpm * v.spanHz;
     this.oscSub.frequency.setTargetAtTime(base * 0.5, t, 0.04);
     this.oscA.frequency.setTargetAtTime(base, t, 0.04);
     this.oscB.frequency.setTargetAtTime(base * 2.02, t, 0.04);
 
     // Louder and brighter under load; a heavy 4x4 should sound like it's working.
     const load = 0.28 + throttle * 0.5 + Math.min(0.25, speed / 60);
-    this.engineGain.gain.setTargetAtTime(load * 0.22, t, 0.08);
-    this.engineFilter.frequency.setTargetAtTime(380 + this.rpm * 1500 + throttle * 600, t, 0.08);
-    this.gainA.gain.setTargetAtTime(0.22 + throttle * 0.18, t, 0.1);
-    this.gainB.gain.setTargetAtTime(0.06 + throttle * 0.12, t, 0.1);
-    this.gainSub.gain.setTargetAtTime(0.5, t, 0.1);
+    this.engineGain.gain.setTargetAtTime(load * v.level, t, 0.08);
+    this.engineFilter.frequency.setTargetAtTime(
+      v.cutoffHz + this.rpm * v.cutoffSpan + throttle * v.cutoffSpan * 0.4, t, 0.08,
+    );
+    // Throttle adds edge on top of each voice's own mix rather than replacing
+    // it, so a diesel under load gets clattery and a thumper gets shrill.
+    this.gainA.gain.setTargetAtTime(v.saw * (1 + throttle * 0.8), t, 0.1);
+    this.gainB.gain.setTargetAtTime(v.square * (1 + throttle * 2), t, 0.1);
+    this.gainSub.gain.setTargetAtTime(v.sub, t, 0.1);
 
     // --- tyres: soft sand hisses low and broad, hardpack is grittier and higher
     const contact = tel.wheelsOnGround / 4;
@@ -133,6 +152,98 @@ export class DrivingSound {
     const windLevel = 0.015 + Math.min(0.14, (speed / 33) ** 2 * 0.14) + (tel.airborne ? 0.03 : 0);
     this.windGain.gain.setTargetAtTime(windLevel, t, 0.25);
     this.windFilter.frequency.setTargetAtTime(320 + speed * 26, t, 0.3);
+  }
+
+  /**
+   * Airing down (§2, backlog 10). A valve hiss for as long as the change takes.
+   *
+   * The mechanic already runs over 1.5s per step and already buzzes the phone,
+   * and in between it was silent — which made a deliberate act read like a menu
+   * toggle. The filter sweeps down across the hiss because that is what a tyre
+   * actually does: the escaping air slows and deepens as the pressure drops.
+   */
+  airDown(duration: number) {
+    const ctx = this.engine.ctx;
+    const t = ctx.currentTime;
+    const end = t + duration;
+
+    const src = this.engine.createNoiseSource();
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = 1.4;
+    filter.frequency.setValueAtTime(2600, t);
+    filter.frequency.exponentialRampToValueAtTime(1500, end);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    // Fast in, because a valve opens fast; slow out, because you let go of it.
+    gain.gain.exponentialRampToValueAtTime(0.14, t + 0.06);
+    gain.gain.setValueAtTime(0.14, end - 0.18);
+    gain.gain.exponentialRampToValueAtTime(0.0001, end + 0.1);
+
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.engine.world);
+    src.start(t);
+    src.stop(end + 0.15);
+  }
+
+  /**
+   * Airing back up: a small 12V compressor, which is a chugging pump rather
+   * than a hiss, finished by the clunk of the chuck coming off.
+   */
+  airUp(duration: number) {
+    const ctx = this.engine.ctx;
+    const t = ctx.currentTime;
+    const end = t + duration;
+
+    const src = this.engine.createNoiseSource();
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 520;
+    filter.Q.value = 3;
+
+    const body = ctx.createGain();
+    body.gain.setValueAtTime(0.0001, t);
+    body.gain.exponentialRampToValueAtTime(0.1, t + 0.12);
+    body.gain.setValueAtTime(0.1, end - 0.1);
+    body.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    // The chug. A square LFO on the gain is what turns flat noise into a pump
+    // with pistons in it; without it this is just brown noise for two seconds.
+    const chug = ctx.createGain();
+    chug.gain.value = 0.55;
+    const lfo = ctx.createOscillator();
+    lfo.type = 'square';
+    lfo.frequency.value = 7.5;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.42;
+    lfo.connect(depth);
+    depth.connect(chug.gain);
+    lfo.start(t);
+    lfo.stop(end + 0.05);
+
+    src.connect(filter);
+    filter.connect(chug);
+    chug.connect(body);
+    body.connect(this.engine.world);
+    src.start(t);
+    src.stop(end + 0.05);
+
+    // The chuck coming off, once the pump stops.
+    const clunk = this.engine.createNoiseSource();
+    const clunkFilter = ctx.createBiquadFilter();
+    clunkFilter.type = 'lowpass';
+    clunkFilter.frequency.setValueAtTime(900, end);
+    clunkFilter.frequency.exponentialRampToValueAtTime(180, end + 0.09);
+    const clunkGain = ctx.createGain();
+    clunkGain.gain.setValueAtTime(0.16, end);
+    clunkGain.gain.exponentialRampToValueAtTime(0.0001, end + 0.12);
+    clunk.connect(clunkFilter);
+    clunkFilter.connect(clunkGain);
+    clunkGain.connect(this.engine.world);
+    clunk.start(end);
+    clunk.stop(end + 0.15);
   }
 
   /** A dull thud through the suspension when the truck lands. */

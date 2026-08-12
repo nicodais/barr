@@ -3,6 +3,7 @@ import { TrackScore } from './TrackScore';
 import { DrivingSound } from './DrivingSound';
 import { RadioCue } from './RadioCue';
 import type { VehicleTelemetry } from '../vehicle/Vehicle';
+import type { BodyId } from '../vehicle/vehicleConfig';
 
 /**
  * One place for the game to talk to audio, and the owner of the adaptive mix
@@ -19,6 +20,9 @@ export class GameAudio {
   private score: TrackScore | null = null;
   private cue: RadioCue | null = null;
   private muted = false;
+  /** Remembered, because the body is usually chosen before the first gesture
+   *  unlocks audio and there would be nothing to tell at the time. */
+  private body: BodyId = 'wagon';
   private volume = 0.9;
   private music = 1;
   private effects = 0.7;
@@ -44,6 +48,7 @@ export class GameAudio {
       if (!ok) return;
       this.engine = engine;
       this.driving = new DrivingSound(engine);
+      this.driving.setBody(this.body);
       this.score = new TrackScore(engine);
       this.cue = new RadioCue(engine);
       this.score.start();
@@ -71,6 +76,19 @@ export class GameAudio {
     this.driving?.update(tel, throttle, dt);
     this.score?.update(dt, this.intensity);
     if (tel.landingImpact > 0.05) this.driving?.landing(tel.landingImpact);
+  }
+
+  /** Which vehicle's engine to sound like. Safe before audio has unlocked. */
+  setBody(body: BodyId) {
+    this.body = body;
+    this.driving?.setBody(body);
+  }
+
+  /** A hiss going down, a compressor going up, for as long as the change takes. */
+  tyreChange(down: boolean, duration: number) {
+    if (!this.engine?.running || duration <= 0.05) return;
+    if (down) this.driving?.airDown(duration);
+    else this.driving?.airUp(duration);
   }
 
   radioKeyUp() {
