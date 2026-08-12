@@ -483,68 +483,6 @@ body.photo-mode #help {
 
 /* --- debug hud ------------------------------------------------------------ */
 
-/*
- * Top-right stick-position control, touch + joystick scheme only (shown by
- * Game). Collapsed it's a single puck; expanded its option row would otherwise
- * reach the top-centre speedometer on a narrow phone, so it folds away.
- */
-.joystick-bar {
-  position: fixed;
-  top: calc(12px + env(safe-area-inset-top));
-  right: calc(12px + env(safe-area-inset-right));
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: 12px;
-  background: rgba(28, 21, 16, 0.42);
-  border: 1.5px solid var(--panel-line);
-  backdrop-filter: blur(6px);
-  pointer-events: auto;
-  z-index: 15;
-}
-
-.joystick-bar[hidden] {
-  display: none;
-}
-
-/* Collapsed: the puck is the whole control, so drop the option row. */
-.joystick-bar.collapsed .joystick-bar-options {
-  display: none;
-}
-
-.joystick-bar-options {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.joystick-bar-label {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.6;
-  padding-left: 2px;
-}
-
-.joystick-bar button {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-content: center;
-  border-radius: 9px;
-  border: 1.5px solid var(--panel-line);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.joystick-bar button.joystick-bar-active {
-  border-color: var(--accent);
-  background: rgba(240, 168, 96, 0.16);
-}
 
 /*
  * The dashboard compass (§5): a slim tick-tape at the top centre. Subtle by
@@ -921,12 +859,15 @@ body.photo-mode #help {
 
 /* --- tuning panel --------------------------------------------------------- */
 
+/* Starts below the hamburger, which now shares this corner. Both are
+   right-aligned and the button floats above everything, so without the offset
+   it sits on top of the panel's own header. */
 .tuning-panel {
   position: fixed;
-  top: calc(14px + env(safe-area-inset-top));
+  top: calc(62px + env(safe-area-inset-top));
   right: calc(14px + env(safe-area-inset-right));
   width: 288px;
-  max-height: calc(100dvh - 28px);
+  max-height: calc(100dvh - 76px);
   display: flex;
   flex-direction: column;
   border-radius: 14px;
@@ -1516,15 +1457,19 @@ body.photo-mode #help {
 
 /* --- menu ----------------------------------------------------------------- */
 /*
- * Top-left hamburger. Desktop already reaches all of this through G, T and the
- * time slider; a phone reaches none of it, which is what this exists for. It is
- * shown on every input type anyway — a discoverable button beats three
+ * Top-right hamburger. Desktop already reaches most of this through G, T and
+ * the time slider; a phone reaches none of it, which is what this exists for.
+ * It is shown on every input type anyway — a discoverable button beats three
  * undocumented shortcuts on any device.
+ *
+ * Right rather than left because that corner is now free: the stick-position
+ * puck that used to live there has moved inside the panel, and the left side
+ * is where the POI card sits on a phone.
  */
 .menu-button {
   position: fixed;
   top: calc(10px + env(safe-area-inset-top));
-  left: calc(10px + env(safe-area-inset-left));
+  right: calc(10px + env(safe-area-inset-right));
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1559,7 +1504,7 @@ body.photo-mode #help {
 .menu-panel {
   position: fixed;
   top: calc(60px + env(safe-area-inset-top));
-  left: calc(10px + env(safe-area-inset-left));
+  right: calc(10px + env(safe-area-inset-right));
   width: min(288px, calc(100vw - 20px));
   padding: 13px 14px 15px;
   border: 1px solid var(--panel-line);

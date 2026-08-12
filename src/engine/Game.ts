@@ -39,7 +39,6 @@ import { airborneSand } from '../terrain/chunkGeometry';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
 import { PhotoMode } from './PhotoMode';
 import { PhotoBar } from '../ui/PhotoBar';
-import { JoystickBar } from '../ui/JoystickBar';
 import { Compass } from '../ui/Compass';
 import { PoiCard } from '../ui/PoiCard';
 import { loadProgress, saveProgress, type Progress } from '../settings/Progress';
@@ -96,7 +95,6 @@ export class Game {
   private director: Director;
   private photo: PhotoMode;
   private photoBar: PhotoBar;
-  private joystickBar: JoystickBar;
   private boundary = new WorldBoundary();
   private compass = new Compass();
   private poiCard = new PoiCard();
@@ -272,6 +270,14 @@ export class Game {
         this.timeOfDay.time = t;
         this.timeOfDay.evaluate();
       },
+      onStick: (pos) => {
+        this.settings.joystickPosition = pos;
+        saveSettings(this.settings);
+        this.input.touch.setJoystickPosition(pos);
+      },
+      getStick: () => this.settings.joystickPosition,
+      stickAvailable: () =>
+        matchMedia('(pointer: coarse)').matches && this.settings.touchScheme === 'joystick',
     });
     this.menu.setVisible(false);
     this.carSelect = new CarSelect(this.settings.vehicle, () => {
@@ -287,12 +293,6 @@ export class Game {
       () => void this.savePhoto(true),
       () => this.exitPhotoMode(),
     );
-    this.joystickBar = new JoystickBar((pos) => {
-      this.settings.joystickPosition = pos;
-      saveSettings(this.settings);
-      this.input.touch.setJoystickPosition(pos);
-      this.joystickBar.setPosition(pos);
-    });
 
     this.tier = this.settings.quality === 'auto' ? detectTier() : this.settings.quality;
     this.applyQuality(this.tier);
@@ -313,7 +313,6 @@ export class Game {
       this.photoBar.element,
       this.panel.element,
       this.garage.element,
-      this.joystickBar.element,
       this.boundary.element,
       this.compass.element,
       this.poiCard.element,
@@ -670,7 +669,7 @@ export class Game {
     this.hud.element.hidden = true;
     this.input.touch.element.hidden = true;
     this.compass.hide();
-    this.updateJoystickBar();
+    this.menu.setVisible(false);
   }
 
   private exitPhotoMode() {
@@ -680,7 +679,7 @@ export class Game {
     this.hud.element.hidden = false;
     if (matchMedia('(pointer: coarse)').matches) this.input.touch.element.hidden = false;
     this.compass.show();
-    this.updateJoystickBar();
+    this.menu.setVisible(true);
     this.chase.reset(this.curPos, this.curQuat);
   }
 
@@ -763,21 +762,6 @@ export class Game {
     this.input.touch.setScheme(this.settings.touchScheme);
     this.input.touch.setHandedness(this.settings.handedness);
     this.input.touch.setJoystickPosition(this.settings.joystickPosition);
-    this.updateJoystickBar();
-  }
-
-  /** The stick-position bar only belongs on touch, and only for the joystick. */
-  private updateJoystickBar() {
-    const show =
-      matchMedia('(pointer: coarse)').matches &&
-      this.settings.touchScheme === 'joystick' &&
-      !this.photo.active;
-    if (show) {
-      this.joystickBar.setPosition(this.settings.joystickPosition);
-      this.joystickBar.show();
-    } else {
-      this.joystickBar.hide();
-    }
   }
 
   /**
