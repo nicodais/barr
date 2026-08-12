@@ -13,18 +13,34 @@ import type { WheelState } from './Vehicle';
  * rear wheels track the same line on a 4x4, so two ribbons is what you'd
  * actually see.
  */
-const MAX_SEGMENTS = 240;
+/**
+ * Segments per ribbon. This, not FADE_TIME, is what actually sets how much of
+ * your drive you can look back on: at 90kph the old 240-segment budget was
+ * spent in five seconds of driving, so the tail was being recycled long before
+ * anything had a chance to fade. 700 at the step below is about 560m of history
+ * per ribbon — far enough back to see the line you took over the last dune.
+ */
+const MAX_SEGMENTS = 700;
 const TRACK_HALF_WIDTH = 0.19;
 /** Minimum travel before a new segment is laid, in metres. */
-const MIN_STEP = 0.5;
+const MIN_STEP = 0.8;
 /**
  * Travel beyond which a frame's movement can't be driving — it's a teleport
  * (boundary respawn, recovery). Connecting across one would streak a single
  * segment across the whole world, so the ribbon breaks and restarts instead.
  */
 const TELEPORT_BREAK = 12;
-/** Seconds before a track has faded completely. */
-const FADE_TIME = 22;
+/**
+ * Seconds before a track has faded completely.
+ *
+ * Sand fills a rut over hours, not seconds. Twenty-two seconds meant a track
+ * was gone before you had finished the dune you made it on, which quietly
+ * undercut the one thing tracks are for — coming back over your own line and
+ * recognising it. Long enough now that the segment budget above is what
+ * expires a track in normal driving, and the timer only takes over when you
+ * stop and sit somewhere.
+ */
+const FADE_TIME = 210;
 const LIFT = 0.04;
 const RIBBONS = 2;
 

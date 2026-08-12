@@ -1,5 +1,5 @@
 import type { PoiKind } from '../data/pois';
-import { POIS } from '../data/pois';
+import { activeRegion } from '../terrain/regions';
 
 /**
  * Exploration progress, persisted separately from settings (§3): discovery is
@@ -15,7 +15,9 @@ export interface Progress {
 }
 
 const STORAGE_KEY = 'dune.progress.v1';
-const VALID_IDS = new Set<PoiKind>(POIS.map((p) => p.id));
+// Region-scoped: a save carrying Liwa's discoveries must not have them
+// silently count toward Fossil Rock's total, and vice versa.
+const validIds = () => new Set<PoiKind>(activeRegion().pois.map((p) => p.id));
 
 export function loadProgress(): Progress {
   const progress: Progress = { discovered: new Set() };
@@ -27,7 +29,7 @@ export function loadProgress(): Progress {
       // Same defensiveness as settings: only ids that still exist get adopted,
       // so a stale blob can't make the counter read 12/10.
       for (const id of saved.discovered) {
-        if (VALID_IDS.has(id as PoiKind)) progress.discovered.add(id as PoiKind);
+        if (validIds().has(id as PoiKind)) progress.discovered.add(id as PoiKind);
       }
     }
   } catch {

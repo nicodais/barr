@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Shamal">
+  <!--
+    The mark: a low sun over two dune crests, in the game's own palette.
+
+    Built to survive 16px. Everything is one of three flat shapes with hard
+    edges and no gradient, because a gradient at favicon size is mud, and the
+    whole visual language of the game is flat-shaded fields anyway.
+  -->
+  <rect width="64" height="64" rx="14" fill="#e8b98a"/>
+  <circle cx="32" cy="27" r="10" fill="#ffd08a"/>
+  <path d="M0 45c9-11 17-11 26-2 7 7 13 8 20 2 6-5 12-6 18-2v21H0z" fill="#c2683a"/>
+  <path d="M0 54c11-9 20-8 29 0 6 6 13 7 20 3 5-3 10-4 15-2v9H0z" fill="#a8552c"/>
+</svg>

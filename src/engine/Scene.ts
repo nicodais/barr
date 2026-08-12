@@ -22,6 +22,22 @@ const SHADOW_EXTENT = 55;
 /** How far up-sun the light sits. Must exceed anything it needs to cast from. */
 const SUN_DISTANCE = 220;
 
+/**
+ * Fraction of the draw distance at which fog must already be opaque.
+ *
+ * Terrain chunks stop being drawn at the tier's `viewDistance`, but fog is
+ * authored in TimeOfDay against no particular draw distance at all — it runs
+ * 560m at night to 1010m at midday. On the low tier, which only draws to 520m,
+ * midday fog leaves the cutoff edge just 36% hazed, so chunks visibly appear
+ * out of clear air. Pulling the curve in so it finishes just inside the cutoff
+ * means whatever arrives is already the colour of the sky it arrived from.
+ *
+ * Slightly under 1 rather than exactly at it: a chunk that reaches full fog on
+ * the very frame it is culled still flickers, since the two tests disagree by
+ * the chunk's own radius.
+ */
+const FOG_REACH = 0.94;
+
 export class SceneRig {
   readonly scene = new THREE.Scene();
   readonly renderer: THREE.WebGLRenderer;
@@ -33,6 +49,8 @@ export class SceneRig {
   private sunDir = new THREE.Vector3();
   private maxPixelRatio = 2;
   private shadowsAllowed = true;
+  /** Distance the fog must be fully opaque by. Set from the quality tier. */
+  private fogLimit = Infinity;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -43,6 +61,34 @@ export class SceneRig {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // Tone mapping, and it is load-bearing for the palette rather than a
+    // finishing touch.
+    //
+    // The keyframes run the sun at 2.4-3.0x "normal daylight" (see LIGHT_SCALE),
+    // so sand with an albedo around 0.7 reflects well over 1.0 whenever the sun
+    // is high. Clipped, every one of those pixels lands on pure white — and
+    // white is not a lighter red, it is *no* red. The whole grain-sorting model
+    // that makes the ridges run iron-red was being thrown away at exactly the
+    // times of day the light is strongest.
+    //
+    // Neutral rather than ACES, which is the obvious pick and the wrong one
+    // here. ACES's RRT walks saturated oranges toward yellow-white — precisely
+    // the convergence this is meant to prevent, applied to precisely the hue the
+    // region is built on. Measured over the ground half of the frame, the
+    // saturation of the brightest decile of sand:
+    //
+    //             midday   afternoon   golden
+    //     ACES      0.23      0.36       0.49
+    //     Neutral   0.43      0.54       0.59
+    //
+    // Both hold at 0% railed pixels, so the highlight protection is a wash and
+    // the only thing separating them is how much of the red survives it.
+    // Neutral is near-identity below its knee, so the big flat colour fields
+    // keep their authored hue and the roll-off is held back for crests and sun
+    // glow, which is where it is actually needed.
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
 
     this.fog = new THREE.Fog(0xe8b98a, 180, 950);
     this.scene.fog = this.fog;
@@ -80,7 +126,11 @@ export class SceneRig {
     this.sunDir.copy(sunDirection);
 
     this.sun.color.copy(state.sunColor);
-    this.sun.intensity = state.sunIntensity * LIGHT_SCALE;
+    // Dust in the air takes light out of the beam and puts it into the ambient:
+    // the sun weakens, the shadows fill in, and the whole scene loses a little
+    // of its modelling. That trade is most of what a hazy day *looks* like, and
+    // it costs two multiplies.
+    this.sun.intensity = state.sunIntensity * (1 - 0.26 * state.haze) * LIGHT_SCALE;
     this.sun.position.copy(focus).addScaledVector(this.sunDir, SUN_DISTANCE);
     this.sun.target.position.copy(focus);
     this.sun.target.updateMatrixWorld();
@@ -88,13 +138,22 @@ export class SceneRig {
     // stretching into artefacts, so stop casting rather than fight them.
     this.sun.castShadow = this.shadowsAllowed && this.sunDir.y > 0.03;
 
-    this.hemi.color.copy(state.hemiSky);
+    // The sky term picks up the dust colour too, or the fill light stays blue
+    // while the sky it's supposed to be coming from has gone sand-coloured.
+    this.hemi.color.copy(state.hemiSky).lerp(state.hazeColor, state.haze * 0.55);
     this.hemi.groundColor.copy(state.hemiGround);
-    this.hemi.intensity = state.hemiIntensity * LIGHT_SCALE;
+    this.hemi.intensity = state.hemiIntensity * (1 + 0.34 * state.haze) * LIGHT_SCALE;
 
-    this.fog.color.copy(state.fog);
-    this.fog.near = state.fogNear;
-    this.fog.far = state.fogFar;
+    // Aerial perspective has to agree with the sky it fades into, or the
+    // horizon prints a seam where the fogged terrain meets the dome.
+    this.fog.color.copy(state.fog).lerp(state.hazeColor, state.haze * 0.7);
+    // Near and far are scaled together rather than far alone being clipped, so
+    // a tier that can't draw as far gets the authored *shape* of the aerial
+    // perspective compressed into the distance it does have, instead of a thin
+    // band of fog slammed against an otherwise clear view.
+    const squeeze = Math.min(1, this.fogLimit / state.fogFar);
+    this.fog.near = state.fogNear * squeeze;
+    this.fog.far = state.fogFar * squeeze;
 
     this.sky.update(state, this.sunDir, camera);
   }
@@ -105,6 +164,7 @@ export class SceneRig {
   }
 
   applyQuality(profile: QualityProfile) {
+    this.fogLimit = profile.viewDistance * FOG_REACH;
     this.maxPixelRatio = profile.maxPixelRatio;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, profile.maxPixelRatio));
 

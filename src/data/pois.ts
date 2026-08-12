@@ -1,10 +1,17 @@
 /**
- * The points of interest for v1 (§5). A curated set that leans into the desert
- * heritage of the UAE — the falaj that carried water, the majlis where a ruler
- * held open council, the ghaf the Sheikhs planted a country out of, falconry and
- * the camel track — plus a couple of playful, present-day spots so the world has
- * texture without becoming a checklist. Nothing here is mandatory and nothing
- * gates movement.
+ * The points of interest (§5).
+ *
+ * `PoiKind` is a shared catalogue rather than a per-region list: the kind is
+ * what decides which landmark gets built and which info card is shown, and both
+ * of those are exhaustive switches. A region picks which kinds it places and
+ * where, so a watchtower can stand in two deserts without either file learning
+ * that regions exist.
+ *
+ * Liwa's set leans into the desert heritage of the UAE — the falaj that carried
+ * water, the majlis where a ruler held open council, the ghaf the Sheikhs
+ * planted a country out of, falconry and the camel track — plus a couple of
+ * playful, present-day spots so the world has texture without becoming a
+ * checklist. Nothing is mandatory and nothing gates movement.
  *
  * Coordinates stay well inside the soft fade-and-respawn boundary (~760 out, see
  * WorldBoundary) so landmarks sit in the curated heart of the region, never out
@@ -24,7 +31,11 @@ export type PoiKind =
   | 'famousdune'
   | 'falconry'
   | 'cameltrack'
-  | 'coffeehearth';
+  | 'coffeehearth'
+  | 'oasis'
+  // Fossil Rock only.
+  | 'fossilbed'
+  | 'tomb';
 
 export interface Poi {
   id: PoiKind;
@@ -37,7 +48,7 @@ export interface Poi {
   lines: string[];
 }
 
-export const POIS: Poi[] = [
+export const LIWA_POIS: Poi[] = [
   {
     id: 'falaj',
     name: 'The Old Falaj',
@@ -92,13 +103,16 @@ export const POIS: Poi[] = [
       "Karak's still on the stove. Don't touch it.",
     ],
   },
+  // Tal Moreeb. Sits on the summit, so the card is what's waiting at the top of
+  // the climb rather than something collected at the bottom — and the radius is
+  // kept tight for the same reason.
   {
     id: 'famousdune',
-    name: 'The Famous Dune',
-    x: 470, z: -260, radius: 95,
+    name: 'Tal Moreeb',
+    x: 310, z: -218, radius: 70,
     lines: [
-      'This dune has more photos of it than my entire family. I never understood why.',
-      'People drive two hours to stand on sand that looks like all the other sand. Mashallah.',
+      'Tal Moreeb. Three hundred metres of sand, and every year people race cars straight up it.',
+      'You got up. Most people need a run-up and a second go. Sit a minute — the view is the point.',
     ],
   },
   {
@@ -117,6 +131,20 @@ export const POIS: Poi[] = [
     lines: [
       'Camel track. The races are serious business — the Sheikhs breed the winners like royalty.',
       'This stretch got left to the sand when they built the big ovals. Mind the old rails.',
+    ],
+  },
+  // The oasis sits in a genuinely enclosed interdune hollow — the flattest,
+  // lowest, most sheltered ground within 350m of anything else, found by
+  // sampling the height field rather than picked by eye. That matters: a date
+  // garden only exists where the water table comes near the surface, which out
+  // here means the bottom of a basin.
+  {
+    id: 'oasis',
+    name: 'The Date Garden',
+    x: 190, z: -580, radius: 80,
+    lines: [
+      "Dates. Out here. That's not luck — the water sits close under this hollow.",
+      'Liwa is a string of these. Whole villages grew out of gardens the size of this one.',
     ],
   },
   {

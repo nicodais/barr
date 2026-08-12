@@ -3,6 +3,7 @@ import type { GameSettings } from '../settings/Settings';
 import { saveSettings } from '../settings/Settings';
 import type { VehicleTuning } from '../vehicle/VehicleTuning';
 import { DEFAULT_TUNING } from '../vehicle/VehicleTuning';
+import { buildChoice, buildToggle, plainOptions } from './controls';
 
 interface Slider {
   key: keyof VehicleTuning;
@@ -110,6 +111,7 @@ export class TuningPanel {
     private onAudioChange: () => void,
     private onQualityChange: () => void,
     private onTouchChange: () => void,
+    private onOpenGarage: () => void,
   ) {
     this.element = document.createElement('aside');
     this.element.className = 'tuning-panel';
@@ -130,7 +132,7 @@ export class TuningPanel {
     controlsTitle.textContent = 'Controls';
     controls.appendChild(controlsTitle);
     controls.appendChild(
-      this.buildToggle(
+      buildToggle(
         'Invert steering',
         () => this.settings.invertSteering,
         (v) => {
@@ -140,7 +142,7 @@ export class TuningPanel {
       ),
     );
     controls.appendChild(
-      this.buildToggle(
+      buildToggle(
         'Mute audio',
         () => this.settings.muted,
         (v) => {
@@ -158,9 +160,23 @@ export class TuningPanel {
       }),
     );
     controls.appendChild(
-      this.buildChoice(
+      this.buildFreeSlider('Music', 0, 1, 0.01, () => this.settings.musicVolume, (v) => {
+        this.settings.musicVolume = v;
+        saveSettings(this.settings);
+        this.onAudioChange();
+      }),
+    );
+    controls.appendChild(
+      this.buildFreeSlider('Vehicle & world', 0, 1, 0.01, () => this.settings.effectsVolume, (v) => {
+        this.settings.effectsVolume = v;
+        saveSettings(this.settings);
+        this.onAudioChange();
+      }),
+    );
+    controls.appendChild(
+      buildChoice(
         'Quality',
-        ['auto', 'low', 'medium', 'high'],
+        plainOptions(['auto', 'low', 'medium', 'high']),
         () => this.settings.quality,
         (v) => {
           this.settings.quality = v as GameSettings['quality'];
@@ -171,9 +187,9 @@ export class TuningPanel {
     );
     if (matchMedia('(pointer: coarse)').matches) {
       controls.appendChild(
-        this.buildChoice(
+        buildChoice(
           'Stick position',
-          ['left', 'middle', 'right'],
+          plainOptions(['left', 'middle', 'right']),
           () => this.settings.joystickPosition,
           (v) => {
             this.settings.joystickPosition = v as GameSettings['joystickPosition'];
@@ -183,6 +199,17 @@ export class TuningPanel {
         ),
       );
     }
+
+    // The garage gets its own panel rather than another section here: it is a
+    // player-facing choice sitting in the middle of a wall of physics sliders,
+    // and nobody scrolls past `pitchInertia` to change their paint.
+    const garageBtn = document.createElement('button');
+    garageBtn.type = 'button';
+    garageBtn.className = 'tuning-link';
+    garageBtn.textContent = 'Open garage — body, paint, kit';
+    garageBtn.onclick = () => this.onOpenGarage();
+    controls.appendChild(garageBtn);
+
     body.appendChild(controls);
 
     // Time of day is an art-direction dial, so it wants to be scrubbable rather
@@ -198,7 +225,7 @@ export class TuningPanel {
       }, formatClock),
     );
     light.appendChild(
-      this.buildToggle(
+      buildToggle(
         'Advance automatically',
         () => this.timeOfDay.autoAdvance,
         (v) => { this.timeOfDay.autoAdvance = v; },
@@ -249,65 +276,6 @@ export class TuningPanel {
 
     this.load();
     this.syncInputs();
-  }
-
-  private buildToggle(
-    label: string,
-    get: () => boolean,
-    set: (value: boolean) => void,
-  ): HTMLElement {
-    const row = document.createElement('label');
-    row.className = 'tuning-row tuning-toggle';
-
-    const name = document.createElement('span');
-    name.className = 'tuning-name';
-    name.textContent = label;
-
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.checked = get();
-    box.onchange = () => set(box.checked);
-
-    row.append(name, box);
-    return row;
-  }
-
-  /** A small segmented control for enum-valued settings. */
-  private buildChoice(
-    label: string,
-    options: string[],
-    get: () => string,
-    set: (value: string) => void,
-  ): HTMLElement {
-    const row = document.createElement('div');
-    row.className = 'tuning-row tuning-choice';
-
-    const name = document.createElement('span');
-    name.className = 'tuning-name';
-    name.textContent = label;
-
-    const group = document.createElement('div');
-    group.className = 'tuning-segments';
-    const sync = () => {
-      for (const el of Array.from(group.children) as HTMLElement[]) {
-        el.classList.toggle('is-active', el.dataset.value === get());
-      }
-    };
-    for (const option of options) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.dataset.value = option;
-      btn.textContent = option;
-      btn.onclick = () => {
-        set(option);
-        sync();
-      };
-      group.appendChild(btn);
-    }
-    sync();
-
-    row.append(name, group);
-    return row;
   }
 
   /** A slider bound to arbitrary get/set rather than a VehicleTuning key. */
@@ -387,6 +355,11 @@ export class TuningPanel {
   toggle() {
     this.visible = !this.visible;
     this.element.hidden = !this.visible;
+  }
+
+  hide() {
+    this.visible = false;
+    this.element.hidden = true;
   }
 
   private save() {

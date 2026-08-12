@@ -72,7 +72,7 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
     credit: 'https://gulfnews.com/uae/the-bitter-truth-about-your-sweet-karak-tea-in-uae-1.68663205'
   },
   famousdune: {
-    title: 'The Famous Dune',
+    title: 'Tal Moreeb',
     body:
       'Dune bashing grew from desert know-how into one of the UAE\'s signature ' +
       'experiences, and certain photogenic dunes — like Moreeb Dune in Liwa — have become ' +
@@ -97,6 +97,30 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
       'robot jockeys have replaced child riders and bloodlines are prized like royalty.',
     photo: '/photos/cameltrack.jpg',
     credit: 'https://www.usatoday.com/picture-gallery/tech/2017/01/03/centuries-old-tradition-changed-by-technology/96116762/'
+  },
+  fossilbed: {
+    title: 'Fossil Rock',
+    body:
+      'Jebel Maleihah is a slab of Cretaceous seabed tilted out of the desert — the ' +
+      'shells and sea urchins in it are around 65 million years old. The dunes ' +
+      'banked against its western flank are one of the best-known 4x4 runs in the ' +
+      'Emirates.',
+  },
+  tomb: {
+    title: 'Umm an-Nar Tombs',
+    body:
+      'Mleiha holds one of the richest archaeological records in the Gulf: circular ' +
+      'Umm an-Nar communal tombs from around 2000 BC, an Iron Age settlement, and a ' +
+      'pre-Islamic fort. The same water that made the desert liveable made it worth ' +
+      'burying your family here.',
+  },
+  oasis: {
+    title: 'The Liwa Oases',
+    body:
+      'Liwa is a 100km crescent of date-palm oases along the northern edge of the Empty ' +
+      'Quarter — the ancestral home of the Bani Yas, and of the family that founded the ' +
+      'UAE. Dates were food, trade and survival, and the summer harvest still empties ' +
+      'Abu Dhabi into the desert every July.',
   },
   coffeehearth: {
     title: 'Gahwa — Arabic Coffee',

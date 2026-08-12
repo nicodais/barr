@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { clamp01, heightAt, softnessAt, smoothstep } from './height';
+import { alongCrest, clamp01, heightAt, rockAt, surfaceAt } from './height';
+import { activeRegion } from './regions';
 
 export const CHUNK_SIZE = 128;
 
@@ -83,12 +84,59 @@ function buildIndices(n: number): Uint16Array | Uint32Array {
 // --- palette ------------------------------------------------------------------
 // Warm and limited (§4). These are albedo, not final pixels — the indigo in the
 // shadows comes from the hemisphere light, not from a dark version of the sand.
-const LOOSE_SAND = new THREE.Color(0xd9a86a);
-const CREST_BLEACH = new THREE.Color(0xe6c896);
-const HARDPACK = new THREE.Color(0xc0a189);
-const SABKHA = new THREE.Color(0xcbb9a6);
+//
+// The two sands are the region, not a colour scheme. Inland Emirati dune sand is
+// quartz wearing an iron-oxide coat, and the wind sorts it: the fine, deeply
+// stained grains ride up onto the crests while the coarse pale ones lag in the
+// interdune. So the map runs red along its ridges and grey-buff in its hollows,
+// and the terrain shader doesn't decide that — `surfaceAt` does, from the same
+// exposure term the dune geometry is built out of.
+//
+// Every entry is per-region (see regions.ts): Liwa is deep-sand-sea red over
+// pale carbonate, Fossil Rock a redder sand against cool grey limestone. Held
+// as scratch Colors refilled once per chunk build rather than per vertex — a
+// chunk is 4225 vertices and these cannot change inside one build.
+const SAND_IRON = new THREE.Color();
+const SAND_PALE = new THREE.Color();
+const GRAVEL = new THREE.Color();
+const SABKHA = new THREE.Color();
+const DUNE_CREST_RED = new THREE.Color();
+const ROCK = new THREE.Color();
+
+function loadPalette() {
+  const p = activeRegion().palette;
+  SAND_IRON.setHex(p.sandIron);
+  SAND_PALE.setHex(p.sandPale);
+  GRAVEL.setHex(p.gravel);
+  SABKHA.setHex(p.sabkha);
+  DUNE_CREST_RED.setHex(p.duneCrest);
+  ROCK.setHex(p.rock);
+}
+
+/**
+ * What the dust and the crest plumes should be tinted toward, so airborne sand
+ * belongs to the ground it came off rather than being a generic beige puff.
+ */
+export function airborneSand(out: THREE.Color): THREE.Color {
+  return out.setHex(activeRegion().palette.airborne);
+}
+
+/**
+ * What an occluded hollow's sand is tinted toward. Ambient occlusion is not a
+ * grey multiply: the light a crest loses when it drops into an interdune is
+ * specifically the *sky*, and the sky here is the one blue thing in the world.
+ * Darkening toward indigo rather than toward black is the same move the
+ * hemisphere light makes, baked in where the geometry knows the answer and the
+ * lighting doesn't.
+ */
+const AO_SHADOW = new THREE.Color(0x6b5a72);
+/** Deepest the hollows go, as a fraction of the way to AO_SHADOW. */
+const AO_STRENGTH = 0.22;
 
 const scratchColor = new THREE.Color();
+const scratchRock = new THREE.Color();
+/** Shadowed, freshly broken limestone: cool and desaturated. */
+const ROCK_COOL = new THREE.Color(0x59606b);
 
 /**
  * Ratio of this chunk's resolution to each neighbour's (1 when the neighbour is
@@ -123,6 +171,7 @@ export function buildChunkGeometry(
   const originX = chunkX * CHUNK_SIZE;
   const originZ = chunkZ * CHUNK_SIZE;
   const cell = CHUNK_SIZE / n;
+  loadPalette();
   const verts = (n + 1) * (n + 1);
   const total = verts + 8 * (n + 1);
 
@@ -162,7 +211,7 @@ export function buildChunkGeometry(
       positions[v * 3 + 1] = h;
       positions[v * 3 + 2] = wz;
 
-      writeColor(colors, v, wx, wz, h);
+      writeColor(colors, v, wx, wz);
     }
   }
 
@@ -261,20 +310,65 @@ function stitchEdge(
   }
 }
 
-function writeColor(out: Float32Array, v: number, wx: number, wz: number, h: number) {
-  const soft = softnessAt(wx, wz);
+function writeColor(out: Float32Array, v: number, wx: number, wz: number) {
+  const s = surfaceAt(wx, wz);
 
-  // Loose sand vs packed ground is the primary read, and it doubles as a legible
-  // cue for where the truck will bog down.
-  scratchColor.copy(HARDPACK).lerp(LOOSE_SAND, soft);
-  // Sabkha floors sit low and firm.
-  scratchColor.lerp(SABKHA, (1 - soft) * smoothstep(12, 2, h) * 0.7);
-  // Crests catch the light and bleach out.
-  scratchColor.lerp(CREST_BLEACH, clamp01(smoothstep(26, 62, h)) * 0.55);
+  // Grain sorting first: this is the primary read of the whole landscape, red
+  // ridges falling away to pale floors.
+  scratchColor.copy(SAND_PALE).lerp(SAND_IRON, s.iron);
+  // Where the sand runs thin the gravel underneath shows through. Partial on
+  // purpose — hardpack here is sand *over* serir, not bare serir.
+  scratchColor.lerp(GRAVEL, (1 - s.softness) * activeRegion().gravelAmount);
+  // Then the salt pan, and the great dune over the top of everything — nothing
+  // buries it, because it is 120 m of sand standing on the lot.
+  scratchColor.lerp(SABKHA, s.sabkha);
+  scratchColor.lerp(DUNE_CREST_RED, s.greatDune * 0.5);
 
-  out[v * 3] = scratchColor.r;
-  out[v * 3 + 1] = scratchColor.g;
-  out[v * 3 + 2] = scratchColor.b;
+  // Bare limestone, where a region has any. Applied after everything else and
+  // at full strength: the sand/rock boundary is the single strongest read in a
+  // region built around a jebel, and blending it would throw that away.
+  const rock = rockAt(wx, wz);
+
+  // Wind lanes: faint streaking drawn out along the crest lines, the direction
+  // the sand is actually travelling. Kept to a few percent — at any strength
+  // where you'd notice it as stripes it stops reading as wind and starts
+  // reading as a texture seam.
+  const lane = 1 + Math.sin(alongCrest(wx, wz) * 0.021) * 0.03 * s.softness;
+  scratchColor.multiplyScalar(lane);
+
+  if (rock > 0) {
+    // Rock gets its own mottling instead of the wind lanes, which would be
+    // nonsense on stone. Steep faces go darker: a limestone cliff is freshly
+    // broken and unweathered where it is vertical, and pale and sun-bleached
+    // where it lies flat enough to hold dust. That difference is most of what
+    // makes a scarp read as a scarp from a distance.
+    const e = 1.5;
+    const gx = (heightAt(wx + e, wz) - heightAt(wx - e, wz)) / (2 * e);
+    const gz = (heightAt(wx, wz + e) - heightAt(wx, wz - e)) / (2 * e);
+    const steep = clamp01((Math.hypot(gx, gz) - 0.45) / 0.9);
+    const mottle = 1 + Math.sin(wx * 0.19) * Math.sin(wz * 0.23) * 0.07;
+    scratchRock.copy(ROCK).multiplyScalar(mottle * (1 - 0.42 * steep));
+    // Cool the steep faces as well as darkening them. Hue is what separates
+    // stone from sand here — under a low warm sun any albedo renders warm, so a
+    // rock that differs only in value still reads as dark sand. Pushing the
+    // faces toward blue is the same trick the hemisphere light plays on the
+    // dune shadows, and it is the thing that makes a scarp look like rock.
+    scratchRock.lerp(ROCK_COOL, steep * 0.5);
+    scratchColor.lerp(scratchRock, rock);
+  }
+
+  // Ambient occlusion, baked into vertex colour (§4). Without it every hollow
+  // is lit exactly as brightly as the ridge above it, which is what makes a
+  // flat-shaded dune field read as a folded sheet of paper rather than as a
+  // landscape with depth in it. Curved rather than linear so the darkening
+  // concentrates in the floors and the top two-thirds of every dune stays clean
+  // — an even ramp just lowers the whole scene's key.
+  const sky = clamp01(s.exposure);
+  scratchColor.lerp(AO_SHADOW, AO_STRENGTH * (1 - sky) * (1 - sky));
+
+  out[v * 3] = clamp01(scratchColor.r);
+  out[v * 3 + 1] = clamp01(scratchColor.g);
+  out[v * 3 + 2] = clamp01(scratchColor.b);
 }
 
 /**

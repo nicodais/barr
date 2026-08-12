@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { duneFieldMask, hash2, heightAt, softnessAt } from '../terrain/height';
+import { duneFieldMask, hash2, heightAt, rockAt, softnessAt, surfaceAt } from '../terrain/height';
 
 /**
  * Ground dressing — scrub, tussock grass and rocks — scattered across the
@@ -26,6 +26,39 @@ const MAX_PER_SPECIES = 1200;
 const MAX_SLOPE = 0.42;
 /** ...and anything looser than this. Plants hold in packed ground, not slip faces. */
 const MAX_SOFTNESS = 0.62;
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+/**
+ * Merge parts that may mix indexed and non-indexed primitives.
+ *
+ * `mergeGeometries` returns null the moment one part carries an index buffer
+ * and another doesn't, and three's polyhedra (Icosahedron, Dodecahedron) are
+ * non-indexed while Box, Cone and Cylinder are indexed. The `?? parts[0]`
+ * fallback this replaces made that failure invisible *and* destructive: the
+ * bush merge was returning null on every call, so every bush in the world was
+ * being drawn as `parts[0]` — one 24cm blob, with its other three blobs, six
+ * twigs and stem silently discarded. Landmarks.ts already normalises this way;
+ * the scatter needed to as well.
+ */
+function mergeParts(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const flat = parts.map((p) => {
+    if (!p.index) return p;
+    const g = p.toNonIndexed();
+    p.dispose();
+    return g;
+  });
+  const merged = mergeGeometries(flat, false);
+  if (!merged) {
+    console.warn('[dune] scatter merge failed; falling back to a single part');
+    return flat[0];
+  }
+  for (const g of flat) g.dispose();
+  merged.computeBoundingSphere();
+  return merged;
+}
 
 type Species = 'bush' | 'grass' | 'rock';
 const SPECIES: Species[] = ['bush', 'grass', 'rock'];
@@ -62,6 +95,13 @@ export class Scatter {
     };
     for (const s of SPECIES) this.group.add(this.meshes[s]);
     this.group.matrixAutoUpdate = false;
+  }
+
+  /** Drops every cached cell. The ground under all of them has been replaced. */
+  reset() {
+    this.cells.clear();
+    this.lastCx = Infinity;
+    this.lastCz = Infinity;
   }
 
   /** Lower tiers thin the scatter out rather than shrinking its radius. */
@@ -145,7 +185,7 @@ export class Scatter {
     // Density falls off inside dune fields: the corridors between them are
     // where anything actually grows.
     const field = duneFieldMask(baseX + CELL / 2, baseZ + CELL / 2);
-    const chance = (0.78 - field * 0.5) * this.densityScale;
+    let chance = (0.78 - field * 0.5) * this.densityScale;
     if (roll > chance) return out;
 
     const count = 1 + Math.floor(hash2(cx + 7919, cz - 104729) * 3);
@@ -163,8 +203,20 @@ export class Scatter {
       const gz = (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e);
       if (Math.hypot(gx, gz) > MAX_SLOPE) continue;
 
+      // Nothing holds on the great dune. Its faces are live sand being moved
+      // constantly, and a bush halfway up a 120 m slip face would say the slope
+      // is stable — which is the opposite of what the climb is about.
+      //
+      // Bare limestone is the same argument for the opposite reason: nothing
+      // roots in rock, and a bush on the massif would undo the one hard-surface
+      // read the region has.
+      const surface = surfaceAt(x, z);
+      const stony = Math.max(surface.greatDune, rockAt(x, z));
       const h3 = hash2(cx * 7 + i * 3, cz * 11 + i * 5);
-      const species: Species = h3 < 0.55 ? 'bush' : h3 < 0.85 ? 'grass' : 'rock';
+      let species: Species;
+      if (h3 < lerp(0.55, 0, stony)) species = 'bush';
+      else if (h3 < lerp(0.85, 0.1, stony)) species = 'grass';
+      else species = 'rock';
 
       out.push({
         x,
@@ -266,7 +318,7 @@ function buildBush(): THREE.BufferGeometry {
   const stem = new THREE.CylinderGeometry(0.02, 0.035, 0.16, 4);
   stem.translate(0, 0.08, 0);
   parts.push(stem);
-  return mergeGeometries(parts, false) ?? parts[0];
+  return mergeParts(parts);
 }
 
 /** Tussock grass — a few stiff blades fanning out. */
@@ -283,7 +335,7 @@ function buildGrass(): THREE.BufferGeometry {
     blade.translate(Math.cos(a) * 0.07, 0, Math.sin(a) * 0.07);
     parts.push(blade);
   }
-  return mergeGeometries(parts, false) ?? parts[0];
+  return mergeParts(parts);
 }
 
 /**

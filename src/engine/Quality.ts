@@ -20,10 +20,16 @@ export interface QualityProfile {
   /** Visual chunk builds allowed per frame. */
   chunkBudget: number;
   maxDust: number;
+  /** Crest sand plumes. Cheap enough that even the low tier keeps some. */
+  maxPlumes: number;
+  /** Sand sloughing down slip faces under the wheels. */
+  maxAvalanche: number;
   /** Multiplier on ground-dressing density, 0..1. */
   scatterDensity: number;
   birds: number;
   gazelles: number;
+  /** Convoy routes running at night. Each is 3-5 vehicles plus their lamps. */
+  convoys: number;
 }
 
 export const PROFILES: Record<QualityTier, QualityProfile> = {
@@ -35,9 +41,12 @@ export const PROFILES: Record<QualityTier, QualityProfile> = {
     lodDistances: [140, 280, 430],
     chunkBudget: 1,
     maxDust: 90,
+    maxPlumes: 70,
+    maxAvalanche: 60,
     scatterDensity: 0.45,
     birds: 5,
     gazelles: 4,
+    convoys: 1,
   },
   medium: {
     maxPixelRatio: 1.5,
@@ -47,9 +56,12 @@ export const PROFILES: Record<QualityTier, QualityProfile> = {
     lodDistances: [180, 340, 560],
     chunkBudget: 2,
     maxDust: 180,
+    maxPlumes: 150,
+    maxAvalanche: 130,
     scatterDensity: 0.72,
     birds: 9,
     gazelles: 6,
+    convoys: 2,
   },
   high: {
     maxPixelRatio: 2,
@@ -59,9 +71,12 @@ export const PROFILES: Record<QualityTier, QualityProfile> = {
     lodDistances: [230, 430, 780],
     chunkBudget: 2,
     maxDust: 320,
+    maxPlumes: 260,
+    maxAvalanche: 220,
     scatterDensity: 1,
     birds: 14,
     gazelles: 9,
+    convoys: 3,
   },
 };
 
