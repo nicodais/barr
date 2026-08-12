@@ -23,6 +23,16 @@ import { heightAt } from '../terrain/height';
 
 /** How close the truck has to be before a string stops to look. */
 const NOTICE_RADIUS = 34;
+/**
+ * How long they stand and look before going back to it.
+ *
+ * The class comment always said a string "stops, looks at it, and then carries
+ * on" — the carrying on was missing. `want` was a pure function of proximity, so
+ * they stayed halted for exactly as long as the player was nearby, which is the
+ * whole time anyone can see them. Standing still forever while being watched is
+ * what an obstacle does, not an animal.
+ */
+const LOOK_TIME = 5.5;
 /** Walking pace, m/s. A working camel does about this and no more. */
 const PLOD_SPEED = 1.25;
 /** Nose-to-tail spacing along the line. */
@@ -64,6 +74,9 @@ export class Camels {
   private phases = new Float32Array(CAPACITY);
   /** Per-string 0..1, how much the string is currently moving. */
   private motion: number[] = STRINGS.map(() => 1);
+  /** Countdown of the look. Armed on arrival, not held by proximity. */
+  private looking: number[] = STRINGS.map(() => 0);
+  private wasNear: boolean[] = STRINGS.map(() => false);
   private clock = 0;
 
   constructor() {
@@ -99,8 +112,15 @@ export class Camels {
       // Stop and look, don't run. Eased rather than switched, because a camel
       // going from walking to stopped in one frame is the tell that this is a
       // state machine and not an animal.
+      // Armed on the *transition* into range rather than sampled while in it,
+      // so the look has a beginning and an end and they get back to walking
+      // with you still standing there.
       const near = Math.hypot(str.cx - focusX, str.cz - focusZ) < NOTICE_RADIUS + str.radius;
-      const want = near ? 0 : 1;
+      if (near && !this.wasNear[s]) this.looking[s] = LOOK_TIME;
+      this.wasNear[s] = near;
+      if (this.looking[s] > 0) this.looking[s] -= dt;
+
+      const want = this.looking[s] > 0 ? 0 : 1;
       this.motion[s] += (want - this.motion[s]) * Math.min(1, dt * 1.1);
 
       for (let k = 0; k < str.count; k++, i++) {
@@ -156,12 +176,30 @@ export class Camels {
            // it's the only thing that distinguishes this silhouette from a
            // large horse at any distance you'd actually see it from.
            float legMask = smoothstep( 1.35, 0.35, transformed.y );
+           float body = 1.0 - legMask;
+           float walk = uTime * 3.1 + aPhase;
+
+           // The per-side half-cycle is what makes it a pace, and it must stay
+           // on the legs. Applied to the body it split the mesh down x=0: the
+           // left half shifted +6cm while the right went -6cm, opening a 12cm
+           // crack the length of the barrel and straight up the neck.
            float sideOffset = transformed.x > 0.0 ? 0.0 : 3.14159;
-           float cycle = uTime * 3.1 + aPhase + sideOffset;
-           transformed.z += sin( cycle ) * legMask * 0.34 * aGait;
-           // The roll, and the long slow nod of the neck over it.
-           transformed.x += sin( cycle ) * ( 1.0 - legMask ) * 0.06 * aGait;
-           transformed.y += sin( uTime * 6.2 + aPhase ) * 0.035 * aGait;`,
+           transformed.z += sin( walk + sideOffset ) * legMask * 0.34 * aGait;
+
+           // The roll and the nod ride the *whole* body on one phase.
+           transformed.x += sin( walk ) * body * 0.06 * aGait;
+           transformed.y += sin( uTime * 6.2 + aPhase ) * 0.035 * aGait;
+
+           // Standing still, and never actually still. A string halts whenever
+           // the player is inside ~96m of it, which is the only range you can
+           // make out a camel at — so without this the animal is a statue every
+           // single time anyone is close enough to look at it. That, not the
+           // walk cycle, is why they read as broken.
+           float idle = 1.0 - aGait;
+           float neck = smoothstep( 2.2, 2.95, transformed.y );
+           transformed.y += sin( uTime * 0.85 + aPhase ) * 0.022 * idle;
+           transformed.z += sin( uTime * 0.5 + aPhase * 1.7 ) * 0.09 * neck * idle;
+           transformed.x += sin( uTime * 0.37 + aPhase ) * 0.06 * neck * idle;`,
         );
     };
 
@@ -197,8 +235,14 @@ function buildCamel(): { coat: THREE.BufferGeometry; dark: THREE.BufferGeometry 
 
   // Neck: two segments, the second pitched back, so it makes the S a camel's
   // neck actually makes rather than a straight tube pointing forward.
+  // The sign here is load-bearing and was wrong: rotateX tips the *top* of a
+  // Y-aligned box toward +Z for a positive angle, so -0.55 leaned the lower
+  // neck backwards. That put its base at z=1.42, hanging in front of a chest
+  // that ends at 1.23, and left its top 0.53m short of where the upper neck
+  // starts. The neck rendered as a detached bar floating above the shoulder,
+  // which at night reads as a flag on a pole.
   const neckLow = new THREE.BoxGeometry(0.32, 1.0, 0.36);
-  neckLow.rotateX(-0.55);
+  neckLow.rotateX(0.55);
   neckLow.translate(0, 2.16, 1.16);
   coat.push(neckLow);
   const neckHigh = new THREE.BoxGeometry(0.28, 0.82, 0.3);
