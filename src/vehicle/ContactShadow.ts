@@ -15,6 +15,14 @@ import type { WheelState } from './Vehicle';
  */
 const WIDTH = 2.7;
 const LENGTH = 5.4;
+/**
+ * Footprint scale for a two-wheeler.
+ *
+ * The oval is sized for a 4x4 and the bike inherited it, so a 0.9m-wide
+ * motorcycle sat on a 2.7m patch of shade — the same fixed-footprint problem
+ * that gave it a car's tyre tracks and a car's dust cloud.
+ */
+const BIKE_SCALE = { x: 0.4, z: 0.45 };
 /** Lifted along the ground normal to stay off the terrain's own triangles. */
 const LIFT = 0.05;
 
@@ -83,7 +91,19 @@ export class ContactShadow {
     this.mesh.renderOrder = 1;
   }
 
-  update(wheels: WheelState[], bodyQuat: THREE.Quaternion, dt: number) {
+  update(
+    wheels: WheelState[],
+    bodyQuat: THREE.Quaternion,
+    dt: number,
+    twoWheeled = false,
+  ) {
+    // Local x is the plane's width and local y its length, before the quaternion
+    // below lays it on the ground.
+    this.mesh.scale.set(
+      twoWheeled ? BIKE_SCALE.x : 1,
+      twoWheeled ? BIKE_SCALE.z : 1,
+      1,
+    );
     const grounded = wheels.filter((w) => w.contact);
     const target = grounded.length / Math.max(1, wheels.length);
 

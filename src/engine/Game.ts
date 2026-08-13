@@ -6,7 +6,7 @@ import { TimeOfDay } from './TimeOfDay';
 import { TerrainStreamer } from '../terrain/TerrainStreamer';
 import { heightAt, softnessAt } from '../terrain/height';
 import { Vehicle } from '../vehicle/Vehicle';
-import { createVehicleView, type VehicleView } from '../vehicle/vehicleMesh';
+import { createVehicleView, isTwoWheeled, type VehicleView } from '../vehicle/vehicleMesh';
 import { DustSystem } from '../vehicle/DustSystem';
 import { ContactShadow } from '../vehicle/ContactShadow';
 import { TrackSystem } from '../vehicle/TrackSystem';
@@ -783,16 +783,27 @@ export class Game {
       this.vehicle.telemetry.speed,
       frameDt,
       landingImpact,
+      isTwoWheeled(this.settings.vehicle.body),
     );
     this.dust.update(frameDt);
     // Sand letting go under the wheels on a slip face. Reads the same wheel
     // contacts the dust does, but keys off the *steepness* of the face rather
     // than the speed across it.
     this.avalanche.update(frameDt, this.vehicle.wheels, this.vehicle.telemetry.speed);
-    this.contactShadow.update(this.vehicle.wheels, this.renderQuat, frameDt);
+    this.contactShadow.update(
+      this.vehicle.wheels,
+      this.renderQuat,
+      frameDt,
+      isTwoWheeled(this.settings.vehicle.body),
+    );
     // Rear wheels only: on a 4x4 the fronts run the same line, so laying all
     // four would just z-fight two ribbons against each other.
-    this.tracks.update(this.vehicle.wheels, [2, 3], frameDt);
+    this.tracks.update(
+      this.vehicle.wheels,
+      [2, 3],
+      frameDt,
+      isTwoWheeled(this.settings.vehicle.body),
+    );
 
     // Heading from the truck's forward vector; the soft nudge points at the
     // nearest POI this player hasn't found yet, across sessions (§5).

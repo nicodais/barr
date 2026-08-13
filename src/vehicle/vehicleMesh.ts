@@ -1342,6 +1342,18 @@ function sideDetails(b: PartBuilder, seams: number[], handleY: number) {
   }
 }
 
+/**
+ * Whether a body runs on two wheels.
+ *
+ * Exported because the mesh is not the only thing that needs to know. The
+ * physics runs four raycasts for every body (see BACKLOG item 12), so anything
+ * downstream that reads wheel contacts — the tyre tracks, most obviously — will
+ * happily produce a four-wheeler's output for a bike unless it asks.
+ */
+export function isTwoWheeled(body: BodyId): boolean {
+  return BODIES[body]?.twoWheeled === true;
+}
+
 const BODIES: Record<BodyId, BodySpec> = {
   wagon: { build: buildWagon },
   pickup: { build: buildPickup },

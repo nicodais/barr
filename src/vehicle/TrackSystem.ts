@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { WheelState } from './Vehicle';
+import { emptyWheelState, mergeAxle } from './twoWheeled';
 
 /**
  * Tyre tracks pressed into the sand.
@@ -111,10 +112,28 @@ export class TrackSystem {
     this.mesh.renderOrder = 2;
   }
 
-  /** @param wheels the two rear wheels, in left/right order */
-  update(wheels: WheelState[], rearIndices: [number, number], dt: number) {
-    for (let r = 0; r < RIBBONS; r++) {
-      const w = wheels[rearIndices[r]];
+  /**
+   * @param rearIndices the two rear wheels, in left/right order
+   * @param single      lay one centred ribbon instead of two.
+   *
+   * A bike leaves one line. The physics gives every body four raycasts at the
+   * shared hard-points, so without this the motorcycle laid a 4x4's pair of
+   * parallel ruts a track-width apart — which is the single most obvious way a
+   * two-wheeler can look wrong from behind.
+   */
+  update(
+    wheels: WheelState[],
+    rearIndices: [number, number],
+    dt: number,
+    single = false,
+  ) {
+    const ribbons = single ? 1 : RIBBONS;
+    for (let r = 0; r < ribbons; r++) {
+      // Centred: the midpoint of the two rear raycasts is where the bike's
+      // single contact patch actually is.
+      const w = single
+        ? mergeAxle(wheels[rearIndices[0]], wheels[rearIndices[1]], this.mid)
+        : wheels[rearIndices[r]];
       if (!w?.contact) {
         // Break the ribbon on takeoff so the track doesn't stretch across a jump.
         this.lastPos[r] = null;
@@ -138,8 +157,18 @@ export class TrackSystem {
       }
     }
 
+    // Whichever ribbons aren't in use must be broken, or switching to the bike
+    // mid-drive leaves ribbon 1 joined across the gap to wherever it left off.
+    for (let r = ribbons; r < RIBBONS; r++) {
+      this.lastPos[r] = null;
+      this.headNext[r] = true;
+    }
+
     this.ageAndUpload(dt);
   }
+
+  /** Scratch for the merged bike contact, so `update` allocates nothing. */
+  private mid: WheelState = emptyWheelState();
 
   private pushSegment(r: number, w: WheelState, last: { x: number; z: number }) {
     // Lay the segment across the direction of travel, in the ground plane.

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { WheelState } from './Vehicle';
+import { emptyWheelState, mergeAxle } from './twoWheeled';
 
 /**
  * Sand kicked up at the wheel contact points.
@@ -109,8 +110,25 @@ export class DustSystem {
    * @param speed  vehicle ground speed, m/s
    * @param impact 0..1 landing severity, for a burst on touchdown
    */
-  emitFromWheels(wheels: WheelState[], speed: number, dt: number, impact = 0) {
-    const grounded = wheels.filter((w) => w.contact);
+  /**
+   * @param single the body runs on two wheels, so merge each axle onto the
+   *   centre line first. Without it the bike sprays sand from four points a
+   *   pickup's track apart, which is as wide as the cloud behind the pickup.
+   */
+  emitFromWheels(
+    wheels: WheelState[],
+    speed: number,
+    dt: number,
+    impact = 0,
+    single = false,
+  ) {
+    let source = wheels;
+    if (single) {
+      mergeAxle(wheels[0], wheels[1], this.axleFront);
+      mergeAxle(wheels[2], wheels[3], this.axleRear);
+      source = this.axlePair;
+    }
+    const grounded = source.filter((w) => w.contact);
     if (grounded.length === 0) return;
 
     if (speed > MIN_SPEED) {
@@ -136,6 +154,11 @@ export class DustSystem {
       }
     }
   }
+
+  /** Scratch for the merged two-wheeler axles; reused, never reallocated. */
+  private axleFront = emptyWheelState();
+  private axleRear = emptyWheelState();
+  private axlePair = [this.axleFront, this.axleRear];
 
   private spawn(w: WheelState, speed: number, softness: number, scale: number) {
     const i = this.cursor;
