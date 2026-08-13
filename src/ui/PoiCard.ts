@@ -81,7 +81,8 @@ export class PoiCard {
   }
 
   show(poi: Poi) {
-    const info = POI_INFO[poi.id];
+    // Per-POI overrides win over the shared per-kind card. See `Poi.info`.
+    const info = { ...POI_INFO[poi.id], ...poi.info };
     this.title.textContent = info.title;
     this.body.textContent = info.body;
     // Credits are stored as full source URLs, which wrap to two lines of grey

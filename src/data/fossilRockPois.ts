@@ -87,6 +87,17 @@ export const FOSSIL_ROCK_POIS: Poi[] = [
       "That's the only way up the rock that isn't a cliff, and everyone who comes here finds it eventually.",
       'Carry your speed at the bottom. Halfway up is a bad place to change your mind.',
     ],
+    // Also not Tal Moreeb — this is the sand ramp banked against the jebel.
+    info: {
+      title: 'The Ramp',
+      body:
+        'Sand piles against the western flank of Jebel Maleihah until it forms a single ' +
+        'climbable ramp to the top — the one line up a formation that is otherwise scarp ' +
+        'on every side. It is the reason this rock is a driving destination and not just ' +
+        'an archaeological one.',
+      photo: undefined,
+      credit: undefined,
+    },
   },
   {
     id: 'cameltrack',

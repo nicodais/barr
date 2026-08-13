@@ -25,6 +25,17 @@ export const BADAYER_POIS: Poi[] = [
       "There it is. Every 4x4 in the country has been up that, and about a third of them came back down sideways.",
       "You'll get up it. Everyone does eventually. It's the coming down people misjudge.",
     ],
+    // Not Tal Moreeb, which is a different dune in a different emirate.
+    info: {
+      title: 'Big Red',
+      body:
+        'Al Badayer\'s landmark dune, an hour from Dubai on the Hatta road, and the place ' +
+        'most people in the Emirates first drove on sand. Weekends bring a queue of 4x4s ' +
+        'and quad hire at the foot of it; the iron in the sand is what gives it the colour ' +
+        'and the name.',
+      photo: undefined,
+      credit: undefined,
+    },
   },
   {
     id: 'teastand',
@@ -43,6 +54,17 @@ export const BADAYER_POIS: Poi[] = [
       "Somebody's date plot, right where the sand runs out. Been creeping closer every year — the sand, not the dates.",
       'He loses a row a decade and plants another one behind it. Slowest argument in the country.',
     ],
+    // The shared card is about the Liwa oases, which are 300km south of here.
+    info: {
+      title: 'The Date Plot',
+      body:
+        'Smallholdings like this one edge the sand all along the inland road, watered now ' +
+        'from a well and a pump rather than a falaj. Date palms tolerate salt and heat ' +
+        'that almost nothing else will, which is why they mark the last cultivable ground ' +
+        'before the dunes take over.',
+      photo: undefined,
+      credit: undefined,
+    },
   },
   {
     id: 'cameltrack',
@@ -88,6 +110,17 @@ export const BADAYER_POIS: Poi[] = [
       'Those carry to the whole valley. First thing anyone built out here, and the only thing still doing its job.',
       "When the sand gets over the access track they call me before they call the electricity people. I don't know why either.",
     ],
+    // The shared card is Liwa's: a dry 1960s oil survey. These towers are live.
+    info: {
+      title: 'The Transmission Line',
+      body:
+        'Power reached the inland villages decades after the coast, and the lines were ' +
+        'run straight across open sand because there was nothing to route around. ' +
+        'Crews still grade the access tracks clear each season — the dunes here move ' +
+        'far enough in a year to bury one.',
+      photo: undefined,
+      credit: undefined,
+    },
   },
   {
     id: 'falconry',

@@ -56,9 +56,10 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
   pylons: {
     title: 'The Oil Surveys',
     body:
-      'Mid-century oil exploration crews mapped these deserts stake by stake. The first ' +
-      'exports left Abu Dhabi in 1962 and transformed the Emirates within a generation — ' +
-      'though plenty of surveyed patches, like this one, gave nothing back.',
+      'Mid-century oil exploration crews mapped these deserts stake by stake, and strung ' +
+      'power out to the camps and rigs they expected to follow. The first exports left ' +
+      'Abu Dhabi in 1962 and transformed the Emirates within a generation — but plenty of ' +
+      'surveyed patches gave nothing back, and the line to this one was never switched on.',
     photo: '/photos/pylons.jpg',
     credit: 'https://emiratitimes.com/a-brief-history-of-oil-in-the-united-arab-emirates/'
   },

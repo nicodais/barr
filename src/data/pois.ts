@@ -21,6 +21,8 @@
  * them as consecutive beats — usually "what it is", then "why it matters" — so a
  * spot can carry its meaning while every individual line stays a one-liner (§13).
  */
+import type { PoiInfo } from './poiInfo';
+
 export type PoiKind =
   | 'falaj'
   | 'ghaf'
@@ -46,6 +48,21 @@ export interface Poi {
   radius: number;
   /** Ordered beats for this spot — played in sequence, never interchangeable (§13). */
   lines: string[];
+  /**
+   * Overrides for the arrival card, merged over the per-kind entry in
+   * POI_INFO.
+   *
+   * The card is keyed by *kind*, which is right for the encyclopaedic ones — a
+   * ghaf tree is a ghaf tree in any emirate, and "The Ghaf Tree" is a better
+   * card title than whatever the local place is called. It stops being right
+   * when a region reuses a kind for something that is factually a different
+   * thing: Al Badayer's pylons carry live power where Liwa's are the leavings
+   * of a dry oil survey, and Big Red is not Tal Moreeb.
+   *
+   * Only set this where the shared card would state something untrue about
+   * this particular spot.
+   */
+  info?: Partial<PoiInfo>;
 }
 
 export const LIWA_POIS: Poi[] = [
