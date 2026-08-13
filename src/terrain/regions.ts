@@ -330,6 +330,8 @@ const FOSSIL_ROCK: RegionSpec = {
     teastand: { lengthR: 4.5, widthR: 4.5, angle: 0 },
     fossilbed: { lengthR: 12, widthR: 9, angle: 0.7 },
     tomb: { lengthR: 9, widthR: 9, angle: 0 },
+    cameltrack: { lengthR: 42, widthR: 8, angle: 0 },
+    falconry: { lengthR: 8, widthR: 6, angle: 0 },
   },
   // The gravel plains here carry noticeably more scrub than deep sand does.
   scatterBias: 1.45,

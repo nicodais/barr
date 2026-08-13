@@ -6,10 +6,10 @@ numbers are given where they exist, and where something is unverified it says so
 
 Sizes are rough: **S** = an afternoon, **M** = a day or two, **L** = a week-ish.
 
-**Status: 13 of 20 done.** Items marked ✅ have shipped; the notes under them
+**Status: 17 of 20 done.** Items marked ✅ have shipped; the notes under them
 record what the work actually found, which in three cases was not what the item
-predicted. Two items are blocked on a decision rather than on effort, one needs
-hardware nobody here has, and three are large.
+predicted. Both items that were blocked on a decision have since been decided and built.
+One item needs hardware nobody here has; two are large and remain open.
 
 ---
 
@@ -132,23 +132,48 @@ system §2 calls the core value. Worth doing only if more vehicles are the plan.
 
 ## 4. World and content
 
-### 13. A third region — **M**
+### 13. ✅ A third region — **M**
 
-`RegionSpec` made another map a data file, and that work is done and proven
-(digest `1257698436` confirmed the refactor was behaviour-identical). Al Badayer's
-bowl or the deep Empty Quarter would both drive unlike Liwa and Fossil Rock.
+*Done:* Al Badayer — "Big Red", the busy one. The first two regions cover scale
+and contrast; neither is *busy*, and busy is what dune bashing here actually
+looks like. A 96m wavelength against Liwa's 165, a field floor of 0.52 against
+Fossil Rock's 0.12, and the reddest palette of the three. Big Red measures
+93.5m over the floor 250m north of it, and a straight 900m line crosses seven
+crests — one every ~129m, where Liwa lets you hold a line for a kilometre.
 
-### 14. More POIs, and more per region — **M**
+One honest caveat: the rim is meant to close the bowl so every bearing out of
+the centre runs uphill, and it does not fully. Four arcs left the diagonals
+open at 8 of 12 bearings; four corner segments brought it to 7 of 12 with a
+6.6m mean rise. Dune noise on this field is ±24m, which swamps that signal, so
+the view from the floor reads as enclosed but the number won't support more.
 
-Liwa has 11, Fossil Rock fewer. §5 called for 7 as a v1 target and the world has
-outgrown that. The rebuilt five set a quality bar the rest should meet.
+### 14. ✅ More POIs, and more per region — **M**
 
-### 15. Daytime world traffic — **M, needs a decision first**
+*Done:* Fossil Rock 7 → 10, and Al Badayer ships with 9. Liwa stays at 11. The
+three Fossil Rock additions are all sited off the massif — the rock already had
+two and the drive out to the plain had no reason on it.
 
-The night convoys work and the day has nothing equivalent. A distant dust plume
-tracking along a ridge would cost about what the convoys did. Deliberately
-declined once already — the counter-argument is that it competes with the
-solitude §1 is built on. **This needs a call before it needs code.**
+Badayer's set is about *people* where Liwa's is about emptiness and Fossil
+Rock's is about deep time: the roadside stand that is actually open, a weekend
+majlis that has been the same family for eleven years, a fire still warm from
+four hours ago.
+
+### 15. ✅ Daytime world traffic — **M**
+
+*Done, and decided to build it properly.* At night the readable thing is the
+lamp; in daylight it is the dust. So the vehicle is true scale and effectively
+invisible, and a plume of camera-facing puffs is what you actually see. Route
+maths is now shared with the convoys rather than duplicated.
+
+Two bugs worth remembering. Per-instance colour cannot carry opacity — three's
+`instanceColor` is RGB — so scaling colour under normal blending renders dark
+discs rather than thin dust; the puffs carry a real alpha attribute now. And
+the haze term was a linear scale where it needed a threshold: Liwa's baseline
+haze sits near 0.5 on a clear day, so every plume was permanently at half
+strength and measured 0.137 alpha on screen.
+
+Against §1, placement does the restraint: every route is outside the POI ring,
+nothing is audible, and from eye level a dune usually hides them.
 
 ### 16. ✅ Ahmed reacting to more state — **S**
 
@@ -184,12 +209,22 @@ at all on the low tier, where `shadows: false`, which is what `detectTier` gives
 most phones. Anything instanced and animated added later needs the same depth
 material; there is no warning when it's missing, only a shadow that doesn't move.
 
-### 18. Flat-shading quilts on low-relief ground — **M, needs a decision first**
+### 18. ✅ Flat-shading quilts on low-relief ground — **M, and the premise was wrong**
 
-At grazing angles on flat ground the 2m render grid shows as a patchwork.
-Measured: face normals there genuinely span 0–29°, so this is the art direction
-meeting the LOD resolution rather than a shading bug. A smoothing-angle rule
-would fix it and is **a real art call** — §4 says flat-shaded stays flat-shaded.
+Reading pixels out of the GL buffer settled it: near the camera there is **no
+quilt at all** — 0.0 hard steps per 1000px at every sun angle on every patch
+under 5m of relief. The existing pan blend was already handling it. The
+0–29° figure recorded in this item was a measurement of the *geometry*, and the
+shader removed the visual consequence before it reached a pixel.
+
+It does show at distance, where LOD coarsens the grid: 3.7 steps per 1000px at
+90m on the flattest ground, 6.5 at 300m.
+
+*Done:* the gate now reads the analytic normal rather than the face normal —
+face tilt can't tell quad noise on a pan from a genuine slope, the height field
+can. The 3m-relief patch goes 1.8 → 1.1 steps at 90m and 2.4 → 0.6 at 300m; the
+16m dune face is unchanged at the ranges you drive at, so §4's faceting is
+intact.
 
 ### 19. ✅ The 11.8MB score — **S, and the premise was wrong**
 
