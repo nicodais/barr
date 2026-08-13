@@ -412,8 +412,15 @@ const BADAYER: RegionSpec = {
   // being climbable, not for being the tallest thing in the country, and a
   // wide crown is what lets a queue of vehicles sit on top of it.
   greatDune: {
-    x: 40,
-    z: -120,
+    // Well clear of the origin, and that distance is load-bearing. At (40,-120)
+    // the spawn landed on Big Red's climb face at 64m and a 31 degree slope,
+    // which crashed the region outright. The spawn pan now flattens the whole
+    // field rather than only the dune field, so that can no longer NaN — but a
+    // 75m disc scooped out of the dune's toe to achieve it would look exactly
+    // as wrong as it sounds. Keeping the dune off the spawn is the real fix;
+    // the pan is the backstop.
+    x: 150,
+    z: -340,
     bearing: (100 * Math.PI) / 180,
     crestR: 240,
     height: 86,

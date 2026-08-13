@@ -678,10 +678,8 @@ function duneGroundAt(x: number, z: number): number {
 
   h += sculpted;
 
-  // A small firm pan at spawn keeps baseline handling judgeable on the flat,
-  // but it stays tight — a wide featureless apron is a poor first impression of
-  // a world that's supposed to read as dunes.
-  h *= smoothstep(18, 75, Math.hypot(x, z));
+  // The spawn pan used to be applied here. It is applied to the *whole* field
+  // in `rawHeightAt` instead — see the note there.
 
   // No rim wall: the dune field runs on procedurally in every direction so the
   // horizon reads as endless. The curated region is bounded instead by a soft
@@ -695,7 +693,30 @@ function rawHeightAt(x: number, z: number): number {
   const ground = duneGroundAt(x, z) + moreebAt(x, z).h;
   // Rock is a maximum, not a sum — see massifAt. Sand piles against the jebel;
   // it does not lift it.
-  return D.massif ? Math.max(ground, massifAt(x, z).h) : ground;
+  const full = D.massif ? Math.max(ground, massifAt(x, z).h) : ground;
+
+  /*
+   * A small firm pan at spawn keeps baseline handling judgeable on the flat,
+   * and it stays tight — a wide featureless apron is a poor first impression of
+   * a world that is supposed to read as dunes.
+   *
+   * It multiplies the *whole* field, and that placement is the fix for a real
+   * crash rather than a tidy-up. This used to sit inside `duneGroundAt`, which
+   * meant it flattened the dune field and nothing else: the great dune and the
+   * massif are both combined in afterwards, so either one placed near the
+   * origin would stand up through a pan that was supposed to be level ground.
+   *
+   * Al Badayer put Big Red 127m from the origin and the spawn landed on a 31°
+   * face, 64m up. The truck was created there, the first `world.step()` returned
+   * a NaN position, every downstream system inherited it, terrain streaming
+   * never started because it keys off the player position, and the region was
+   * simply a blue screen with an audio error repeating every frame. Nothing in
+   * the region data was wrong — this was.
+   *
+   * Every region assumes the spawn is level. Now every region gets that,
+   * whatever it places at the origin.
+   */
+  return full * smoothstep(18, 75, Math.hypot(x, z));
 }
 
 // --- POI ground pads ----------------------------------------------------------

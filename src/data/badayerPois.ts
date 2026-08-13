@@ -19,7 +19,8 @@ export const BADAYER_POIS: Poi[] = [
   {
     id: 'famousdune',
     name: 'Big Red',
-    x: 40, z: -120, radius: 110,
+    // Tracks the great dune in regions.ts — these two must not drift apart.
+    x: 150, z: -340, radius: 110,
     lines: [
       "There it is. Every 4x4 in the country has been up that, and about a third of them came back down sideways.",
       "You'll get up it. Everyone does eventually. It's the coming down people misjudge.",
