@@ -1,6 +1,7 @@
 import type { Poi, PoiKind } from '../data/pois';
 import { LIWA_POIS } from '../data/pois';
 import { FOSSIL_ROCK_POIS } from '../data/fossilRockPois';
+import { BADAYER_POIS } from '../data/badayerPois';
 
 /**
  * The places you can drive.
@@ -166,7 +167,7 @@ export interface RegionSpec {
   gravelAmount: number;
 }
 
-export type RegionId = 'liwa' | 'fossilrock';
+export type RegionId = 'liwa' | 'fossilrock' | 'badayer';
 
 /**
  * Liwa, around Tal Moreeb. Deep sand sea: no rock anywhere, because an outcrop
@@ -338,12 +339,131 @@ const FOSSIL_ROCK: RegionSpec = {
   gravelAmount: 0.72,
 };
 
+/**
+ * Al Badayer — "Big Red", on the Dubai–Hatta road.
+ *
+ * The third region exists to cover the axis the first two miss. Liwa is scale:
+ * one enormous dune and nothing else for kilometres. Fossil Rock is contrast:
+ * rock against sand, firm ground, an obstacle. Neither of them is *busy*, and
+ * busy is what dune bashing in the UAE actually looks like — an hour from the
+ * city, a petrol station at the entrance, tyre tracks over every face by nine
+ * in the morning.
+ *
+ * So this is the dense one. Tight dune trains close together, almost no open
+ * ground between them, and the reddest sand of the three — Badayer's iron
+ * content is the whole reason the place is called Big Red. There is no massif
+ * and no far horizon: the rim ridges close the bowl in, and what you can see
+ * from anywhere in it is more dunes.
+ *
+ * It drives shortest-period of the three. Liwa lets you carry speed for a
+ * kilometre; here a crest arrives every hundred metres and the game becomes
+ * reading the next one rather than committing to a long line.
+ */
+const BADAYER: RegionSpec = {
+  id: 'badayer',
+  name: 'Al Badayer',
+  where: 'Big Red, Dubai–Hatta road, Sharjah',
+  blurb: 'The busy one. Steep red bowls, a crest every hundred metres, no horizon to speak of.',
+
+  // Badayer's trains run much closer to N-S than Liwa's WNW-ESE, banked along
+  // the road rather than across the open sand sea.
+  crestBearing: (18 * Math.PI) / 180,
+  // The tightest of the three, and the number that does most of the work: at a
+  // 96m period you are cresting something every few seconds.
+  wavelength: 96,
+  megaWavelength: 430,
+  swell: 24,
+
+  // The highest floor of the three — this is a dune field with barely any gaps
+  // in it, which is the opposite of Fossil Rock's gravel plains at 0.12.
+  fieldFloor: 0.52,
+  fieldFreq: 0.0031,
+  fieldOffsetX: 143,
+  fieldOffsetZ: 77,
+  // Wide spread, so what open ground there is arrives as a soft bowl floor
+  // rather than as a hard edge between field and flat.
+  fieldSpread: 0.42,
+
+  sculpted: [
+    // The rim. Four long arcs set around the centre, which is as close to a
+    // ring as elliptical bumps get — enough that from the middle of the bowl
+    // every direction is uphill, which is the feeling the place is built on.
+    { x: 0, z: -620, angle: 0.1, lengthR: 460, widthR: 150, height: 58 },
+    { x: 610, z: 40, angle: 1.62, lengthR: 430, widthR: 145, height: 54 },
+    { x: -30, z: 640, angle: 0.06, lengthR: 470, widthR: 155, height: 50 },
+    { x: -600, z: -20, angle: 1.55, lengthR: 420, widthR: 140, height: 56 },
+    // And the corners. Four arcs leave the diagonals open — measured, only 8 of
+    // 12 bearings out of the centre ran uphill — so these close the ring. Lower
+    // than the main rim on purpose: a bowl with a perfectly even wall reads as
+    // a crater, and the gaps between these are the ways out.
+    { x: 430, z: -430, angle: 0.78, lengthR: 300, widthR: 120, height: 44 },
+    { x: 440, z: 440, angle: 2.36, lengthR: 300, widthR: 120, height: 41 },
+    { x: -430, z: 440, angle: 0.78, lengthR: 300, widthR: 120, height: 43 },
+    { x: -440, z: -430, angle: 2.36, lengthR: 300, widthR: 120, height: 46 },
+    // Two steep kickers on the bowl floor. Short and sharp: lips you leave the
+    // ground over rather than climbs.
+    { x: -210, z: -260, angle: 0.85, lengthR: 74, widthR: 46, height: 17 },
+    { x: 300, z: 340, angle: 2.3, lengthR: 82, widthR: 50, height: 19 },
+  ],
+
+  // Big Red itself. Lower than Tal Moreeb and far broader — it is famous for
+  // being climbable, not for being the tallest thing in the country, and a
+  // wide crown is what lets a queue of vehicles sit on top of it.
+  greatDune: {
+    x: 40,
+    z: -120,
+    bearing: (100 * Math.PI) / 180,
+    crestR: 240,
+    height: 86,
+    // A gentler grade than Liwa's on purpose: 86m over 250m is about 19
+    // degrees, which almost anything gets up with a run at it.
+    climbRun: 250,
+    slipRun: 175,
+    crown: 40,
+    taper: 0.62,
+  },
+  massif: null,
+
+  palette: {
+    // The reddest of the three, and not by a little. Badayer sand is heavily
+    // iron-stained and reads almost brick in low sun, which is the single most
+    // recognisable thing about the place.
+    sandIron: 0xa8512a,
+    sandPale: 0xbe8a5f,
+    gravel: 0x98836a,
+    sabkha: 0xcfc2ae,
+    duneCrest: 0x8d3c1c,
+    // No rock here at all; kept in range of the sand so anything that does
+    // sample it cannot print a grey hole in a red bowl.
+    rock: 0x8a7867,
+    airborne: 0xcf8a52,
+  },
+  pois: BADAYER_POIS,
+  padFootprints: {
+    teastand: { lengthR: 4.5, widthR: 4.5, angle: 0 },
+    coffeehearth: { lengthR: 3, widthR: 3, angle: 0 },
+    ghaf: { lengthR: 5, widthR: 5, angle: 0 },
+    majlis: { lengthR: 9, widthR: 9, angle: 0 },
+    falconry: { lengthR: 8, widthR: 6, angle: 0 },
+    cameltrack: { lengthR: 42, widthR: 8, angle: 0 },
+    oasis: { lengthR: 16, widthR: 14, angle: 0 },
+  },
+  // More than Liwa's deep sand, less than Mleiha's gravel plains: there is
+  // scrub along the margins here and almost none on the faces.
+  scatterBias: 1.1,
+  // Effectively none. A bowl of active dunes has nowhere for a pan to form.
+  sabkhaAmount: 0.08,
+  // Some serir shows in the hollows, but the sand is deep nearly everywhere.
+  gravelAmount: 0.28,
+};
+
 export const REGIONS: Record<RegionId, RegionSpec> = {
   liwa: LIWA,
   fossilrock: FOSSIL_ROCK,
+  badayer: BADAYER,
 };
 
-export const REGION_ORDER: RegionId[] = ['liwa', 'fossilrock'];
+export const REGION_ORDER: RegionId[] = ['liwa', 'fossilrock', 'badayer'];
 
 let active: RegionSpec = LIWA;
 

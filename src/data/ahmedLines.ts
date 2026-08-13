@@ -229,4 +229,9 @@ export const AHMED_REGION_LINES: Record<RegionId, string[]> = {
     'Harder ground, tighter lines. You can actually carry speed out here — so people do.',
     'Red sand up against limestone. Very pretty. Very unforgiving on a rim.',
   ],
+  badayer: [
+    "Badayer. Everyone's first desert and half of them never go anywhere else.",
+    'Crest every hundred metres here. Stop looking at the one you are on, habibi.',
+    "Busiest sand in the country. If you get stuck, somebody will see it. That is the real risk.",
+  ],
 };

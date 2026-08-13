@@ -134,9 +134,67 @@ const FOSSIL_ROCK_ROUTES: Route[] = [
   },
 ];
 
+/**
+ * Badayer's tracks are the busiest of the three, because Badayer is the busiest
+ * of the three. Everything converges on Big Red from the road side, which is
+ * the honest shape of a place a hundred vehicles a weekend drive to.
+ */
+const BADAYER_ROUTES: Route[] = [
+  // In off the Hatta road, past the stand, straight at the big dune. Braided
+  // hard: nobody follows anybody's line exactly, and everybody goes the same way.
+  {
+    points: [
+      { x: -640, z: 380 },
+      { x: -470, z: 300 },
+      { x: -330, z: 215 },
+      { x: -190, z: 110 },
+      { x: -70, z: -20 },
+      { x: 20, z: -105 },
+    ],
+    traffic: 1,
+    braid: 6,
+    braidSpread: 11,
+  },
+  // The climb line up Big Red's western flank, and the mess at the top of it.
+  {
+    points: [
+      { x: 20, z: -105 },
+      { x: 60, z: -145 },
+      { x: 105, z: -190 },
+    ],
+    traffic: 1,
+    braid: 7,
+    braidSpread: 9,
+  },
+  // Off toward the weekend camp, for the people who came to sit rather than
+  // to drive. Quieter, and a single line rather than a braid.
+  {
+    points: [
+      { x: -70, z: -20 },
+      { x: 130, z: -110 },
+      { x: 300, z: -220 },
+      { x: 410, z: -292 },
+    ],
+    traffic: 0.55,
+  },
+  // The loop back out around the northern rim.
+  {
+    points: [
+      { x: 105, z: -190 },
+      { x: 250, z: 60 },
+      { x: 300, z: 250 },
+      { x: 245, z: 450 },
+    ],
+    traffic: 0.5,
+    braid: 3,
+    braidSpread: 7,
+  },
+];
+
 const ROUTES_BY_REGION: Record<RegionId, Route[]> = {
   liwa: LIWA_ROUTES,
   fossilrock: FOSSIL_ROCK_ROUTES,
+  badayer: BADAYER_ROUTES,
 };
 
 const VERTEX = /* glsl */ `
