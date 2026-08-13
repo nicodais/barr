@@ -16,6 +16,48 @@ export type JoystickPosition = 'left' | 'middle' | 'right';
 const STICK_RADIUS = 62;
 const WHEEL_MAX_ANGLE = Math.PI * 0.62;
 
+/**
+ * Inline SVG rather than glyphs.
+ *
+ * The buttons started as `◉` and `↺`, which is fine until you look at them on a
+ * real device: those are font characters, so they render as whatever the
+ * platform decides — different weights on iOS and Android, sometimes a colour
+ * emoji, occasionally a tofu box. Drawn paths are the same everywhere and they
+ * inherit `currentColor`, so the pressed state comes for free.
+ */
+const CAMERA_SVG =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"' +
+  ' stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+  // Body, with the little bump over the lens that says "camera" faster than
+  // the rest of the shape does.
+  '<path d="M3 8.5h3.2l1.5-2.2h8.6l1.5 2.2H21a1 1 0 0 1 1 1v8.3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1Z"/>' +
+  '<circle cx="12" cy="13.4" r="3.6"/>' +
+  '</svg>';
+
+/**
+ * A brake pedal, seen from the side: pivot, arm, and the rubber pad.
+ *
+ * Two attempts at detail were thrown away before this. Ribs across the pad
+ * crossed its edges and stuck out the far side, which at 34px reads as a garden
+ * rake; outlining the pad instead left a 5-unit box that was mostly its own
+ * 2-unit stroke. A filled silhouette with a short arm is what survives being
+ * shrunk — and the pad has to be the dominant shape, or the glyph reads as a
+ * golf club.
+ */
+const BRAKE_PEDAL_SVG =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"' +
+  ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<circle cx="16.8" cy="4.4" r="1.6" fill="currentColor" stroke="none"/>' +
+  // Short arm, wide pad. A long arm and a small pad reads as a golf club; the
+  // pedal has to be the dominant shape for the glyph to land.
+  '<path d="M16.3 6 11.6 13.4" stroke-width="2.3"/>' +
+  // Solid, not outlined. At 34px a 5-unit-tall stroked box is mostly its own
+  // stroke, and the ribs inside it turned to mush — the pad has to be a filled
+  // silhouette to read as a pedal at this size rather than as a wire rectangle.
+  '<rect x="2.2" y="13.6" width="15" height="6.2" rx="2.6"' +
+  ' fill="currentColor" stroke="none" transform="rotate(-14 9.7 16.7)"/>' +
+  '</svg>';
+
 export class TouchSource implements InputSource {
   readonly id = 'touch';
   readonly element: HTMLElement;
@@ -38,6 +80,7 @@ export class TouchSource implements InputSource {
   private throttlePad: HTMLElement;
   private brakePad: HTMLElement;
   private actions: HTMLElement;
+  private topLeft: HTMLElement;
   private handPad: HTMLElement;
 
   private stickTouch: number | null = null;
@@ -84,18 +127,27 @@ export class TouchSource implements InputSource {
     this.brakePad.textContent = 'STOP';
     this.pedals.append(this.brakePad, this.throttlePad);
 
-    // Opposite thumb from the stick. Everything here was keyboard-only until
-    // now: Space, R and P have no touch equivalent, which quietly made the
-    // handbrake, the unstick and the whole of photo mode desktop features.
+    // The handbrake sits under the thumb opposite the stick, because it is held
+    // rather than tapped and wants to be where a thumb already rests.
     this.actions = div('touch-actions');
-    this.handPad = button('touch-action touch-action-hand', 'HOLD', 'Handbrake');
-    const resetPad = button('touch-action', '↺', 'Reset the truck');
-    const photoPad = button('touch-action', '◉', 'Photo mode');
-    resetPad.addEventListener('click', () => this.onReset?.());
-    photoPad.addEventListener('click', () => this.onPhoto?.());
-    this.actions.append(photoPad, resetPad, this.handPad);
+    this.handPad = button('touch-action touch-action-hand', '', 'Handbrake');
+    this.handPad.innerHTML = BRAKE_PEDAL_SVG;
+    this.actions.append(this.handPad);
 
-    this.element.append(this.stickZone, this.wheel, this.pedals, this.actions);
+    // Photo and reset are deliberately *not* down there with it. Both are
+    // deliberate, occasional taps, and putting a one-shot next to a control you
+    // grab in a hurry is how you take a photograph while trying to stop. Top
+    // left is the one corner nothing else claims — the menu owns top right and
+    // the speed readout owns the bottom.
+    this.topLeft = div('touch-topleft');
+    const photoPad = button('touch-chip touch-chip-icon', '', 'Photo mode');
+    photoPad.innerHTML = CAMERA_SVG;
+    const resetPad = button('touch-chip', 'RESET', 'Reset the truck');
+    photoPad.addEventListener('click', () => this.onPhoto?.());
+    resetPad.addEventListener('click', () => this.onReset?.());
+    this.topLeft.append(photoPad, resetPad);
+
+    this.element.append(this.stickZone, this.wheel, this.pedals, this.actions, this.topLeft);
     this.bind();
     this.applyScheme();
   }

@@ -149,16 +149,19 @@ body.photo-mode #help {
 .touch-stick-zone,
 .touch-wheel,
 .touch-pedals,
-.touch-actions {
+.touch-actions,
+.touch-topleft {
   position: absolute;
   pointer-events: auto;
   touch-action: none;
 }
 
 /*
- * Handbrake, reset and photo — the three things a phone could not do at all.
- * Stacked rather than in a row so the handbrake sits lowest, under a resting
- * thumb; the two taps you reach for deliberately sit above it.
+ * The handbrake, alone, under the thumb opposite the stick.
+ *
+ * Photo and reset used to be stacked above it here. They are one-shot taps and
+ * this is a control you grab in a hurry, and a tap target next to it is how you
+ * take a photograph while trying to stop — so they moved to the top left.
  */
 .touch-actions {
   right: calc(20px + env(safe-area-inset-right));
@@ -192,18 +195,71 @@ body.photo-mode #help {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Held, not tapped — bigger, and labelled with the verb rather than a glyph. */
+/* Held, not tapped, so it is the biggest target on the screen. */
 .touch-action-hand {
   width: 76px;
   height: 76px;
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.1em;
   border-color: rgba(255, 224, 190, 0.3);
+}
+
+.touch-action-hand svg {
+  width: 40px;
+  height: 40px;
 }
 
 .touch-action.touch-pedal-down {
   background: rgba(240, 168, 96, 0.5);
+  border-color: rgba(255, 236, 214, 0.5);
+}
+
+/*
+ * Photo and reset, top left — the one corner nothing else claims. The menu owns
+ * top right, the compass the top centre, the speed readout the bottom left.
+ * A row rather than a stack: two items is not a list, and side by side keeps
+ * them out of the POI card's way (which is nudged down to suit, below).
+ */
+.touch-topleft {
+  top: calc(10px + env(safe-area-inset-top));
+  left: calc(10px + env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.touch-chip {
+  height: 42px;
+  padding: 0 14px;
+  display: grid;
+  place-content: center;
+  border-radius: 11px;
+  border: 1px solid var(--panel-line);
+  background: rgba(30, 22, 17, 0.72);
+  backdrop-filter: blur(8px);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Square, so the camera sits in the same 42px block the word RESET does. */
+.touch-chip-icon {
+  width: 42px;
+  padding: 0;
+}
+
+.touch-chip svg {
+  width: 21px;
+  height: 21px;
+  color: var(--accent);
+}
+
+.touch-chip:active {
+  background: rgba(240, 168, 96, 0.42);
   border-color: rgba(255, 236, 214, 0.5);
 }
 
@@ -740,6 +796,18 @@ body.high-contrast .radio {
 .poi-card.poi-card-show {
   opacity: 1;
   transform: none;
+}
+
+/*
+ * Tablets only. The photo/reset row now occupies the top-left corner on touch,
+ * and this is the one layout where the card is still anchored up there — on a
+ * phone (max-width 720px, below) it has already moved to the bottom, and on a
+ * keyboard the row doesn't exist at all.
+ */
+@media (pointer: coarse) and (min-width: 721px) {
+  .poi-card {
+    top: 62px;
+  }
 }
 
 /* The one interactive element in the HUD. `#ui > .poi-card` forces the card
@@ -1815,4 +1883,34 @@ body.high-contrast .radio {
   border-color: var(--accent);
   background: rgba(224, 154, 100, 0.18);
   color: var(--accent);
+}
+
+/*
+ * Room for the photo/reset row.
+ *
+ * The top strip on a phone was compass, then speed, then Ahmed's frame, all
+ * centred and starting 6px down. The compass alone spans 82–330px on a 412px
+ * screen, and the new row runs 10–136px, so they overlapped by 54px — the tape
+ * ran underneath the RESET chip.
+ *
+ * Everything centred moves down one row rather than the row moving or the tape
+ * narrowing. A heading tape whose centre is your heading wants to stay on the
+ * screen's centre line, and at the width needed to clear the chips (under
+ * 124px) it would have stopped being readable.
+ *
+ * Coarse pointers only: a narrow desktop window has no touch layer and so has
+ * nothing to make room for.
+ */
+@media (pointer: coarse) and (max-width: 720px) {
+  .compass {
+    top: calc(58px + env(safe-area-inset-top));
+  }
+
+  .hud {
+    top: calc(86px + env(safe-area-inset-top));
+  }
+
+  .radio {
+    top: calc(142px + env(safe-area-inset-top));
+  }
 }
