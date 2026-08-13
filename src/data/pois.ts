@@ -28,6 +28,12 @@ export type PoiKind =
   | 'ghaf'
   | 'watchtower'
   | 'majlis'
+  // Two different things that both happen to be steel in the sand, and which
+  // were one kind until the card started lying about one of them: `oilwell` is
+  // a dry 1960s exploration well — a derrick over a plugged hole — and `pylons`
+  // is a live transmission line. Sharing a kind meant sharing a landmark, so
+  // Liwa's oil survey was built out of power pylons and strung with cable.
+  | 'oilwell'
   | 'pylons'
   | 'teastand'
   | 'famousdune'
@@ -55,9 +61,14 @@ export interface Poi {
    * The card is keyed by *kind*, which is right for the encyclopaedic ones — a
    * ghaf tree is a ghaf tree in any emirate, and "The Ghaf Tree" is a better
    * card title than whatever the local place is called. It stops being right
-   * when a region reuses a kind for something that is factually a different
-   * thing: Al Badayer's pylons carry live power where Liwa's are the leavings
-   * of a dry oil survey, and Big Red is not Tal Moreeb.
+   * when a region reuses a kind for a spot the shared text does not describe:
+   * Big Red is not Tal Moreeb, and Fossil Rock's Ramp is not a famous dune at
+   * all, it is the one climbable line up a jebel.
+   *
+   * Where two regions' spots are factually *different things* rather than
+   * differently-named examples of one thing, they get different kinds instead —
+   * an override cannot fix the landmark that gets built, only the words next to
+   * it. That is why the dry well and the power line are no longer one kind.
    *
    * Only set this where the shared card would state something untrue about
    * this particular spot.
@@ -103,12 +114,12 @@ export const LIWA_POIS: Poi[] = [
     ],
   },
   {
-    id: 'pylons',
-    name: 'The Survey Pylons',
+    id: 'oilwell',
+    name: 'The Dry Well',
     x: 660, z: -640, radius: 85,
     lines: [
-      'Seventies oil survey. They marked the whole desert up, chasing the stuff that built the country.',
-      'This patch came up dry. Markers stayed anyway — the wealth was just somewhere else.',
+      'Old exploration well. They drilled half this desert chasing the stuff that built the country.',
+      'This one came up dry. Capped the hole and left — dragging the derrick out was more trouble than it was worth.',
     ],
   },
   {

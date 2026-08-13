@@ -8,7 +8,7 @@ import { smoothstep } from '../terrain/height';
  * damage-free and never blocks: you keep driving the whole time it fades.
  *
  * The boundary uses the max-of-axes distance (a square, matching the region's
- * shape) so a corner POI like the survey pylons never sits in the fade zone.
+ * shape) so a corner POI like Liwa's dry well never sits in the fade zone.
  */
 const FADE_START = 760;
 const FADE_FULL = 900;

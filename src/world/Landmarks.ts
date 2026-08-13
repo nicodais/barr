@@ -159,6 +159,7 @@ function buildLandmark(poi: Poi): THREE.Group {
     case 'ghaf': return buildGhafTree();
     case 'watchtower': return buildWatchtower();
     case 'majlis': return buildMajlis();
+    case 'oilwell': return buildOilWell(poi);
     case 'pylons': return buildPylons(poi);
     case 'teastand': return buildTeaStand();
     case 'famousdune': return buildFamousDune();
@@ -518,7 +519,281 @@ function buildMajlis(): THREE.Group {
 }
 
 /**
- * The survey pylons: a line of them, marching off across the dunes.
+ * The dry well: a derrick standing over the hole that finished the survey, and
+ * the capped ones it worked its way across the site drilling first.
+ *
+ * This spot used to be built out of *power pylons* — a cable-strung
+ * transmission line — while its card talked about oil exploration, which is a
+ * straightforward lie about a real industry and the one bit of UAE history this
+ * world leans on hardest. An exploration well leaves specific, recognisable
+ * things behind, and none of them carry electricity.
+ *
+ * The composition follows how wildcat drilling actually worked. A rig is not
+ * infrastructure that marches somewhere the way a pylon line does; it is a
+ * machine that sits over one hole until that hole answers, then gets skidded to
+ * the next one. So the site reads as a *centre* rather than a line: the derrick
+ * at the middle, and around it the plugged holes from earlier attempts, each
+ * one now nothing but a concrete cellar and a capped wellhead. Dry ones were
+ * abandoned exactly like this — the hole sealed, the valve stack left on top,
+ * and a marker plate so the next crew knew what was under them.
+ *
+ * The derrick standing at all is the one liberty taken, and Ahmed covers it:
+ * steel this far out was usually worth less than the diesel to drag it home.
+ *
+ * Structurally this is the same trick as the pylon line — everything hangs
+ * inside one wrapper child, so `drapeToTerrain` shifts it by zero and each
+ * structure samples its own footing height here instead. A derrick that had
+ * been draped per-mesh would have torn itself apart.
+ */
+function buildOilWell(poi: Poi): THREE.Group {
+  const g = new THREE.Group();
+  // One child, positioned at the origin: drape shifts it by zero.
+  const site = new THREE.Group();
+  g.add(site);
+
+  const baseY = heightAt(poi.x, poi.z);
+  /** Bearing the whole site is squared up to. */
+  const DIR = 0.72;
+  /** Terrain height at a site-local offset, relative to the POI's own ground. */
+  const ground = (lx: number, lz: number) => heightAt(poi.x + lx, poi.z + lz) - baseY;
+
+  const derrick = buildDerrick();
+  derrick.rotation.y = -DIR;
+  site.add(derrick);
+
+  // The earlier holes. Scattered rather than spaced on a grid: a crew steps out
+  // in the direction the geology suggests, not in a line, and three of them
+  // sitting at even intervals would put the pylon rhythm straight back.
+  for (const [hx, hz, rot] of WELLHEADS) {
+    const head = buildWellhead();
+    head.position.set(hx, ground(hx, hz), hz);
+    head.rotation.y = rot;
+    site.add(head);
+  }
+
+  // Drill pipe, racked where it was pulled out of the hole and never collected.
+  const rack = new THREE.Group();
+  rack.position.set(-11.5, ground(-11.5, 7.4), 7.4);
+  rack.rotation.y = -DIR + 0.35;
+  for (const sz of [-2.1, 2.1]) {
+    rack.add(mesh(new THREE.BoxGeometry(5.6, 0.34, 0.5), WOOD_DARK, 0, 0.17, sz));
+  }
+  for (let i = 0; i < 5; i++) {
+    const pipe = mesh(new THREE.CylinderGeometry(0.15, 0.15, 5.4, 8), RUST,
+      0, 0.49, -1.1 + i * 0.55);
+    pipe.rotation.z = Math.PI / 2;
+    rack.add(pipe);
+  }
+  site.add(rack);
+
+  // Fuel drums. The same drum turns up as a standalone discovery elsewhere in
+  // the desert (see Discoveries) — this is where that one came from.
+  for (const [dx, dz, tipped] of [
+    [8.9, 6.2, false], [10.1, 5.4, false], [9.4, 7.9, true], [-7.8, -8.6, false],
+  ] as const) {
+    const y = ground(dx, dz);
+    const drum = mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.02, 10), RUST_DARK,
+      dx, y + (tipped ? 0.42 : 0.51), dz);
+    if (tipped) drum.rotation.z = Math.PI / 2;
+    site.add(drum);
+  }
+
+  // Survey stakes, which is what the card means by "stake by stake" and what
+  // was here before any of the rest of it. Bleached tops, driven in a rough
+  // line across the site because they were set out on a traverse.
+  for (let i = 0; i < 7; i++) {
+    const sx = -26 + i * 8.5;
+    const sz = -18 + Math.sin(i * 1.9) * 6;
+    const y = ground(sx, sz);
+    site.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.92, 5), WOOD_DARK, sx, y + 0.46, sz));
+    site.add(mesh(new THREE.BoxGeometry(0.14, 0.16, 0.03), STONE_LIGHT, sx, y + 0.86, sz));
+  }
+
+  return g;
+}
+
+/**
+ * Where the plugged holes sit, in site-local metres, with the yaw of the
+ * wellhead on each. Shared with `colliderSpecs` so the thing you can see and
+ * the thing you can hit cannot drift apart.
+ */
+const WELLHEADS: Array<[number, number, number]> = [
+  [-44, 19, 0.9],
+  [31, -47, 2.4],
+  [58, 24, 5.1],
+];
+
+/**
+ * A standard derrick over its substructure.
+ *
+ * Everything here is doing one job: reading as a *drilling* rig at 300m and not
+ * as a pylon, since they are both tapered steel lattices and the silhouette is
+ * all the player gets. Three details carry that difference, and they are the
+ * three things a pylon can never have — a solid block of substructure holding
+ * the tower a storey clear of the ground, a crown block capping the top instead
+ * of a cross-arm spreading out from it, and the V-door ramp running down to the
+ * sand where pipe was dragged up to the floor.
+ */
+function buildDerrick(): THREE.Group {
+  const t = new THREE.Group();
+  /** Height of the drill floor above grade, and of the tower above that. */
+  const SUB = 3.3;
+  const H = 14.6;
+  const subR = 2.15;
+
+  // Concrete cellar slab: the one part of a well site that outlasts everything
+  // and the reason the plugged holes elsewhere are still findable.
+  t.add(mesh(new THREE.BoxGeometry(5.6, 0.3, 5.6), STONE_LIGHT, 0, 0.15, 0));
+
+  // Substructure: four heavy posts, cross-braced, carrying the floor.
+  for (const [sx, sz] of CORNERS) {
+    strutBetween(t, RUST, [sx * subR, 0.2, sz * subR], [sx * subR, SUB, sz * subR], 0.17);
+  }
+  for (const [ax, az, bx, bz] of FACES) {
+    strutBetween(t, RUST_DARK,
+      [ax * subR, 0.2, az * subR], [bx * subR, SUB, bz * subR], 0.07);
+  }
+  t.add(mesh(new THREE.BoxGeometry(4.8, 0.24, 4.8), RUST_DARK, 0, SUB, 0));
+  // Rotary table, dead centre of the floor and directly over the hole.
+  t.add(mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.26, 12), METAL, 0, SUB + 0.24, 0));
+
+  // The tower itself, rising from the floor rather than from the sand.
+  latticeBody(t, SUB, H, 1.72, 0.6, 0.12, 0.055, 2.4);
+
+  // Crown block: a boxed platform with the sheaves the drilling line ran over.
+  // Flat and heavy on top, which is exactly what a pylon's cross-arm is not.
+  const top = SUB + H;
+  t.add(mesh(new THREE.BoxGeometry(1.9, 0.18, 1.9), RUST, 0, top, 0));
+  for (const side of [-1, 1]) {
+    const sheave = mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.16, 10), METAL,
+      0, top + 0.5, side * 0.34);
+    sheave.rotation.z = Math.PI / 2;
+    t.add(sheave);
+  }
+  t.add(mesh(new THREE.BoxGeometry(1.5, 0.14, 1.5), RUST_DARK, 0, top + 0.82, 0));
+
+  // Ladder up the north face, following the taper the way a real one does
+  // rather than standing off it vertically.
+  const ladderR = (y: number) => 1.72 + (0.6 - 1.72) * ((y - SUB) / H) + 0.14;
+  for (const side of [-1, 1]) {
+    strutBetween(t, RUST_DARK,
+      [side * 0.3, SUB, ladderR(SUB)], [side * 0.3, top, ladderR(top)], 0.035);
+  }
+  for (let y = SUB + 0.7; y < top - 0.4; y += 0.82) {
+    t.add(mesh(new THREE.BoxGeometry(0.6, 0.05, 0.05), RUST_DARK, 0, y, ladderR(y)));
+  }
+
+  // V-door ramp: pipe was dragged up this from the rack to the floor, and it is
+  // the detail that says "this thing made a hole" more than any other.
+  for (const side of [-1, 1]) {
+    strutBetween(t, RUST,
+      [side * 0.85, 0.1, 7.6], [side * 0.85, SUB - 0.1, 2.3], 0.09);
+  }
+  for (let i = 0; i <= 4; i++) {
+    const f = i / 4;
+    t.add(mesh(new THREE.BoxGeometry(1.9, 0.07, 0.22), RUST_DARK,
+      0, 0.14 + (SUB - 0.2) * f, 7.6 - 5.3 * f));
+  }
+
+  // Drawworks shed on its skid, alongside. Engine noise lived in here.
+  t.add(mesh(new THREE.BoxGeometry(2.7, 1.9, 3.6), RUST_DARK, 5.1, 0.95, -1.2));
+  t.add(mesh(new THREE.BoxGeometry(3.0, 0.16, 3.9), RUST, 5.1, 1.98, -1.2));
+  t.add(mesh(new THREE.CylinderGeometry(0.13, 0.13, 1.3, 6), METAL, 6.1, 2.6, -2.5));
+
+  // Mud pit: a shallow bunded rectangle, dry for fifty years.
+  for (const [ox, oz, lx, lz] of [
+    [-6.4, 2.0, 0.3, 2.4], [-6.4, -2.0, 0.3, 2.4],
+    [-4.6, 0, 2.2, 0.3], [-8.2, 0, 2.2, 0.3],
+  ] as const) {
+    t.add(mesh(new THREE.BoxGeometry(lx * 2, 0.5, lz * 2), STONE_LIGHT, ox - 1.4, 0.25, oz));
+  }
+
+  return t;
+}
+
+/**
+ * A plugged and abandoned wellhead: cellar slab, casing stub, valve stack.
+ *
+ * Small, and deliberately so. The whole point of a dry hole is that there is
+ * almost nothing to show for it — you find these by driving over the concrete
+ * before you see the steel, which is a better arrival than a landmark that
+ * announces itself from the next dune.
+ */
+function buildWellhead(): THREE.Group {
+  const w = new THREE.Group();
+
+  w.add(mesh(new THREE.BoxGeometry(2.3, 0.26, 2.3), STONE_LIGHT, 0, 0.13, 0));
+  w.add(mesh(new THREE.CylinderGeometry(0.31, 0.34, 0.44, 10), METAL, 0, 0.46, 0));
+  // The stack: two valve bodies and a blind flange capping the top, which is
+  // what "capped" means and what is actually left on an abandoned well.
+  w.add(mesh(new THREE.BoxGeometry(0.44, 0.46, 0.44), RUST, 0, 0.9, 0));
+  w.add(mesh(new THREE.BoxGeometry(0.36, 0.34, 0.36), RUST_DARK, 0, 1.29, 0));
+  w.add(mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.13, 8), RUST, 0, 1.52, 0));
+  for (const side of [-1, 1]) {
+    const wheel = mesh(new THREE.TorusGeometry(0.2, 0.045, 5, 9), RUST_DARK,
+      side * 0.38, 0.9, 0);
+    wheel.rotation.y = Math.PI / 2;
+    w.add(wheel);
+  }
+
+  // Abandonment marker. Leaving one is a legal requirement, not set dressing.
+  w.add(mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.25, 5), WOOD_DARK, 1.05, 0.62, 0.95));
+  const plate = mesh(new THREE.BoxGeometry(0.34, 0.24, 0.04), STONE_LIGHT, 1.05, 1.22, 0.95);
+  plate.rotation.y = -0.5;
+  w.add(plate);
+
+  return w;
+}
+
+/** The four corners and the four faces of a square tower, in unit coordinates. */
+const CORNERS: ReadonlyArray<readonly [number, number]> = [
+  [-1, -1], [1, -1], [-1, 1], [1, 1],
+];
+const FACES: ReadonlyArray<readonly [number, number, number, number]> = [
+  [-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1],
+];
+
+/**
+ * The shared body of a tapered lattice tower: four leg struts, X-bracing on
+ * every face at every level, and a horizontal belt closing each level.
+ *
+ * Used by both steel structures in the world, which are different machines
+ * built the same way. An early version braced each face with a single random
+ * diagonal and the result read as a step-ladder rather than a structure; the
+ * full X is what makes a lattice look load-bearing.
+ */
+function latticeBody(
+  t: THREE.Group,
+  y0: number,
+  height: number,
+  baseR: number,
+  topR: number,
+  legR: number,
+  braceR: number,
+  levelStep: number,
+) {
+  for (const [sx, sz] of CORNERS) {
+    strutBetween(t, RUST,
+      [sx * baseR, y0, sz * baseR],
+      [sx * topR, y0 + height, sz * topR], legR);
+  }
+
+  const levels = Math.max(2, Math.round(height / levelStep));
+  for (let l = 0; l < levels; l++) {
+    const ya = y0 + (l / levels) * height;
+    const yb = y0 + ((l + 1) / levels) * height;
+    const r0 = baseR + (topR - baseR) * (l / levels);
+    const r1 = baseR + (topR - baseR) * ((l + 1) / levels);
+    for (const [ax, az, bx, bz] of FACES) {
+      strutBetween(t, RUST_DARK, [ax * r0, ya, az * r0], [bx * r1, yb, bz * r1], braceR);
+      strutBetween(t, RUST_DARK, [bx * r0, ya, bz * r0], [ax * r1, yb, az * r1], braceR);
+      strutBetween(t, RUST, [ax * r1, yb, az * r1], [bx * r1, yb, bz * r1], braceR + 0.01);
+    }
+  }
+}
+
+/**
+ * The power line: a run of towers, marching off across the dunes.
  *
  * The first version was one lattice tower with a scatter of ankle-high stakes
  * around it, and it read as abandoned scaffolding. The thing that makes a
@@ -526,6 +801,12 @@ function buildMajlis(): THREE.Group {
  * tower, it is the *repetition*: identical steel shapes stepping away over the
  * horizon with the cable sagging between them. One pylon is litter. Five is a
  * line, and a line has somewhere it came from and somewhere it is going.
+ *
+ * Every tower stands and every span is strung, because this line is live and
+ * Ahmed says so — it is the only thing out here still doing its job. (It once
+ * had a collapsed tower at the end, back when this landmark was standing in for
+ * an abandoned oil survey. That survey now has its own landmark, and a wrecked
+ * pylon on a working line would just read as a fault nobody had reported.)
  *
  * Each tower is its own sub-group so `drapeToTerrain` settles it on its own
  * ground. The cables can't be draped — a catenary that follows the dunes is not
@@ -551,24 +832,20 @@ function buildPylons(poi: Poi): THREE.Group {
     const lx = dx * SPAN * i;
     const lz = dz * SPAN * i;
     const ground = heightAt(poi.x + lx, poi.z + lz) - baseY;
-    // The far one has come down: a line that is entirely intact reads as
-    // maintained, and the whole point of these is that nobody came back.
-    const fallen = i === 2;
-    const height = fallen ? 5.5 : 12.4 + (i % 2) * 0.6;
+    const height = 12.4 + (i % 2) * 0.6;
 
-    const tower = buildPylonTower(height, fallen);
+    const tower = buildPylonTower(height);
     tower.position.set(lx, ground, lz);
-    tower.rotation.y = -DIR + (fallen ? 0.5 : 0);
-    if (fallen) tower.rotation.z = 0.62;
+    tower.rotation.y = -DIR;
     line.add(tower);
 
-    if (!fallen) tops.push([lx, ground + height, lz]);
+    tops.push([lx, ground + height, lz]);
 
-    // Concrete footings, which is all that is left where a tower is gone.
-    for (const [ox, oz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]] as const) {
+    // Concrete footings, sat proud of the sand the way a graded pad leaves them.
+    for (const [ox, oz] of CORNERS) {
       const c = Math.cos(-DIR), sn = Math.sin(-DIR);
-      const fx = lx + ox * c + oz * sn;
-      const fz = lz - ox * sn + oz * c;
+      const fx = lx + ox * 1.5 * c + oz * 1.5 * sn;
+      const fz = lz - ox * 1.5 * sn + oz * 1.5 * c;
       line.add(mesh(new THREE.BoxGeometry(0.8, 0.4, 0.8), STONE_LIGHT, fx, ground + 0.1, fz));
     }
   }
@@ -583,47 +860,18 @@ function buildPylons(poi: Poi): THREE.Group {
 }
 
 /** One lattice tower: tapered legs, X-bracing, a cross-arm at the top. */
-function buildPylonTower(height: number, stump: boolean): THREE.Group {
+function buildPylonTower(height: number): THREE.Group {
   const t = new THREE.Group();
-  const baseR = 1.5;
-  const topR = 0.62;
-  const legs: Array<[number, number]> = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
 
-  // Legs as struts from footing to shoulder, so the taper is one straight
-  // member rather than a stack of boxes stepping inward.
-  for (const [sx, sz] of legs) {
-    strutBetween(t, RUST,
-      [sx * baseR, 0, sz * baseR],
-      [sx * topR, height, sz * topR], 0.11);
-  }
+  latticeBody(t, 0, height, 1.5, 0.62, 0.11, 0.05, 2.6);
 
-  // Bracing. X on each face at every level — the first pass used single random
-  // diagonals, which is why it read as a step-ladder rather than a structure.
-  const levels = Math.max(2, Math.round(height / 2.6));
-  for (let l = 0; l < levels; l++) {
-    const y0 = (l / levels) * height;
-    const y1 = ((l + 1) / levels) * height;
-    const r0 = baseR + (topR - baseR) * (l / levels);
-    const r1 = baseR + (topR - baseR) * ((l + 1) / levels);
-    for (const [ax, az, bx, bz] of [
-      [-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1],
-    ] as const) {
-      strutBetween(t, RUST_DARK, [ax * r0, y0, az * r0], [bx * r1, y1, bz * r1], 0.05);
-      strutBetween(t, RUST_DARK, [bx * r0, y0, bz * r0], [ax * r1, y1, az * r1], 0.05);
-      // Horizontal belt closing the level.
-      strutBetween(t, RUST, [ax * r1, y1, az * r1], [bx * r1, y1, bz * r1], 0.06);
-    }
+  // Cross-arm: the silhouette that says "power line" at any distance.
+  t.add(mesh(new THREE.BoxGeometry(4.6, 0.16, 0.3), RUST, 0, height, 0));
+  for (const side of [-1, 1]) {
+    t.add(mesh(new THREE.BoxGeometry(0.12, 0.34, 0.12), DARK_STONE, side * 1.9, height - 0.24, 0));
+    strutBetween(t, RUST_DARK, [side * 2.2, height, 0], [side * 0.5, height + 1.1, 0], 0.05);
   }
-
-  if (!stump) {
-    // Cross-arm: the silhouette that says "power line" at any distance.
-    t.add(mesh(new THREE.BoxGeometry(4.6, 0.16, 0.3), RUST, 0, height, 0));
-    for (const side of [-1, 1]) {
-      t.add(mesh(new THREE.BoxGeometry(0.12, 0.34, 0.12), DARK_STONE, side * 1.9, height - 0.24, 0));
-      strutBetween(t, RUST_DARK, [side * 2.2, height, 0], [side * 0.5, height + 1.1, 0], 0.05);
-    }
-    t.add(mesh(new THREE.BoxGeometry(0.9, 0.12, 0.2), RUST, 0, height + 1.1, 0));
-  }
+  t.add(mesh(new THREE.BoxGeometry(0.9, 0.12, 0.2), RUST, 0, height + 1.1, 0));
   return t;
 }
 
@@ -1015,6 +1263,23 @@ function colliderSpecs(id: PoiKind): ColliderSpec[] {
         cyl(6.2, 3.2, -6.2, 3.2, 0.14),
         cyl(0, 0.14, 0, 0.2, 1.1),
       ];
+    case 'oilwell': {
+      const DIR = 0.72;
+      // The substructure, which is the mass the derrick stands on and the only
+      // part of it at bumper height, plus the shed on its skid beside it. The
+      // tower above is inside the same footprint, so one box covers both.
+      const specs: ColliderSpec[] = [
+        box(0, 2.2, 0, 2.4, 2.2, 2.4, -DIR),
+        box(3.6, 0.95, -4.1, 1.5, 0.95, 1.9, -DIR),
+        // The racked pipe. Low, but a stack of drill pipe is not something you
+        // drive through, and it sits where you would naturally swing round.
+        box(-11.5, 0.5, 7.4, 2.9, 0.5, 2.3, -DIR + 0.35),
+      ];
+      // Every capped hole. Knee-high and easy to miss, which is the point —
+      // clipping one should be a small surprise, not a wall.
+      for (const [hx, hz] of WELLHEADS) specs.push(cyl(hx, 0.8, hz, 0.8, 0.7));
+      return specs;
+    }
     case 'pylons': {
       // One collider per tower rather than per leg: sixteen thin boxes strung
       // over 140m of dune is a lot of geometry to catch a truck on, and a
@@ -1024,8 +1289,7 @@ function colliderSpecs(id: PoiKind): ColliderSpec[] {
       for (let i = -2; i <= 2; i++) {
         const x = Math.sin(DIR) * 34 * i;
         const z = Math.cos(DIR) * 34 * i;
-        const fallen = i === 2;
-        specs.push(box(x, fallen ? 1.2 : 6.2, z, 1.5, fallen ? 1.2 : 6.2, 1.5, -DIR));
+        specs.push(box(x, 6.2, z, 1.5, 6.2, 1.5, -DIR));
       }
       return specs;
     }

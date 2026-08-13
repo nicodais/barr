@@ -110,17 +110,9 @@ export const BADAYER_POIS: Poi[] = [
       'Those carry to the whole valley. First thing anyone built out here, and the only thing still doing its job.',
       "When the sand gets over the access track they call me before they call the electricity people. I don't know why either.",
     ],
-    // The shared card is Liwa's: a dry 1960s oil survey. These towers are live.
-    info: {
-      title: 'The Transmission Line',
-      body:
-        'Power reached the inland villages decades after the coast, and the lines were ' +
-        'run straight across open sand because there was nothing to route around. ' +
-        'Crews still grade the access tracks clear each season — the dunes here move ' +
-        'far enough in a year to bury one.',
-      photo: undefined,
-      credit: undefined,
-    },
+    // No card override: `pylons` is a transmission line and nothing else now
+    // that Liwa's dry well has its own kind, so the shared card already says
+    // the true thing.
   },
   {
     id: 'falconry',

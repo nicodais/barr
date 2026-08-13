@@ -53,15 +53,23 @@ export const POI_INFO: Record<PoiKind, PoiInfo> = {
     photo: '/photos/majlis.jpg',
     credit: 'https://www.desertsafarisdubai.com/desert-safari-with-vip-majlis-tent/'
   },
-  pylons: {
+  oilwell: {
     title: 'The Oil Surveys',
     body:
-      'Mid-century oil exploration crews mapped these deserts stake by stake, and strung ' +
-      'power out to the camps and rigs they expected to follow. The first exports left ' +
-      'Abu Dhabi in 1962 and transformed the Emirates within a generation — but plenty of ' +
-      'surveyed patches gave nothing back, and the line to this one was never switched on.',
-    photo: '/photos/pylons.jpg',
+      'Mid-century crews mapped these deserts stake by stake, then put a derrick on ' +
+      'anything that looked promising. The first exports left Abu Dhabi in 1962 and ' +
+      'transformed the Emirates within a generation — but most wildcat wells found ' +
+      'nothing, and were plugged, capped and abandoned where they stood.',
+    photo: '/photos/oilwell.jpg',
     credit: 'https://emiratitimes.com/a-brief-history-of-oil-in-the-united-arab-emirates/'
+  },
+  pylons: {
+    title: 'The Transmission Line',
+    body:
+      'Power reached the inland villages decades after the coast, and the lines were ' +
+      'run straight across open sand because there was nothing to route around. ' +
+      'Crews still grade the access tracks clear each season — the dunes here move ' +
+      'far enough in a year to bury one.',
   },
   teastand: {
     title: 'The Karak Stop',

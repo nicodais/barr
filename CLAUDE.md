@@ -71,7 +71,7 @@ This is the single most important system in the game. Everything else (art, audi
   2. **Ghaf Tree Ridge** — a lone, genuinely old ghaf tree (UAE's national tree) improbably still alive on a high ridge, the only shade for kilometers.
   3. **The Watchtower Ruin** — a crumbling old stone watchtower on a rocky outcrop, once used to watch for raiders, now just watching 4x4s get stuck.
   4. **Old Campsite Ruins** — fire-ring stones and flattened ground from a long-abandoned Bedouin camp.
-  5. **The Survey Pylons** — a scatter of 1970s-era oil-survey markers and a rusted pylon line, monument to an exploration that didn't pan out.
+  5. **The Dry Well** — a rusted exploration derrick over a plugged hole, with the capped wellheads and survey stakes of the attempts around it: monument to an exploration that didn't pan out. (Oil-field steel, explicitly *not* a power line — the two got conflated once and the card ended up describing a thing the model wasn't.)
   6. **Ahmed's Tea Stand** *(playful)* — a tiny, genuinely-in-use makeshift tea stand parked in the middle of nowhere. Turns out this is where Ahmed actually goes on break.
   7. **The Famous Dune** *(playful)* — one specific dune ridge that's inexplicably become an Instagram pilgrimage spot, tire tracks and abandoned tripods included.
   
@@ -196,7 +196,7 @@ CLAUDE.md
 - **Ghaf Tree Ridge:** "That tree's older than both of us. Don't be the reason it isn't anymore."
 - **The Watchtower Ruin:** "Old watchtower. Whoever built it had a better view than my station does."
 - **Old Campsite Ruins:** "People lived out here before air conditioning existed. Show some respect."
-- **The Survey Pylons:** "Seventies oil survey. They were wrong. Markers stayed anyway."
+- **The Dry Well:** "Old exploration well. They drilled half this desert chasing the stuff that built the country."
 - **Ahmed's Tea Stand:** "That's my actual tea stand. If I'm not on shift, I'm probably right there."
 - **The Famous Dune:** "This dune has more photos of it than my entire family. I've never understood why."
 

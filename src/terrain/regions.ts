@@ -232,9 +232,12 @@ const LIWA: RegionSpec = {
     ghaf: { lengthR: 5, widthR: 5, angle: 0 },
     watchtower: { lengthR: 11, widthR: 11, angle: 0 },
     majlis: { lengthR: 9, widthR: 9, angle: 0 },
-    // No pad: the pylon line is 140m long and each tower is sited on its own
-    // ground on purpose. Grading that flat would erase the dunes it crosses,
-    // which are most of why the line is worth looking at.
+    // A drilling location is bulldozed level before anything is put on it, so
+    // this is the one pad in the world that is historically the point rather
+    // than a concession to the geometry. Kept tight to the derrick: the capped
+    // holes scattered around the site sit on their own ground, half-buried,
+    // which is what fifty years of sand does to them.
+    oilwell: { lengthR: 13, widthR: 13, angle: 0.72 },
     teastand: { lengthR: 4.5, widthR: 4.5, angle: 0 },
     falconry: { lengthR: 8, widthR: 6, angle: 0 },
     cameltrack: { lengthR: 42, widthR: 8, angle: 0 },
