@@ -165,7 +165,10 @@ export const DEFAULT_TUNING: VehicleTuning = {
   hardpackSideGrip: 0.6,
   sandSideGrip: 0.3,
   slopeGripLoss: 0.35,
-  rearGripBias: 0.72,
+  // Raised from 0.72 with the side-grip trim. This is the dial that decides how
+  // readily the back steps out, and the bodies that slid worst were the ones
+  // rotating rather than running wide.
+  rearGripBias: 0.76,
   yawAssist: 2.4,
   maxYawRate: 1.2,
   // Grip coefficients above are dimensionless multipliers on normal load, so

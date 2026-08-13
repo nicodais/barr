@@ -13,6 +13,23 @@ import {
 
 const WHEELBASE = HALF_WHEELBASE * 2;
 
+/**
+ * Global trim on lateral grip, applied after the per-body figures.
+ *
+ * A single multiplier rather than seven edited numbers, because four bodies
+ * override `hardpackSideGrip`/`sandSideGrip` outright and three inherit the
+ * baseline — raising the baseline alone would have lifted the wagon, pickup and
+ * single cab while leaving the buggy and the bike exactly as loose as they
+ * were, which is the wrong half. Scaling at the point of use keeps every body's
+ * character and its ordering against the others intact.
+ *
+ * Measured at full lock and full throttle before and after; see the commit.
+ * §2 still wants the truck to run wide on loose sand rather than carve, so this
+ * is deliberately a trim and not a fix — the slide is the point, a corner spent
+ * permanently sideways is not.
+ */
+const SIDE_GRIP_TRIM = 1.14;
+
 export interface WheelState {
   /** Local-space wheel centre, already displaced by suspension travel. */
   x: number;
@@ -277,7 +294,8 @@ export class Vehicle {
       const rearBias = WHEEL_LAYOUT[i].steered ? 1 : t.rearGripBias;
       const grip = lerp(t.hardpackGrip, t.sandGrip, softness) * (1 - slopeLoss) * rearBias;
       const sideGrip =
-        lerp(t.hardpackSideGrip, t.sandSideGrip, softness) * (1 - slopeLoss) * rearBias;
+        lerp(t.hardpackSideGrip, t.sandSideGrip, softness) * (1 - slopeLoss)
+        * rearBias * SIDE_GRIP_TRIM;
       this.controller.setWheelFrictionSlip(i, Math.max(0.15, grip));
       this.controller.setWheelSideFrictionStiffness(i, Math.max(0.1, sideGrip));
       this.wheels[i].softness = softness;
