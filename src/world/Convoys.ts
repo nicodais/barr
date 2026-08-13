@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { heightAt } from '../terrain/height';
+import {
+  emptyRoutePoint, routeLead, routeScale, sampleRoute, type Route, type RoutePoint,
+} from './routes';
 
 /**
  * Other people, out there in the dark.
@@ -40,22 +42,6 @@ const SPACING = 19;
 /** Below this much night, they are not on the road at all. */
 const NIGHT_ON = 0.12;
 
-interface Route {
-  cx: number;
-  cz: number;
-  /** Long and short axes of the loop. Flat ellipses read as out-and-back runs
-   *  along a ridge rather than as something driving in circles. */
-  major: number;
-  minor: number;
-  /** Rotation of the long axis, radians. */
-  bearing: number;
-  count: number;
-  /** Metres per second along the path. */
-  speed: number;
-  phase: number;
-  direction: number;
-}
-
 /**
  * Three convoys, all well out toward the boundary. Nothing here is placed near
  * a POI: these are meant to be somewhere else, permanently.
@@ -90,6 +76,7 @@ export class Convoys {
   private dummy = new THREE.Object3D();
   private tint = new THREE.Color();
   private toCam = new THREE.Vector3();
+  private point: RoutePoint = emptyRoutePoint();
   private t = 0;
   /** Routes currently switched on, from the quality tier. */
   private routes = ROUTES.length;
@@ -97,7 +84,7 @@ export class Convoys {
   private static readonly MAX_VEHICLES = ROUTES.reduce((n, r) => n + r.count, 0);
 
   constructor() {
-    this.bodyGeo = buildBody();
+    this.bodyGeo = buildAnonymousBody();
     this.bodyMat = new THREE.MeshLambertMaterial({ color: 0x2b2a30, flatShading: true });
     this.bodies = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, Convoys.MAX_VEHICLES);
     this.bodies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -145,33 +132,13 @@ export class Convoys {
     let g = 0;
     for (let r = 0; r < this.routes; r++) {
       const route = ROUTES[r];
-      const cb = Math.cos(route.bearing);
-      const sb = Math.sin(route.bearing);
-      // Crude but adequate: mean radius as the circumference basis, so a fixed
-      // metre spacing can be turned into a parameter offset.
-      const mean = (route.major + route.minor) / 2;
-      const lead = route.phase + (this.t * route.speed * route.direction) / mean;
+      const mean = routeScale(route);
+      const lead = routeLead(route, this.t);
 
       for (let i = 0; i < route.count; i++) {
         const u = lead - (i * SPACING * route.direction) / mean;
-        const x = route.cx + route.major * Math.cos(u) * cb - route.minor * Math.sin(u) * sb;
-        const z = route.cz + route.major * Math.cos(u) * sb + route.minor * Math.sin(u) * cb;
-        // Heading from the analytic tangent rather than from last frame's
-        // position: a finite difference at this speed jitters the yaw enough to
-        // make the lamp facing flicker, which is the one thing that would give
-        // the whole trick away.
-        const dx = (-route.major * Math.sin(u) * cb - route.minor * Math.cos(u) * sb) * route.direction;
-        const dz = (-route.major * Math.sin(u) * sb + route.minor * Math.cos(u) * cb) * route.direction;
-        const len = Math.hypot(dx, dz) || 1;
-        const fx = dx / len;
-        const fz = dz / len;
-        const yaw = Math.atan2(fx, fz);
-
-        const y = heightAt(x, z);
-        // Pitch off the ground a wheelbase ahead, so they lean into climbs
-        // instead of shearing through crests flat.
-        const ahead = heightAt(x + fx * 2.9, z + fz * 2.9);
-        const pitch = -Math.atan2(ahead - y, 2.9);
+        const p = sampleRoute(route, u, this.point);
+        const { x, z, y, fx, fz, yaw, pitch } = p;
 
         this.dummy.position.set(x, y, z);
         this.dummy.rotation.set(pitch, yaw, 0, 'YXZ');
@@ -231,10 +198,10 @@ export class Convoys {
  * A generic 4x4 in five boxes, origin at ground level between the wheels.
  *
  * Kept anonymous on purpose. These are other people, and giving them one of the
- * player's five bodies would raise the question of which one — and then of why
- * you can't catch it.
+ * player's own bodies would raise the question of which one — and then of why
+ * you can't catch it. Shared with the daytime traffic for the same reason.
  */
-function buildBody(): THREE.BufferGeometry {
+export function buildAnonymousBody(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   const at = (g: THREE.BufferGeometry, x: number, y: number, z: number) => {
     g.translate(x, y, z);

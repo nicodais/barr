@@ -40,6 +40,7 @@ import { createOldTracks } from '../world/OldTracks';
 import { Weather } from '../world/Weather';
 import { Camels } from '../world/Camels';
 import { Convoys } from '../world/Convoys';
+import { DayTraffic } from '../world/DayTraffic';
 import { createDiscoveries } from '../world/Discoveries';
 import { airborneSand } from '../terrain/chunkGeometry';
 import { PROFILES, QualityWatchdog, detectTier, type QualityTier } from './Quality';
@@ -79,6 +80,7 @@ export class Game {
   private weather = new Weather();
   private camels = new Camels();
   private convoys = new Convoys();
+  private dayTraffic = new DayTraffic();
   private headlights = new Headlights();
   private chase: ChaseCamera;
   private input: InputManager;
@@ -218,6 +220,7 @@ export class Game {
     this.rig.scene.add(this.wildlife.group);
     this.rig.scene.add(this.camels.group);
     this.rig.scene.add(this.convoys.group);
+    this.rig.scene.add(this.dayTraffic.group);
     // Junk in the sand. No colliders — small enough that a stop would read as
     // hitting an invisible box rather than as hitting a sandal.
     this.worldProps.add(createDiscoveries());
@@ -728,6 +731,13 @@ export class Game {
     // billboards, and orienting them against last frame's camera makes them
     // visibly lag when you swing the view.
     this.convoys.update(frameDt, this.timeOfDay.state.night, this.chase.camera.position);
+    this.dayTraffic.update(
+      frameDt,
+      this.timeOfDay.state.night,
+      this.chase.camera.position,
+      this.timeOfDay.state.sunColor,
+      this.timeOfDay.state.haze,
+    );
 
     // Airborne sand: lit by the sky, but tinted by the ground it came off.
     // Without the sand term the dust reads as pale smoke against red dunes.
@@ -1004,6 +1014,7 @@ export class Game {
     this.birds.setCount(profile.birds);
     this.wildlife.setCount(profile.gazelles);
     this.convoys.setRoutes(profile.convoys);
+    this.dayTraffic.setRoutes(profile.convoys);
     this.watchdog.reset();
     this.onResize();
   }
