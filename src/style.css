@@ -1703,6 +1703,18 @@ body.high-contrast .radio {
     linear-gradient(#a99ec2 0%, #e6b48b 78%, #dda877 100%);
 }
 
+/*
+ * Badayer: a bowl, so it gets the least sky of the three and two overlapping
+ * crests rather than one horizon line. Reddest of the set, because the iron in
+ * the sand is the whole reason the place is called Big Red.
+ */
+.mapselect-art-badayer {
+  background:
+    radial-gradient(86% 128% at 76% 126%, #8e3a1d 0%, #7b3118 54%, transparent 55%),
+    radial-gradient(112% 150% at 20% 122%, #b8532a 0%, #a2451e 50%, transparent 51%),
+    linear-gradient(#a293bb 0%, #dd9e6f 58%, #c67c4b 100%);
+}
+
 .mapselect-art-fossilrock {
   background:
     linear-gradient(112deg, transparent 0 46%, #6e6a63 46% 62%, transparent 62%),

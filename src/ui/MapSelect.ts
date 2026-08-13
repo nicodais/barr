@@ -46,7 +46,11 @@ export class MapSelect {
 
     const sub = document.createElement('p');
     sub.className = 'carselect-sub';
-    sub.textContent = 'Two deserts, and they drive nothing like each other.';
+    // Counted, not spelled out by hand — the copy said "Two deserts" for a
+    // while after the third one shipped.
+    const COUNTS = ['No', 'One', 'Two', 'Three', 'Four', 'Five'];
+    const n = COUNTS[REGION_ORDER.length] ?? String(REGION_ORDER.length);
+    sub.textContent = `${n} deserts, and they drive nothing like each other.`;
 
     this.cards = document.createElement('div');
     this.cards.className = 'mapselect-cards';

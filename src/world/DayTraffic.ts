@@ -64,6 +64,18 @@ const SIZE_GROWTH = 3.1;
 const PEAK_ALPHA = 0.62;
 
 /**
+ * Distance fade at the near end. Below `NEAR_GONE` a puff is invisible; by
+ * `NEAR_FULL` it is at full strength.
+ *
+ * These plumes are meant to be read from hundreds of metres away, and the sizes
+ * are set for that — the oldest puff in a tail is 26m across. Drive up to one
+ * and those discs are camera-facing sheets filling the screen, which reads as
+ * broken geometry rather than as dust.
+ */
+const NEAR_GONE = 22;
+const NEAR_FULL = 90;
+
+/**
  * Three daytime runs, all outside the POI ring and none near another. Closer
  * in than the night convoys — a plume has to be resolvable to read as a plume,
  * where a headlight only has to be a bright dot — but never close enough to
@@ -98,8 +110,8 @@ export class DayTraffic {
   private static readonly MAX_VEHICLES = ROUTES.reduce((n, r) => n + r.count, 0);
 
   constructor() {
-    this.bodyGeo = buildAnonymousBody();
-    this.bodyMat = new THREE.MeshLambertMaterial({ color: 0x3a3630, flatShading: true });
+    this.bodyGeo = buildAnonymousBody(0x7d6b58);
+    this.bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this.bodies = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, DayTraffic.MAX_VEHICLES);
     this.bodies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.bodies.frustumCulled = false;
@@ -221,13 +233,24 @@ export class DayTraffic {
             this.tail.z + wz * DRIFT * age,
           );
           this.dummy.lookAt(camera);
+          // How close this puff is to the eye. A 26m camera-facing disc a few
+          // metres away is a translucent wall across the screen, and driving up
+          // to a plume is exactly what a player does once they notice one.
+          const near = Math.hypot(
+            this.dummy.position.x - camera.x,
+            this.dummy.position.y - camera.y,
+            this.dummy.position.z - camera.z,
+          );
           this.dummy.scale.setScalar(SIZE_NEW + SIZE_GROWTH * age);
           this.dummy.updateMatrix();
           this.puffs.setMatrixAt(p, this.dummy.matrix);
 
           // Thin, and thinning fast. A plume is mostly air: the density that
           // reads correctly is far lower than it feels like it should be.
-          this.alphaAttr.setX(p, (1 - t01) ** 1.05 * PEAK_ALPHA * fade);
+          this.alphaAttr.setX(
+            p,
+            (1 - t01) ** 1.05 * PEAK_ALPHA * fade * smoothstep(NEAR_GONE, NEAR_FULL, near),
+          );
           // Colour is the dust itself, unscaled — the fade lives in the alpha.
           this.tint.copy(sunColor).lerp(SAND, 0.45);
           this.puffs.setColorAt(p, this.tint);

@@ -84,8 +84,8 @@ export class Convoys {
   private static readonly MAX_VEHICLES = ROUTES.reduce((n, r) => n + r.count, 0);
 
   constructor() {
-    this.bodyGeo = buildAnonymousBody();
-    this.bodyMat = new THREE.MeshLambertMaterial({ color: 0x2b2a30, flatShading: true });
+    this.bodyGeo = buildAnonymousBody(0x2f2b28);
+    this.bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this.bodies = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, Convoys.MAX_VEHICLES);
     this.bodies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.bodies.frustumCulled = false;
@@ -201,31 +201,62 @@ export class Convoys {
  * player's own bodies would raise the question of which one — and then of why
  * you can't catch it. Shared with the daytime traffic for the same reason.
  */
-export function buildAnonymousBody(): THREE.BufferGeometry {
+export function buildAnonymousBody(paint = 0x6d5f52): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
-  const at = (g: THREE.BufferGeometry, x: number, y: number, z: number) => {
+
+  /** Paint a part a flat colour, move it into place, and keep it. */
+  const at = (g: THREE.BufferGeometry, colour: number, x: number, y: number, z: number) => {
     g.translate(x, y, z);
-    parts.push(g);
+    const n = g.toNonIndexed();
+    g.dispose();
+    const count = n.getAttribute('position').count;
+    const c = new Float32Array(count * 3);
+    const col = new THREE.Color(colour);
+    for (let i = 0; i < count; i++) {
+      c[i * 3] = col.r;
+      c[i * 3 + 1] = col.g;
+      c[i * 3 + 2] = col.b;
+    }
+    n.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    parts.push(n);
+    return n;
   };
-  at(new THREE.BoxGeometry(1.86, 0.86, 4.3), 0, 0.86, 0);
-  at(new THREE.BoxGeometry(1.7, 0.72, 2.5), 0, 1.6, -0.3);
-  // Wheels, as four stubby cylinders. At these distances they only have to
-  // stop the body reading as a floating brick.
+
+  const glass = 0x2b3138;
+  const trim = 0x3b352f;
+  const rubber = 0x1b1a19;
+
+  // Chassis rail and the lower body, slightly narrower than the tub above it so
+  // the silhouette has a shoulder rather than being one slab.
+  at(new THREE.BoxGeometry(1.72, 0.30, 4.24), trim, 0, 0.66, 0);
+  at(new THREE.BoxGeometry(1.88, 0.62, 4.12), paint, 0, 1.06, 0);
+  // Cab: a glass band with a roof over it, which is what actually makes this
+  // read as a vehicle rather than a crate at any distance you can see it.
+  at(new THREE.BoxGeometry(1.76, 0.46, 2.30), glass, 0, 1.56, -0.22);
+  at(new THREE.BoxGeometry(1.80, 0.16, 2.36), paint, 0, 1.86, -0.22);
+  // Bonnet, forward of the cab and lower than it.
+  at(new THREE.BoxGeometry(1.80, 0.34, 1.30), paint, 0, 1.54, 1.42);
+  // Bumpers.
+  at(new THREE.BoxGeometry(1.94, 0.22, 0.24), trim, 0, 0.80, 2.10);
+  at(new THREE.BoxGeometry(1.94, 0.22, 0.24), trim, 0, 0.80, -2.10);
+
+  // Wheels. Twelve segments, not six: at six a wheel is a hexagon, and the
+  // player *can* drive up to these — the first pass was built on the assumption
+  // that nobody ever would, and it read as a broken prop the moment somebody
+  // did.
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
-      const w = new THREE.CylinderGeometry(0.42, 0.42, 0.3, 6);
+      const w = new THREE.CylinderGeometry(0.46, 0.46, 0.34, 12);
       w.rotateZ(Math.PI / 2);
-      at(w, sx * 0.8, 0.42, sz * 1.45);
+      at(w, rubber, sx * 0.86, 0.46, sz * 1.42);
+      // Arch over each wheel, so the body doesn't just float above them.
+      at(new THREE.BoxGeometry(0.26, 0.30, 1.16), trim, sx * 0.92, 0.92, sz * 1.42);
     }
   }
-  // Merge is strict about index buffers matching, and dropping the originals
-  // rather than the copies is how you leak the ones that were actually merged.
-  const flat = parts.map((p) => {
-    const n = p.toNonIndexed();
-    p.dispose();
-    return n;
-  });
-  const merged = mergeGeometries(flat, false);
-  for (const f of flat) f.dispose();
-  return merged ?? new THREE.BoxGeometry(1.86, 1.7, 4.3);
+
+  // Every part is non-indexed and carries a colour attribute, so the sets match
+  // and the merge cannot silently return null.
+  const merged = mergeGeometries(parts, false);
+  for (const part of parts) part.dispose();
+  return merged ?? new THREE.BoxGeometry(1.88, 1.7, 4.24);
 }
