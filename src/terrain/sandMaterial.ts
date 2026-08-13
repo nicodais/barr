@@ -125,12 +125,23 @@ export function createSandMaterial(): {
          if ( sandN.y < 0.0 ) sandN = -sandN;
          {
            // On near-level ground the two triangles of every quad get slightly
-           // different face normals, and the whole pan prints as a diagonal
+           // different face normals, and the pan prints as a diagonal
            // checkerboard. That faceting is exactly what's wanted on a dune
            // face (§4) and is pure quad noise on flat ground, so fade to the
-           // height field's analytic normal precisely where it stops helping —
-           // above about 85 degrees of levelness, which no dune slope reaches.
-           float pan = smoothstep( 0.978, 0.997, sandN.y );
+           // height field's analytic normal precisely where it stops helping.
+           //
+           // The gate reads the *analytic* normal, not the face normal. Face
+           // tilt cannot tell the two cases apart — a facet leaning 12 degrees
+           // looks identical whether it is quad noise on a pan or a genuine
+           // slope — whereas the height field knows the real local gradient,
+           // and on a true dune face the facets agree with it. Keying on the
+           // face normal meant the blend could only be trusted very close to
+           // level; keying on the ground itself lets it reach the gentle
+           // swells where the checkerboard actually survived, while leaving
+           // everything steeper than about 12 degrees fully faceted. No dune
+           // face in either region is shallower than that.
+           float trueLevel = normalize( vSandSmooth ).y;
+           float pan = smoothstep( 0.978, 0.9955, trueLevel );
            sandN = normalize( mix( sandN, normalize( vSandSmooth ), pan ) );
 
            // Fade with distance: past ~35m the ripple period is down to a pixel
