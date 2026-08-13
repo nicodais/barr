@@ -117,6 +117,10 @@ export class Game {
   private photoBar: PhotoBar;
   private boundary = new WorldBoundary();
   private compass = new Compass();
+  /** Wrapper around the compass and the speed readout. On a phone it is the
+   *  panel drawn around both, so it has to be hidden as a unit in photo mode —
+   *  hiding only the children would leave an empty box on screen. */
+  private instruments!: HTMLElement;
   private poiCard = new PoiCard();
   private firstRun = new FirstRun();
   private activePoi: PoiKind | null = null;
@@ -432,14 +436,28 @@ export class Game {
     );
 
     if (this.panel) uiRoot.appendChild(this.panel.element);
+    /*
+     * Compass and speed readout, in one box.
+     *
+     * On a phone these were two separately-positioned panels stacked at the top
+     * centre with a gap between them, which read as clutter rather than as an
+     * instrument. Wrapping them lets the mobile stylesheet draw a single panel
+     * around both; on a keyboard the wrapper is `display: contents`, so the two
+     * keep the independent positions they have always had (compass top centre,
+     * HUD bottom left with its diagnostics).
+     */
+    const instruments = document.createElement('div');
+    instruments.className = 'instruments';
+    instruments.append(this.compass.element, this.hud.element);
+    this.instruments = instruments;
+
     uiRoot.append(
-      this.hud.element,
       this.subtitles.element,
       this.input.touch.element,
       this.photoBar.element,
       this.garage.element,
       this.boundary.element,
-      this.compass.element,
+      instruments,
       this.poiCard.element,
       this.firstRun.element,
       this.carSelect.element,
@@ -912,6 +930,7 @@ export class Game {
     this.garage.hide();
     document.body.classList.add('photo-mode');
     this.hud.element.hidden = true;
+    this.instruments.hidden = true;
     this.input.touch.element.hidden = true;
     this.compass.hide();
     this.menu.setVisible(false);
@@ -923,6 +942,7 @@ export class Game {
     this.photoBar.hide();
     document.body.classList.remove('photo-mode');
     this.hud.element.hidden = false;
+    this.instruments.hidden = false;
     if (matchMedia('(pointer: coarse)').matches) this.input.touch.element.hidden = false;
     this.compass.show();
     this.menu.setVisible(true);

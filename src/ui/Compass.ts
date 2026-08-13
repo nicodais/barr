@@ -9,6 +9,24 @@
 const PX_PER_DEG = 2;
 const CARDINALS: Array<[number, string]> = [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W']];
 
+/**
+ * Which way the tape travels as you turn right.
+ *
+ * `+1` is the aircraft-HUD convention and what this shipped with: bearings
+ * increase to the right along the strip, so turning right brings them in from
+ * the right and the tape scrolls left. Measured before changing anything, to
+ * confirm it was the convention and not a sign bug — the centre reads N, E, S,
+ * W correctly at 0, 90, 180 and 270 degrees either way.
+ *
+ * `-1` mirrors the strip so it travels with the steering instead. That is the
+ * setting here, and it is a real trade rather than a free win: mirrored, the
+ * bearings increase to the *left*, so the POI diamond for something off your
+ * right shoulder now sits on the left of the tape. The marker is driven by this
+ * same constant so the two can never disagree, whichever way it is set — one
+ * character reverts the lot.
+ */
+const TAPE_DIRECTION = -1;
+
 export class Compass {
   readonly element: HTMLElement;
   private tape: HTMLElement;
@@ -26,7 +44,7 @@ export class Compass {
     // under it regardless of wraparound.
     for (let rev = -1; rev <= 1; rev++) {
       for (let deg = 0; deg < 360; deg += 15) {
-        const at = (rev * 360 + deg) * PX_PER_DEG;
+        const at = TAPE_DIRECTION * (rev * 360 + deg) * PX_PER_DEG;
         const cardinal = CARDINALS.find(([d]) => d === deg);
         if (cardinal) {
           const label = document.createElement('span');
@@ -66,7 +84,7 @@ export class Compass {
   update(heading: number, targetBearing: number | null, found: number, total: number) {
     if (this.width === 0) this.width = this.element.clientWidth;
     const headingDeg = ((heading * 180) / Math.PI + 360) % 360;
-    this.tape.style.transform = `translateX(${-headingDeg * PX_PER_DEG}px)`;
+    this.tape.style.transform = `translateX(${-TAPE_DIRECTION * headingDeg * PX_PER_DEG}px)`;
 
     if (targetBearing === null) {
       this.marker.hidden = true;
@@ -75,7 +93,7 @@ export class Compass {
       let rel = ((targetBearing - heading) * 180) / Math.PI;
       rel = ((rel + 540) % 360) - 180;
       const limit = Math.max(0, this.width / 2 - 12);
-      const offset = Math.max(-limit, Math.min(limit, rel * PX_PER_DEG));
+      const offset = Math.max(-limit, Math.min(limit, TAPE_DIRECTION * rel * PX_PER_DEG));
       // Pinned at the edge means "behind you / far off to the side" — the
       // diamond dims rather than pointing anywhere exact.
       this.marker.classList.toggle('compass-marker-edge', Math.abs(rel * PX_PER_DEG) > limit);

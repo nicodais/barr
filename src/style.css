@@ -80,12 +80,14 @@ body {
  */
 #ui > .touch-controls,
 #ui > .radio,
-#ui > .hud,
-#ui > .compass,
+#ui .hud,
+#ui .compass,
+#ui > .instruments,
 #ui > .poi-card,
 #ui > .boundary-fade {
   pointer-events: none;
 }
+
 
 /* --- loader --------------------------------------------------------------- */
 
@@ -683,6 +685,18 @@ body.high-contrast .radio {
  * The dashboard compass (§5): a slim tick-tape at the top centre. Subtle by
  * design — it nudges, it never commands.
  */
+/*
+ * Compass over speed, as one instrument.
+ *
+ * `display: contents` by default, so on a keyboard the wrapper contributes
+ * nothing and its two children keep the independent fixed positions they have
+ * always had — compass top centre, HUD bottom left with its diagnostics. Only
+ * the mobile rules below turn it into an actual box.
+ */
+.instruments {
+  display: contents;
+}
+
 .compass {
   position: fixed;
   top: 8px;
@@ -1902,15 +1916,60 @@ body.high-contrast .radio {
  * nothing to make room for.
  */
 @media (pointer: coarse) and (max-width: 720px) {
-  .compass {
-    top: calc(58px + env(safe-area-inset-top));
+  .instruments {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: fixed;
+    /* Second row, under the photo/reset chips and the menu button. The corners
+       hold the buttons; this holds everything you read. */
+    top: calc(60px + env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 10px 7px;
+    border-radius: 14px;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    backdrop-filter: blur(8px);
   }
 
-  .hud {
-    top: calc(86px + env(safe-area-inset-top));
+  .instruments[hidden] {
+    display: none;
+  }
+
+  /*
+   * Both children give up their fixed placement and their chrome — the panel
+   * draws the one box now, and they are just its two rows.
+   *
+   * `relative`, not `static`. Both contain absolutely-positioned children (the
+   * compass tape and its count badge, the HUD's flag line), and those resolve
+   * against the nearest *positioned* ancestor. Made static, the tape escaped
+   * the compass entirely, resolved against the panel, and stopped being clipped
+   * by `overflow: hidden` — E and W ended up painted on the bare sky at either
+   * edge of the screen.
+   */
+  .instruments .compass,
+  .instruments .hud {
+    position: relative;
+    top: auto;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    background: transparent;
+    border: 0;
+    backdrop-filter: none;
+  }
+
+  .instruments .compass {
+    width: min(272px, 62vw);
+  }
+
+  .instruments .hud {
+    padding: 3px 0 0;
+    gap: 10px;
   }
 
   .radio {
-    top: calc(142px + env(safe-area-inset-top));
+    top: calc(146px + env(safe-area-inset-top));
   }
 }
