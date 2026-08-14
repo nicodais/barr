@@ -44,25 +44,30 @@ const CAMERA_SVG =
  * makes it legible: the pad becomes a foreshortened slab you could put a boot
  * on, and the arm runs away from you rather than across the frame.
  *
- * Three bands, no outlines. The lessons from the flat version all still hold at
- * this size — ribs across the pad turned to a garden rake, and an outlined pad
- * was mostly its own stroke — so everything here is a filled silhouette, and
- * the pad stays the largest single mass so the glyph doesn't read as a tool.
+ * Four bands, all filled, and every corner square. The corner treatment is not
+ * a detail: rounded ends turn the same four bands into something soft and
+ * limb-like, and the reference is unmistakably a piece of machinery.
  *
- * The one deliberate departure from the reference is weight: the crossbar is
- * thinner than the arm it crosses. Drawn at equal weight the junction stops
- * being a pedal on a shaft and becomes an X, which at 40px is all you see.
+ * What carries the perspective is the *bend*. The pad sits at 45° and the arm
+ * leaves it at 17°, so the two meet at a visible angle — drawn closer to
+ * parallel they fuse into one long diagonal stick with a cross on the end, and
+ * the whole thing stops being a pedal. The shaft then crosses the arm low and
+ * off-centre, with the arm passing through it rather than stopping at it.
+ *
+ * The earlier flat version's lessons still hold at this size: ribs across the
+ * pad turned to a garden rake, an outlined pad was mostly its own stroke, and
+ * the pad has to stay the largest single mass or the glyph reads as a tool.
  */
 const BRAKE_PEDAL_SVG =
   '<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none">' +
-  // The pad, tilted away to the top right. Longest and thickest shape here.
-  '<rect x="11.3" y="5.2" width="11.4" height="5.4" rx="0.6" transform="rotate(-34 17 7.9)"/>' +
-  // The arm, one continuous band from under the pad down to the bottom left —
-  // it has to pass *through* the crossbar rather than stop at it, or the two
-  // halves separate into unrelated marks.
-  '<rect x="1.6" y="14.7" width="13.4" height="3.4" rx="0.5" transform="rotate(-43.6 8.3 16.4)"/>' +
-  // The pivot shaft, crossing low and off-centre.
-  '<rect x="0.7" y="15.6" width="13" height="2.6" rx="0.5" transform="rotate(25.2 7.2 16.9)"/>' +
+  // The pad, steeply foreshortened at the top right. Biggest mass in the glyph.
+  '<rect x="11" y="4.7" width="11.6" height="6" transform="rotate(-45 16.8 7.7)"/>' +
+  // The arm, running away shallow to the left. The angle between this and the
+  // pad is the whole illusion.
+  '<rect x="3.2" y="10.7" width="10.6" height="3.6" transform="rotate(-16.9 8.5 12.5)"/>' +
+  // The pivot shaft it hangs off, and the bracket dropping to the floor.
+  '<rect x="0.05" y="14.6" width="13.4" height="3" transform="rotate(27.9 6.75 16.1)"/>' +
+  '<rect x="0.5" y="16.7" width="7.9" height="3" transform="rotate(-57.4 4.45 18.2)"/>' +
   '</svg>';
 
 export class TouchSource implements InputSource {
