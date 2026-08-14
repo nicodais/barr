@@ -35,27 +35,34 @@ const CAMERA_SVG =
   '</svg>';
 
 /**
- * A brake pedal, seen from the side: pivot, arm, and the rubber pad.
+ * A brake pedal in three-quarter view: pad, arm, and the shaft it pivots on.
  *
- * Two attempts at detail were thrown away before this. Ribs across the pad
- * crossed its edges and stuck out the far side, which at 34px reads as a garden
- * rake; outlining the pad instead left a 5-unit box that was mostly its own
- * 2-unit stroke. A filled silhouette with a short arm is what survives being
- * shrunk — and the pad has to be the dominant shape, or the glyph reads as a
- * golf club.
+ * Drawn to a supplied reference, and the change from what was here before is
+ * one of *viewpoint*. The old glyph was a flat side elevation — pivot dot top
+ * right, thin arm, a wide pad lying almost flat along the bottom — which is
+ * technically a pedal and reads as a spoon. Turning it into perspective is what
+ * makes it legible: the pad becomes a foreshortened slab you could put a boot
+ * on, and the arm runs away from you rather than across the frame.
+ *
+ * Three bands, no outlines. The lessons from the flat version all still hold at
+ * this size — ribs across the pad turned to a garden rake, and an outlined pad
+ * was mostly its own stroke — so everything here is a filled silhouette, and
+ * the pad stays the largest single mass so the glyph doesn't read as a tool.
+ *
+ * The one deliberate departure from the reference is weight: the crossbar is
+ * thinner than the arm it crosses. Drawn at equal weight the junction stops
+ * being a pedal on a shaft and becomes an X, which at 40px is all you see.
  */
 const BRAKE_PEDAL_SVG =
-  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"' +
-  ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-  '<circle cx="16.8" cy="4.4" r="1.6" fill="currentColor" stroke="none"/>' +
-  // Short arm, wide pad. A long arm and a small pad reads as a golf club; the
-  // pedal has to be the dominant shape for the glyph to land.
-  '<path d="M16.3 6 11.6 13.4" stroke-width="2.3"/>' +
-  // Solid, not outlined. At 34px a 5-unit-tall stroked box is mostly its own
-  // stroke, and the ribs inside it turned to mush — the pad has to be a filled
-  // silhouette to read as a pedal at this size rather than as a wire rectangle.
-  '<rect x="2.2" y="13.6" width="15" height="6.2" rx="2.6"' +
-  ' fill="currentColor" stroke="none" transform="rotate(-14 9.7 16.7)"/>' +
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none">' +
+  // The pad, tilted away to the top right. Longest and thickest shape here.
+  '<rect x="11.3" y="5.2" width="11.4" height="5.4" rx="0.6" transform="rotate(-34 17 7.9)"/>' +
+  // The arm, one continuous band from under the pad down to the bottom left —
+  // it has to pass *through* the crossbar rather than stop at it, or the two
+  // halves separate into unrelated marks.
+  '<rect x="1.6" y="14.7" width="13.4" height="3.4" rx="0.5" transform="rotate(-43.6 8.3 16.4)"/>' +
+  // The pivot shaft, crossing low and off-centre.
+  '<rect x="0.7" y="15.6" width="13" height="2.6" rx="0.5" transform="rotate(25.2 7.2 16.9)"/>' +
   '</svg>';
 
 export class TouchSource implements InputSource {
