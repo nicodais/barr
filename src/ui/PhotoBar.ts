@@ -1,4 +1,5 @@
 import { FILTERS, PhotoMode, type PhotoFilter } from '../engine/PhotoMode';
+import { isNative } from '../engine/photoExport';
 import { haptics } from '../input/Haptics';
 
 /**
@@ -52,11 +53,15 @@ export class PhotoBar {
       haptics.shutter();
       onSave();
     };
+    // In the app there is no separate save: the only route out of the container
+    // is the system share sheet, and "Save Image" lives inside it. Two buttons
+    // opening the same sheet is a worse answer than one honest one.
+    save.hidden = isNative;
 
     const share = document.createElement('button');
     share.textContent = 'Share';
     // Only offered where the platform can actually do something with it.
-    share.hidden = typeof navigator.share !== 'function';
+    share.hidden = !isNative && typeof navigator.share !== 'function';
     share.onclick = () => {
       haptics.shutter();
       onShare();

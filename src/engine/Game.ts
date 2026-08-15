@@ -31,6 +31,8 @@ import { Director, timeBand } from '../narrative/Director';
 import { RadioSubtitles } from '../narrative/RadioSubtitles';
 import { createLandmarks, createLandmarkColliders } from '../world/Landmarks';
 import { WorldBoundary } from './WorldBoundary';
+import { isNative, shareNative } from './photoExport';
+import { App as CapacitorApp } from '@capacitor/app';
 import { Scatter } from '../world/Scatter';
 import { Birds } from '../world/Birds';
 import { Wildlife } from '../world/Wildlife';
@@ -473,6 +475,22 @@ export class Game {
     window.addEventListener('keydown', unlock);
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('touchend', unlock);
+
+    // Coming back from the background, in the app.
+    //
+    // iOS suspends the audio session when a call arrives, when Siri is invoked
+    // or when the app is backgrounded, and it does not resume it for you: the
+    // AudioContext comes back running with every node still wired and no sound
+    // coming out. On the web a returning player touches something within a
+    // second or two and the gesture handlers above cover it, but in the app
+    // they can return to a paused-looking desert and just watch it, so the
+    // resume has to be driven by the lifecycle rather than by input. `unlock`
+    // is idempotent by design, which is why this can be blunt.
+    if (isNative) {
+      void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) void this.audio.unlock();
+      });
+    }
 
     this.vehicle.onRecover = (reason) => {
       if (reason === 'rollover') {
@@ -976,6 +994,19 @@ export class Game {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
     const filename = `${GAME_NAME.toLowerCase()}-${stamp}.png`;
     const file = new File([blob], filename, { type: 'image/png' });
+    const caption = `${GAME_NAME} — ${GAME_TAGLINE}`;
+
+    // Native first, and unconditionally — not gated on `share`, because in the
+    // app the share sheet *is* the save mechanism (it contains "Save Image")
+    // and the browser's download path silently does nothing there. See
+    // photoExport for why this is the sheet rather than the photo library.
+    if (isNative) {
+      const result = await shareNative(blob, filename, caption, GAME_URL, GAME_NAME);
+      this.photoBar.say(
+        result === 'shared' ? 'Shared' : result === 'cancelled' ? 'Share cancelled' : 'Could not save',
+      );
+      return;
+    }
 
     if (share && navigator.canShare?.({ files: [file] })) {
       try {
@@ -985,7 +1016,7 @@ export class Game {
         await navigator.share({
           files: [file],
           title: GAME_NAME,
-          text: `${GAME_NAME} — ${GAME_TAGLINE}`,
+          text: caption,
           url: GAME_URL,
         });
         this.photoBar.say('Shared');

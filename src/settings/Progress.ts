@@ -1,5 +1,6 @@
 import type { PoiKind } from '../data/pois';
 import { activeRegion } from '../terrain/regions';
+import { read, write } from './store';
 
 /**
  * Exploration progress, persisted separately from settings (§3): discovery is
@@ -22,7 +23,7 @@ const validIds = () => new Set<PoiKind>(activeRegion().pois.map((p) => p.id));
 export function loadProgress(): Progress {
   const progress: Progress = { discovered: new Set() };
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = read(STORAGE_KEY);
     if (!raw) return progress;
     const saved = JSON.parse(raw) as { discovered?: unknown };
     if (Array.isArray(saved.discovered)) {
@@ -39,9 +40,7 @@ export function loadProgress(): Progress {
 }
 
 export function saveProgress(progress: Progress): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ discovered: [...progress.discovered] }));
-  } catch {
-    // Private-mode storage failures aren't worth interrupting a drive over.
-  }
+  // `write` swallows its own storage failures and never throws, so there is no
+  // try/catch here any more — see settings/store.ts.
+  write(STORAGE_KEY, JSON.stringify({ discovered: [...progress.discovered] }));
 }

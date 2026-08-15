@@ -1,4 +1,5 @@
 import type { VehicleTelemetry } from '../vehicle/Vehicle';
+import { read, write } from '../settings/store';
 
 /**
  * The four things a new player needs, delivered while they drive.
@@ -170,18 +171,15 @@ export class FirstRun {
 
 function load(): Set<string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = read(STORAGE_KEY);
     if (raw) return new Set(JSON.parse(raw) as string[]);
   } catch {
-    // Corrupt or unavailable: showing the hints again is a small cost.
+    // Corrupt: showing the hints again is a small cost.
   }
   return new Set();
 }
 
 function save(seen: Set<string>) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...seen]));
-  } catch {
-    // Private mode. They'll see them once more next visit; nobody is harmed.
-  }
+  // Storage failures are handled inside the store and never surface here.
+  write(STORAGE_KEY, JSON.stringify([...seen]));
 }

@@ -267,5 +267,7 @@ Still untested against an actual screen reader.
 
 - **The Old Falaj being geographically odd in Liwa** — decided, deliberately
   kept. The map is explicitly fictionalised and Ahmed's line leans on it.
-- **Leaderboards, damage, multiplayer, native wrapper** — §11 non-goals.
+- **Leaderboards, damage, multiplayer** — §11 non-goals.
+- **A native wrapper** — was a §11 non-goal, now built for iOS (CLAUDE.md §14).
+  Android is still not started, and the reasons to leave it are unchanged.
 - **Photoreal rendering** — §11, and the palette work depends on it staying flat.

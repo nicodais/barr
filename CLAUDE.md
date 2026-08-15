@@ -43,11 +43,11 @@ This is the single most important system in the game. Everything else (art, audi
 
 ## 3. Platform & Tech Stack
 
-- **Engine:** Three.js (WebGL), running directly in the browser — no native wrapper. Ships as a static site (HTML/CSS/JS bundle), deployed to **Vercel**.
+- **Engine:** Three.js (WebGL), running in the browser. Ships as a static site (HTML/CSS/JS bundle), deployed to **Vercel** — and, since the iOS pass, that same bundle also ships inside a **Capacitor** shell to the App Store. The web build stays the primary target and the reference behaviour; the native shell adds capabilities rather than changing any. See §14.
 - **Physics:** Rapier (via `@dimforge/rapier3d-compat` WASM build) for vehicle dynamics and terrain collision — chosen over Cannon.js for better vehicle-suspension support and solid WASM performance across desktop and mobile browsers.
 - **Responsive target:** desktop browsers (Chrome, Safari, Firefox, Edge) and mobile browsers (Safari iOS, Chrome Android), 60fps target on desktop, graceful degrade on mobile (see §8). Layout and control scheme adapt to viewport/input capability at runtime rather than being a separate build.
 - **Audio:** Web Audio API, layered ambient system (see §6).
-- **Persistence:** `localStorage` for settings, unlocked waypoints, photo-mode capture metadata.
+- **Persistence:** settings, unlocked waypoints and first-run flags go through `src/settings/store.ts` — `localStorage` in a browser, NSUserDefaults in the iOS app, where webview local storage is evictable (§14).
 - **Language:** TypeScript throughout. No framework (React/Vue) needed for the 3D layer — vanilla TS + Three.js, bundled with Vite. A thin DOM/CSS layer for menus/HUD is fine (plain HTML/CSS, no framework, to keep things light and dependency-free).
 - **Build/dev tooling:** Vite for local dev server + bundling — fast iteration, static build output deployed to Vercel (zero-config for a Vite static site; connect the repo and ship on push).
 
@@ -158,7 +158,7 @@ CLAUDE.md
 - No multiplayer.
 - No procedurally infinite world (curated single region only).
 - No combat, damage-based fail states, or scoring/leaderboards.
-- No native app wrapper in v1 (browser-only for now; Electron/Capacitor wrapping is a later-stage option, not current scope).
+- ~~No native app wrapper in v1~~ — **reversed.** This was a scope decision, not a technical one, and it was taken back deliberately: the game is now also packaged for iOS with Capacitor (§14). The reasoning that made it a non-goal still holds for everything it did not cover — no Electron desktop build, no Android build yet, and the web version is never allowed to regress in service of the app.
 - No official/licensed Nissan assets, badging, or trademarked design files — the Patrol Super Safari is a visual reference only; the model is built independently in-house.
 - No photoreal/PBR rendering — flat-shaded stays flat-shaded even under scrutiny; resist scope creep toward realism.
 
@@ -220,3 +220,79 @@ CLAUDE.md
 - POI lines reference something real/concrete about that spot — no generic filler that could be swapped between locations.
 - He's tired, not cruel — affectionate exasperation, not contempt.
 - No fourth-wall breaks about the game itself — he stays fully in-world.
+
+---
+
+## 14. The iOS App (Capacitor)
+
+The same `dist/` bundle the website serves, wrapped in a WKWebView and shipped to
+the App Store. **Free, no in-app purchases, iOS only** — Android is deliberately
+not started (§11).
+
+**The rule that governs everything here:** the web build is the reference
+behaviour and must never regress in service of the app. Every native path is
+additive and feature-detected behind `Capacitor.isNativePlatform()`, with the
+existing browser path intact as the fallback. Nothing is served over the network,
+ever — no `server.url` in `capacitor.config.ts`. Pointing the shell at the Vercel
+deployment would make it a browser with the chrome removed, which is both an App
+Store guideline 4.2 rejection and worse than the website it was imitating.
+
+### What the shell adds
+
+Four capabilities the browser withholds, and nothing else:
+
+- **Durable storage** (`src/settings/store.ts`). WKWebView treats local storage as
+  cache and can evict it under pressure, so settings, exploration progress and the
+  first-run flags move to NSUserDefaults. The wrinkle is that everything reads its
+  blob synchronously at construction while the native API is async, so the store
+  hydrates once in `boot()` and serves synchronous reads from memory thereafter.
+- **Photo export** (`src/engine/photoExport.ts`). The browser's `<a download>` is a
+  *silent no-op* in WKWebView — the button said "Saved" and nothing was saved. The
+  capture now goes to the cache directory and out through the system share sheet,
+  which contains "Save Image" and needs no photo-library permission.
+- **Real haptics** (`src/input/Haptics.ts`). iOS has no `navigator.vibrate` at all,
+  so the setting used to hide itself on every iPhone. The Taptic Engine cannot
+  replay arbitrary on/off patterns, so each cue is re-fired as a sequence of
+  impacts on its own timings — the shape survives, and the weights are better than
+  a single motor could manage.
+- **An audio session** (`ios/App/App/AppDelegate.swift`). `.playback` with
+  `.mixWithOthers`, so the score is not silenced by the ring/silent switch and does
+  not stop whatever the player already had playing.
+
+### Building it
+
+```
+npm run ios         # native build (no sourcemaps) + cap sync
+npm run ios:open    # …and open Xcode
+```
+
+`SHAMAL_NATIVE=1` drops the ~6 MB of sourcemaps, which are useful on a URL and
+dead weight inside an IPA.
+
+### What still needs a Mac
+
+The repo side is complete and platform-independent; the rest is Xcode-only:
+
+1. **Signing** — team, and the bundle ID `com.nicodais.shamal` registered to match.
+2. **`PrivacyInfo.xcprivacy` must be added to the App target.** The file is written
+   and correct (`ios/App/App/`), but it is not referenced by `project.pbxproj` —
+   drag it into the App group in Xcode, "Copy items if needed" off. Without this
+   step the upload gets an automated privacy warning.
+3. **App icon** — a 1024×1024 with **no alpha channel**, into
+   `Assets.xcassets/AppIcon.appiconset`. The existing `public/icon-*.png` are
+   web-manifest sizes and will not do.
+4. **Launch screen** — `Base.lproj/LaunchScreen.storyboard`, in the sand palette,
+   so the first half-second is not a white flash.
+5. **Run on a real device before judging anything.** Simulator WebGL is not
+   representative and cannot be used to assess the 60fps target; `Quality.ts` will
+   step tiers down on its own, so watch which tier it settles at.
+
+### Release blockers that are not code
+
+- **The music licence.** `src/audio/Barr Background Music.mp3` is 12 MB and most of
+  the bundle. Store distribution is distribution even when the app is free.
+- **The name.** `src/brand.ts` says Shamal; another branch renames it. The listing
+  name, the bundle ID and the icon all key off whichever wins.
+- **Privacy answers.** "Data Not Collected" is true today because the game makes no
+  network requests of any kind. Merging the Vercel Web Analytics branch would make
+  that false and change the App Store privacy declaration with it.

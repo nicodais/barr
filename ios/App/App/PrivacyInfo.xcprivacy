@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The app-level privacy manifest.
+
+  Capacitor ships one for its own framework, but it only covers the framework —
+  the app target needs its own, and an upload without it gets an automated
+  warning from App Store Connect naming the exact APIs below.
+
+  Everything here is a "required reason" API: ones Apple considers capable of
+  fingerprinting a device, which you may use freely so long as you say why. The
+  two declared reasons are both the most restrictive available, and both are
+  true: this app touches its own container and nothing else.
+
+  Nothing is collected and nothing is tracked, which is not a policy position so
+  much as a fact about the code — the game makes no network requests of any kind.
+  If analytics is ever added (see the Vercel Web Analytics branch), all three of
+  the empty arrays below stop being accurate and the App Store privacy answers
+  change with them.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!--
+			  UserDefaults, via @capacitor/preferences — settings, exploration
+			  progress and the first-run flags. CA92.1 is "the app's own
+			  defaults, not shared with any other app", which is exactly what a
+			  single-app container with no app group is.
+			-->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<!--
+			  File timestamps, via @capacitor/filesystem when a photo is written
+			  to the cache directory on its way to the share sheet. C617.1 is
+			  "files inside the app's own container", which is where it goes.
+			-->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyTracking</key>
+	<false/>
+</dict>
+</plist>

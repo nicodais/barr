@@ -22,13 +22,30 @@
  *    repeat. Texture is therefore *event*-driven — a tick when a wheel actually
  *    takes a hit — and hard rate-limited.
  *
- * iOS is the notable gap: Safari implements no vibration API at all, on any
- * version, so `supported` is false on every iPhone and iPad and the setting
- * hides itself rather than offering a switch that does nothing. Android Chrome,
- * Firefox and Samsung Internet all have it.
+ * iOS is the notable gap *on the web*: Safari implements no vibration API at
+ * all, on any version, so `supported` is false on every iPhone and iPad in a
+ * browser and the setting hides itself rather than offering a switch that does
+ * nothing. Android Chrome, Firefox and Samsung Internet all have it.
+ *
+ * ## In the iOS app
+ *
+ * The native build reaches the Taptic Engine instead, which is a better device
+ * than any of the above — real transients with distinct weights rather than one
+ * motor with a duration. It cannot do the one thing this file is written
+ * around, though: arbitrary on/off patterns. So the cues are not rewritten for
+ * it. Each pattern is replayed as a *sequence of impacts on the pattern's own
+ * timings*, with the weight of each hit chosen by how long that run was, which
+ * keeps the shape — the double click, the tumble, the thud — intact. The shape
+ * was always the design; the durations were only ever the crude way of
+ * expressing it, and on iOS they get a better one.
  */
 
+import { Capacitor } from '@capacitor/core';
+import { Haptics as Taptic, ImpactStyle } from '@capacitor/haptics';
 import type { VehicleTelemetry, WheelState } from '../vehicle/Vehicle';
+
+/** The native shell, where the Taptic Engine replaces `navigator.vibrate`. */
+const NATIVE = Capacitor.isNativePlatform();
 
 type Pattern = number | number[];
 
@@ -81,7 +98,10 @@ const BUMP_MIN_SPEED = 5;
 const BOG_GAP = 0.62;
 
 export class Haptics {
-  /** The device can actually do this. False on desktop and on all of iOS. */
+  /**
+   * The device can actually do this. False on desktop and on iOS *in a
+   * browser*; true in the iOS app, where the Taptic Engine is available.
+   */
   readonly supported: boolean;
 
   private on = true;
@@ -96,18 +116,24 @@ export class Haptics {
   private bumpTimer = 0;
   private bogTimer = 0;
   private compression = [0, 0, 0, 0];
+  /** Pending hits of a multi-part cue, so `stop` can actually stop one. */
+  private pending: number[] = [];
 
   constructor() {
-    this.supported =
-      typeof navigator !== 'undefined' &&
+    this.supported = NATIVE ||
+      (typeof navigator !== 'undefined' &&
       typeof navigator.vibrate === 'function' &&
       // Chrome on desktop defines `vibrate` and silently does nothing with it.
       // Same test the touch controls use, so the setting appears in exactly the
       // sessions where the controls it belongs next to do.
-      matchMedia('(pointer: coarse)').matches;
+      matchMedia('(pointer: coarse)').matches);
 
     if (!this.supported) return;
 
+    // The user-activation rule is a browser rule. The Taptic Engine has no such
+    // requirement, so the native build is armed from the start rather than
+    // swallowing whatever cue happens to land before the first tap.
+    if (NATIVE) this.armed = true;
     const arm = () => { this.armed = true; };
     window.addEventListener('pointerdown', arm, { once: true, passive: true });
     window.addEventListener('keydown', arm, { once: true });
@@ -234,7 +260,8 @@ export class Haptics {
 
   private stop() {
     if (!this.supported) return;
-    navigator.vibrate(0);
+    if (NATIVE) this.clearPending();
+    else navigator.vibrate(0);
     this.busyUntil = 0;
     this.busyPriority = P.ui;
   }
@@ -249,10 +276,60 @@ export class Haptics {
     // one, not like the first one finishing.
     if (now < this.busyUntil && priority < this.busyPriority) return;
 
-    navigator.vibrate(pattern);
+    if (NATIVE) this.tap(pattern);
+    else navigator.vibrate(pattern);
     this.busyUntil = now + span(pattern);
     this.busyPriority = priority;
   }
+
+  /**
+   * Replays a vibration pattern on the Taptic Engine.
+   *
+   * A pattern is `[on, off, on, off, …]`, so the even entries are the hits and
+   * the odd ones are the gaps between them. Each hit fires at its own cumulative
+   * offset, which is what preserves the rhythm the cue was written as. The
+   * first one goes out synchronously — a scheduled zero-delay tap is a frame
+   * late, and on a UI tick that lateness is the whole cue.
+   *
+   * Pre-emption is handled by clearing first, matching `vibrate`'s behaviour of
+   * replacing rather than queueing: the priority check above has already
+   * decided this cue wins.
+   */
+  private tap(pattern: Pattern) {
+    this.clearPending();
+    if (typeof pattern === 'number') {
+      void Taptic.impact({ style: weight(pattern) });
+      return;
+    }
+    let at = 0;
+    for (let i = 0; i < pattern.length; i += 2) {
+      const hit = pattern[i];
+      const style = weight(hit);
+      if (at === 0) void Taptic.impact({ style });
+      else this.pending.push(setTimeout(() => void Taptic.impact({ style }), at));
+      at += hit + (pattern[i + 1] ?? 0);
+    }
+  }
+
+  private clearPending() {
+    for (const id of this.pending) clearTimeout(id);
+    this.pending.length = 0;
+  }
+}
+
+/**
+ * How hard a hit of this length should land.
+ *
+ * The thresholds come off the existing cue set rather than being round numbers:
+ * the 8ms UI tick and the 7-20ms corrugation ticks want the lightest transient
+ * there is, the 12-32ms radio and shutter clicks want a definite but unhurried
+ * one, and the 45-70ms rollover and heavy-landing runs want everything the
+ * engine has.
+ */
+function weight(ms: number): ImpactStyle {
+  if (ms < 12) return ImpactStyle.Light;
+  if (ms < 34) return ImpactStyle.Medium;
+  return ImpactStyle.Heavy;
 }
 
 function span(pattern: Pattern): number {

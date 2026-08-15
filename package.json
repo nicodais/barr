@@ -6,14 +6,25 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:native": "SHAMAL_NATIVE=1 npm run build",
+    "ios": "npm run build:native && cap sync ios",
+    "ios:open": "npm run ios && cap open ios",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.1",
     "@dimforge/rapier3d-compat": "^0.14.0",
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@types/three": "^0.180.0",
     "typescript": "^5.7.3",
     "vite": "^6.0.7"

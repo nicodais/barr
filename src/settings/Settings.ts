@@ -1,5 +1,6 @@
 /**
- * Player settings, persisted to localStorage (§3). Kept separate from
+ * Player settings, persisted via settings/store (§3) — localStorage in a
+ * browser, NSUserDefaults in the iOS app. Kept separate from
  * VehicleTuning: tuning is developer-facing numbers that get baked into the
  * build once they feel right, settings are player choices that must survive it.
  *
@@ -10,6 +11,7 @@ import type { Handedness, JoystickPosition, TouchScheme } from '../input/TouchSo
 import type { QualityTier } from '../engine/Quality';
 import { isRegionId, type RegionId } from '../terrain/regions';
 import { DEFAULT_PRESSURE, isPressureId, type PressureId } from '../vehicle/tyrePressure';
+import { read, write } from './store';
 import {
   DEFAULT_VEHICLE,
   sanitizeVehicleConfig,
@@ -112,7 +114,7 @@ export function loadSettings(): GameSettings {
   // then quietly rewrite the defaults for the rest of the session.
   const settings = { ...DEFAULT_SETTINGS, vehicle: { ...DEFAULT_VEHICLE } };
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = read(STORAGE_KEY);
     if (!raw) return settings;
     const saved = JSON.parse(raw) as Partial<GameSettings>;
     // Only adopt keys we still recognise, and only at the right type, so an
@@ -184,9 +186,7 @@ export function loadSettings(): GameSettings {
 }
 
 export function saveSettings(settings: GameSettings): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // Private-mode storage failures aren't worth interrupting a drive over.
-  }
+  // `write` never throws — private-mode and out-of-disk failures are swallowed
+  // there, along with the ordering problem two saves in the same frame create.
+  write(STORAGE_KEY, JSON.stringify(settings));
 }
