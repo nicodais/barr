@@ -214,7 +214,7 @@ class PartBuilder {
       // so holding them any longer just pins buffers no mesh will ever draw.
       for (const g of flat) g.dispose();
       if (!merged) {
-        console.warn(`[dune] vehicle merge dropped the "${key}" bucket`);
+        console.warn(`[shamal] vehicle merge dropped the "${key}" bucket`);
         continue;
       }
       merged.computeBoundingSphere();

@@ -52,7 +52,7 @@ function mergeParts(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   });
   const merged = mergeGeometries(flat, false);
   if (!merged) {
-    console.warn('[dune] scatter merge failed; falling back to a single part');
+    console.warn('[shamal] scatter merge failed; falling back to a single part');
     return flat[0];
   }
   for (const g of flat) g.dispose();

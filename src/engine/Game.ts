@@ -192,10 +192,10 @@ export class Game {
 
     const check = this.terrain.verifyAlignment(spawn.x, spawn.z);
     if (check.ok) {
-      console.info(`[dune] terrain aligned (max error ${check.worstError.toFixed(3)}m)`);
+      console.info(`[shamal] terrain aligned (max error ${check.worstError.toFixed(3)}m)`);
     } else {
       console.warn(
-        `[dune] terrain colliders disagree with the height field by ${check.worstError.toFixed(2)}m` +
+        `[shamal] terrain colliders disagree with the height field by ${check.worstError.toFixed(2)}m` +
         ' — check the chunk sample layout or collider translation',
       );
     }
@@ -669,7 +669,7 @@ export class Game {
 
     const drop = this.watchdog.sample(frameDt, this.tier, this.settings.quality !== 'auto');
     if (drop) {
-      console.info(`[dune] frame time sustained above budget — quality ${this.tier} -> ${drop}`);
+      console.info(`[shamal] frame time sustained above budget — quality ${this.tier} -> ${drop}`);
       this.qualityDrops++;
       this.applyQuality(drop);
     }

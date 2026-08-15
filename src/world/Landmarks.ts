@@ -103,7 +103,7 @@ function bake(built: THREE.Group): THREE.Group {
     const merged = mergeGeometries(geos, false);
     for (const g of geos) g.dispose();
     if (!merged) {
-      console.warn('[dune] landmark bake dropped a material bucket');
+      console.warn('[shamal] landmark bake dropped a material bucket');
       continue;
     }
     merged.computeBoundingSphere();

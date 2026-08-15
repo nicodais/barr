@@ -15,7 +15,7 @@ export interface Progress {
   discovered: Set<PoiKind>;
 }
 
-const STORAGE_KEY = 'dune.progress.v1';
+const STORAGE_KEY = 'shamal.progress.v1';
 // Region-scoped: a save carrying Liwa's discoveries must not have them
 // silently count toward Fossil Rock's total, and vice versa.
 const validIds = () => new Set<PoiKind>(activeRegion().pois.map((p) => p.id));

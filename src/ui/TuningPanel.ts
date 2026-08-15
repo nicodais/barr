@@ -96,7 +96,15 @@ const SECTIONS: Section[] = [
  * over v2 defaults would pair old force values with heavy gravity and quietly
  * make dune faces unclimbable — the exact failure this rescale exists to avoid.
  */
-const STORAGE_KEY = 'dune.tuning.v3';
+const STORAGE_KEY = 'shamal.tuning.v3';
+/**
+ * The DUNE-era name for the same key. Read once if the current one is empty, so
+ * a dev mid-way through a tuning session doesn't lose it to a rename. Unlike
+ * the player-facing stores in settings/store this is dev-only and never touched
+ * by a shipped build, so it does its own migration rather than earning a slot
+ * in the shared one.
+ */
+const LEGACY_STORAGE_KEY = 'dune.tuning.v3';
 
 export class TuningPanel {
   readonly element: HTMLElement;
@@ -252,6 +260,9 @@ export class TuningPanel {
     resetBtn.onclick = () => {
       Object.assign(this.tuning, DEFAULT_TUNING);
       localStorage.removeItem(STORAGE_KEY);
+      // Both, or "reset defaults" would leave the old blob to be picked up again
+      // by the migration on the next load.
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
       this.syncInputs();
       this.onChange();
     };
@@ -372,7 +383,7 @@ export class TuningPanel {
 
   private load() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw) as Partial<VehicleTuning>;
       // Only adopt keys we still recognise, so an old blob can't inject junk.

@@ -289,10 +289,14 @@ The repo side is complete and platform-independent; the rest is Xcode-only:
 
 ### Release blockers that are not code
 
-- **The music licence.** `src/audio/Barr Background Music.mp3` is 12 MB and most of
+- **The music licence.** `src/audio/Shamal Background Music.mp3` is 12 MB and most of
   the bundle. Store distribution is distribution even when the app is free.
-- **The name.** `src/brand.ts` says Shamal; another branch renames it. The listing
-  name, the bundle ID and the icon all key off whichever wins.
+- **The deployment URL.** `GAME_URL` in `src/brand.ts` is still `barr-six.vercel.app`,
+  which is the one place the old name survives — and it survives because it is an
+  *address*, not a name. It is burned into saved photos as a watermark and used as
+  the canonical/OG URL, and pointing either at somewhere that does not resolve is
+  worse than the stale name. Renaming the Vercel project (or attaching a domain)
+  makes it a two-line change: `brand.ts` and the four absolute URLs in `index.html`.
 - **Privacy answers.** "Data Not Collected" is true today because the game makes no
   network requests of any kind. Merging the Vercel Web Analytics branch would make
   that false and change the App Store privacy declaration with it.

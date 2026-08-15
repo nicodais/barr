@@ -1,9 +1,9 @@
 import type { AudioEngine } from './AudioEngine';
-import trackUrl from './Barr Background Music.mp3';
+import trackUrl from './Shamal Background Music.mp3';
 
 /**
- * The authored background score: the Barr track, looped through the score bus
- * in place of the synthesized oud bed (kept in AmbientScore, unwired). The
+ * The authored background score, looped through the score bus in place of the
+ * synthesized oud bed (kept in AmbientScore, unwired). The
  * adaptive mix survives the swap — the bus still swells with driving intensity
  * and ducks under Ahmed's radio calls (§6).
  *

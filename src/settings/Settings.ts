@@ -106,7 +106,7 @@ const QUALITIES: Array<QualityTier | 'auto'> = ['auto', 'low', 'medium', 'high']
 // the old mix had the score 10-20dB under the vehicle, and anyone who dragged
 // the master volume up to compensate has a stored value that is now much too
 // loud. Resetting once is kinder than shipping them a wall of noise.
-const STORAGE_KEY = 'dune.settings.v3';
+const STORAGE_KEY = 'shamal.settings.v3';
 
 export function loadSettings(): GameSettings {
   // The spread is shallow, so `vehicle` would otherwise be the *same object* as

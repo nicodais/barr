@@ -85,7 +85,7 @@ const DWELL = 6.5;
 /** Never two in a row without a gap, however many conditions have come true. */
 const GAP = 12;
 
-const STORAGE_KEY = 'dune.seen.v1';
+const STORAGE_KEY = 'shamal.seen.v1';
 
 export class FirstRun {
   readonly element: HTMLElement;

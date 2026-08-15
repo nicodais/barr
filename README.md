@@ -1,6 +1,6 @@
-# BARR — prototype
+# Shamal (شمال)
 
-Relaxing open-world dune-bashing for the browser. See [CLAUDE.md](CLAUDE.md) for the full design brief.
+Relaxing open-world dune-bashing, for the browser and for iOS. See [CLAUDE.md](CLAUDE.md) for the full design brief.
 
 **Current phase: 5 complete, 6 ready to ship.** Driving feel, the streamed world, audio,
 Ahmed's radio and the ten POIs are all in, along with photo mode, touch controls,

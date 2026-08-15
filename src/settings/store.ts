@@ -43,17 +43,38 @@ import { Preferences } from '@capacitor/preferences';
  * here. A union type means adding a store without adding it to this list does
  * not compile.
  *
- * `dune.tuning.v3` is absent on purpose: `TuningPanel` is only constructed under
- * `import.meta.env.DEV` (see Game.ts), so it never exists in a shipped build and
- * has no reason to occupy a slot in the native store.
+ * `shamal.tuning.v3` is absent on purpose: `TuningPanel` is only constructed
+ * under `import.meta.env.DEV` (see Game.ts), so it never exists in a shipped
+ * build and has no reason to occupy a slot in the native store.
  */
 const KEYS = [
-  'dune.settings.v3',
-  'dune.progress.v1',
-  'dune.seen.v1',
+  'shamal.settings.v3',
+  'shamal.progress.v1',
+  'shamal.seen.v1',
 ] as const;
 
 export type StoreKey = (typeof KEYS)[number];
+
+/**
+ * What each key used to be called, back when the working title was DUNE.
+ *
+ * The rename is cosmetic — nobody sees a storage key — but leaving them would
+ * have been the last place in the codebase still calling the game by a name it
+ * could never have shipped under (see the top of CLAUDE.md), and a half-renamed
+ * project is how you end up with two conventions forever.
+ *
+ * What is *not* cosmetic is that real players have real blobs under the old
+ * names: settings, a garage they built, POIs they found. So the old key is read
+ * whenever the new one is empty, and written straight back under the new name.
+ * The old entry is deliberately left in place rather than deleted — it costs a
+ * few hundred bytes, and it means someone who opens an older deployment of the
+ * site afterwards still finds their save where that build expects it.
+ */
+const RENAMED_FROM: Record<StoreKey, string> = {
+  'shamal.settings.v3': 'dune.settings.v3',
+  'shamal.progress.v1': 'dune.progress.v1',
+  'shamal.seen.v1': 'dune.seen.v1',
+};
 
 const cache = new Map<StoreKey, string>();
 
@@ -86,33 +107,62 @@ export async function hydrate(): Promise<void> {
   cache.clear();
   for (const key of KEYS) {
     try {
-      if (native) {
-        const { value } = await Preferences.get({ key });
-        if (value !== null) {
-          cache.set(key, value);
-          continue;
-        }
-        // Nothing under this key in Preferences. Fall through to the webview's
-        // own localStorage, which is where a build of this app made before the
-        // move to Preferences would have left it. Not a path from the *website*
-        // — an app's webview storage is its own container and cannot see
-        // Safari's — so this only ever rescues an in-app upgrade.
-        const legacy = localStorage.getItem(key);
-        if (legacy !== null) {
-          cache.set(key, legacy);
-          // Written straight back so the rescue happens once rather than on
-          // every launch until something else saves.
-          void persist(key, legacy);
-        }
-      } else {
-        const value = localStorage.getItem(key);
-        if (value !== null) cache.set(key, value);
-      }
+      const found = await recover(key);
+      if (found !== null) cache.set(key, found);
     } catch {
       // Storage unavailable or corrupt. Defaults everywhere is a working game,
       // and it is a far better outcome than refusing to boot.
     }
   }
+}
+
+/**
+ * Finds a key's value, trying every place a previous build might have left it,
+ * and normalises whatever it finds into the current backend and the current
+ * name. Returns null only when this player genuinely has no save.
+ *
+ * The order matters: current name first, then the old name, and on native the
+ * webview's own localStorage after each. Two independent migrations overlap
+ * here — DUNE to Shamal, and localStorage to Preferences — and a player can be
+ * on either side of both.
+ */
+async function recover(key: StoreKey): Promise<string | null> {
+  const legacyKey = RENAMED_FROM[key];
+
+  if (native) {
+    const current = await Preferences.get({ key });
+    if (current.value !== null) return current.value;
+
+    const renamed = await Preferences.get({ key: legacyKey });
+    if (renamed.value !== null) {
+      void persist(key, renamed.value);
+      return renamed.value;
+    }
+
+    // Nothing in Preferences under either name. Fall through to the webview's
+    // own localStorage, which is where a build of this app made before the move
+    // to Preferences would have left it. Not a path from the *website* — an
+    // app's webview storage is its own container and cannot see Safari's — so
+    // this only ever rescues an in-app upgrade.
+    const stored = localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
+    if (stored !== null) {
+      // Written straight back so the rescue happens once rather than on every
+      // launch until something else saves.
+      void persist(key, stored);
+      return stored;
+    }
+    return null;
+  }
+
+  const current = localStorage.getItem(key);
+  if (current !== null) return current;
+
+  const renamed = localStorage.getItem(legacyKey);
+  if (renamed !== null) {
+    void persist(key, renamed);
+    return renamed;
+  }
+  return null;
 }
 
 /** The stored blob for a key, or null if there isn't one. Synchronous. */

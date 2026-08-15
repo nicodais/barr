@@ -61,7 +61,7 @@ export class GameAudio {
       engine.setEffectsVolume(this.effects);
     } catch (err) {
       // Audio is a nice-to-have; a browser refusing it must not stop the drive.
-      console.warn('[dune] audio unavailable', err);
+      console.warn('[shamal] audio unavailable', err);
     }
   }
 

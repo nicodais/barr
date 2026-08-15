@@ -121,7 +121,7 @@ export function createDiscoveries(): THREE.Group {
     const merged = mergeGeometries(geos, false);
     for (const g of geos) g.dispose();
     if (!merged) {
-      console.warn('[dune] discovery bake dropped a material bucket');
+      console.warn('[shamal] discovery bake dropped a material bucket');
       continue;
     }
     merged.computeBoundingSphere();
