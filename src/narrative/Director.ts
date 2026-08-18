@@ -316,9 +316,15 @@ export class Director {
    * every stray ambient comment.
    */
   private callPoi(poi: Poi) {
-    this.speak(poi.lines[0], true);
+    // A POI with no lines is a data error, not a silent one: keying up to say
+    // `undefined` puts the word on screen as a subtitle. The discovery still
+    // counts — the compass and the counter are driven by the visit, not by
+    // Ahmed — he just has nothing to say about it.
+    const [first, ...rest] = poi.lines;
+    if (first === undefined) return;
+    this.speak(first, true);
     this.cooldown = COOLDOWN;
-    this.pendingLines = poi.lines.slice(1);
+    this.pendingLines = rest;
     if (this.pendingLines.length === 0) this.pendingSignOff = 1.2;
   }
 
