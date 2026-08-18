@@ -82,7 +82,11 @@ export const FOSSIL_ROCK_POIS: Poi[] = [
   {
     id: 'famousdune',
     name: 'The Ramp',
-    x: 60, z: -150, radius: 95,
+    // On the sculpted ramp's eastern flank rather than in the gap between it
+    // and the rock: at (60, -150) its 95m trigger reached into the fossil
+    // bed's, so one parking spot discovered both and Ahmed called them in
+    // back to back.
+    x: -10, z: -190, radius: 95,
     lines: [
       "That's the only way up the rock that isn't a cliff, and everyone who comes here finds it eventually.",
       'Carry your speed at the bottom. Halfway up is a bad place to change your mind.',
@@ -102,7 +106,9 @@ export const FOSSIL_ROCK_POIS: Poi[] = [
   {
     id: 'cameltrack',
     name: 'The Old Race Track',
-    x: -400, z: 480, radius: 85,
+    // Moved clear of the ghaf stand, whose trigger it overlapped, and off the
+    // flank of the sculpted dune at (-520, 430) — a race track wants the flat.
+    x: -300, z: 620, radius: 85,
     lines: [
       'Camel track. The races are serious business — the winners get bred like royalty.',
       'This stretch got left to the sand when they built the big ovals. Mind the old rails.',

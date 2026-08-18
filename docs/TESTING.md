@@ -1,8 +1,14 @@
-# Test coverage: where we are, and what to test first
+# Test coverage: what was wrong, and what now guards it
 
-## 1. The state of play
+> **Status: implemented.** This began as an analysis of a codebase with no
+> tests. Everything in §4 has since been built and everything in §3 fixed —
+> `npm test` runs 225 tests across 8 files in about 1.5 seconds. §1 and §2
+> describe the situation that motivated the work and are kept as the rationale;
+> §7 records what shipped.
 
-There are no tests. Not "thin coverage" — zero test files, zero test
+## 1. The state of play, before this
+
+There were no tests. Not "thin coverage" — zero test files, zero test
 dependencies, zero CI.
 
 | | |
@@ -13,10 +19,10 @@ dependencies, zero CI.
 | Only automated gate | `tsc --noEmit`, via `npm run build` |
 | TypeScript under `src/` | ~19,000 lines across 74 files |
 
-`tsc` is a real gate and it currently passes clean, but it only checks that
-types line up. Every behavioural claim in this codebase — that the sand grips
-the way §2 says, that Ahmed doesn't repeat himself, that a save from last week
-still loads — is unverified except by driving the game and looking.
+`tsc` is a real gate and it passed clean, but it only checks that types line up.
+Every behavioural claim in this codebase — that the sand grips the way §2 says,
+that Ahmed doesn't repeat himself, that a save from last week still loads — was
+unverified except by driving the game and looking.
 
 ## 2. What that has already cost
 
@@ -51,12 +57,13 @@ This is the pattern: the failures here are **silent and semantic**, not crashes.
 Nothing throws. The world is just flatter, or the card just lies. Those are
 exactly the failures a type system cannot see and a playtest catches late.
 
-## 3. Four live defects found while writing this
+## 3. Five live defects found while writing this
 
 To check that the argument above isn't theoretical, here is what a few hours of
-reading turned up in code that is on `main` right now.
+reading turned up in code that was on `main`. All five are now fixed, each with
+the test that fails without the fix.
 
-### 3.1 Progress is shared across regions, and switching regions deletes it
+### 3.1 Progress is shared across regions, and switching regions deletes it *(fixed)*
 
 `src/settings/Progress.ts` stores discoveries under one key, `dune.progress.v1`,
 as a flat array of `PoiKind`. But POI kinds are deliberately reused between
@@ -78,12 +85,18 @@ Two consequences, both user-visible:
    filtered in-memory set back over the key. `fossilbed` is now gone from disk
    permanently.
 
-The fix is a region-scoped key (`dune.progress.v1.${regionId}`) or storing a
-`Record<RegionId, PoiKind[]>`. The test is about ten lines against a `Map`-backed
-`localStorage` stub, and it is the single highest-value test in this document —
-this is earned player state being destroyed.
+**Fixed** by scoping the key: `dune.progress.v2.${regionId}`, so the two deserts
+cannot see each other's saves at all. The per-region id filter stays, because it
+is still the right defence against a stale blob naming a retired POI. A legacy
+`v1` blob is migrated once into whichever region the player last left off in —
+which is what `activeRegion()` reports at first load, since settings restore the
+region before progress loads — and then removed.
 
-### 3.2 The majlis card has been showing a placeholder for its whole life
+`tests/progress.test.ts` covers both halves. Against the old implementation five
+of its nine cases fail, including `expected 2 to be +0` for the false credit and
+`expected [] to deeply equal [ 'fossilbed', 'tomb' ]` for the deletion.
+
+### 3.2 The majlis card has been showing a placeholder for its whole life *(fixed)*
 
 `POI_INFO.majlis.photo` is `'/photos/majlis.jpg'`. The file on disk is
 `public/photos/majilis.jpg` — `majilis`, with the `i` transposed. The request
@@ -94,12 +107,15 @@ Nobody noticed because `PoiCard` has a deliberate graceful fallback
 exists. So the card renders the in-palette placeholder postcard and looks
 entirely intentional. The real photograph has never been seen.
 
-That fallback is good design, and it is exactly why this needs a test rather
-than an eyeball: the failure mode was built to be invisible. A test that walks
-`POI_INFO`, and every per-POI `info` override, and asserts each `photo` path
-exists under `public/`, is about six lines and catches every future typo too.
+That fallback is good design, and it is exactly why this needed a test rather
+than an eyeball: the failure mode was built to be invisible.
 
-### 3.3 Two pairs of Fossil Rock POIs have overlapping trigger radii
+**Fixed** by renaming the file to `majlis.jpg` — the reference was spelled
+correctly and matches the `PoiKind`, as every other photo does. Guarded by
+`tests/poiData.test.ts`, which walks `POI_INFO` and every per-POI `info`
+override and asserts each `photo` path exists under `public/`.
+
+### 3.3 Two pairs of Fossil Rock POIs have overlapping trigger radii *(fixed)*
 
 Computed from the coordinates in `src/data/fossilRockPois.ts`:
 
@@ -116,26 +132,52 @@ POI call-ins bypass the cooldown entirely: Ahmed signs off from the first and
 immediately keys back up for the second. §5 asks for dialogue that is "sparse and
 ambient"; back-to-back call-ins from a standing start is the opposite of that.
 
-Liwa and Al Badayer are clean. A test asserting no two POIs in a region have
-overlapping radii is four lines and makes this a build failure rather than a
-thing someone eventually notices.
+Liwa and Al Badayer are clean.
 
-### 3.4 `callPoi` will emit `undefined` if a POI ships with no lines
+**Fixed** by moving two POIs rather than shrinking their triggers — the radius
+is how prominent a landmark is, and a smaller one is a worse answer than a
+better position. The Ramp moves onto the sculpted ramp's eastern flank at
+(-10, -190) instead of sitting in the gap between it and the rock, and the Old
+Race Track moves to (-300, 620), which also takes it off the flank of the
+sculpted dune at (-520, 430) — a camel track wants the flat. Guarded by an
+all-pairs assertion in `tests/poiData.test.ts`.
+
+### 3.4 `callPoi` will emit `undefined` if a POI ships with no lines *(fixed)*
 
 `src/narrative/Director.ts:319` reads `poi.lines[0]` with no guard. All 30 POIs
-currently have at least one line, so this is latent rather than live — but it is
-one careless data edit from putting the literal string `undefined` on screen as
-a radio subtitle. It belongs in the same data-invariant sweep as 3.2 and 3.3.
+had at least one line, so this was latent rather than live — but it was one
+careless data edit from putting the literal string `undefined` on screen as a
+radio subtitle.
 
-## 4. Proposed priorities
+**Fixed** by returning early on an empty pool. The discovery still counts — the
+compass and the counter are driven by the visit, not by Ahmed — he just has
+nothing to say. The data-invariant sweep asserts a non-empty pool as well, so
+the content bug is caught even though it can no longer reach the screen.
+
+### 3.5 `smoothstep` returns `NaN` for a degenerate window *(fixed)*
+
+Found by the test written for it, which is the honest way to report it.
+`smoothstep(edge0, edge1, x)` divides by `edge1 - edge0`. Off the window the
+resulting infinities clamp to 0 and 1 correctly, but at `edge0 === edge1 === x`
+it is 0/0, and `clamp01` passes `NaN` straight through.
+
+Nothing in the tree currently calls it with equal edges. But the edges are
+frequently region-derived tuning numbers, and a `NaN` from this function lands
+in the height field as a hole in the world and a physics explosion — from two
+values a region author happened to set equal. **Fixed** by collapsing the
+degenerate case to the step it is already reaching for: `x < edge0 ? 0 : 1`.
+
+## 4. The tiers, as built
 
 Ranked by defect-caught-per-line-of-test. Everything in tiers 1–3 runs in Node
 with no browser, no WebGL, and no Rapier.
 
 ### Tier 1 — Data invariants *(highest value, lowest cost)*
 
-Three of the four defects above are data problems, as was the shipped
-arrival-card bug. This is one file, perhaps 120 lines, iterating `REGIONS`:
+`tests/poiData.test.ts` and `tests/ahmedLines.test.ts`, 104 cases.
+
+Three of the five defects above are data problems, as was the shipped
+arrival-card bug. Iterating `REGIONS`:
 
 - Every POI resolves a card, and the resolved title is not another region's
   (this is precisely the `5a8fb44` regression).
@@ -155,8 +197,11 @@ error.
 
 ### Tier 2 — Persistence and migration
 
+`tests/progress.test.ts` and `tests/settings.test.ts`, 36 cases, against the
+`Map`-backed stub in `tests/localStorageStub.ts`.
+
 `loadSettings` is 75 lines of hand-written per-field validation
-(`src/settings/Settings.ts:109`) and `loadProgress` is the source of §3.1.
+(`src/settings/Settings.ts:109`) and `loadProgress` was the source of §3.1.
 Both are pure functions of a string, so they need nothing but a `localStorage`
 stub.
 
@@ -181,10 +226,15 @@ have the old blob — never by whoever is developing.
 
 ### Tier 3 — Terrain field and pure vehicle maths
 
+`tests/terrain.test.ts` and `tests/vehicleMaths.test.ts`, 45 cases.
+
 `src/terrain/height.ts` is 930 lines, explicitly documented as "deterministic and
 side-effect free", and it is the ground truth that physics, rendering and the
 traction model all read. It is the most consequential pure module in the repo and
-the natural home for property-based assertions:
+the natural home for property-based assertions. These are deliberately property
+assertions over a sampled grid rather than golden values — pinning the terrain to
+a fixed output would break on every legitimate tuning change and teach everyone
+to regenerate the fixture without reading it:
 
 - `hash2` — mean ≈ 0.5 over a large sample, range within `[0, 1)`, well
   distributed across buckets. **This is the regression test for the bug the file
@@ -211,15 +261,31 @@ the natural home for property-based assertions:
 
 ### Tier 4 — Physics/render agreement *(one test, disproportionate value)*
 
+`tests/chunkAgreement.test.ts`, 32 cases.
+
 `buildChunkGeometry` (render) and `buildChunkHeightSamples` (physics) sample
-`heightAt` independently, at different resolutions, with different index
-orderings — `[iz + ix * (n+1)]` versus `[ix * (n+1) + iz]`. If those ever
-disagree, the car drives on ground that is not the ground you can see, which is
-a whole-game bug that no unit test of either function alone would find.
+`heightAt` independently, at different resolutions, with separately written
+coordinate arithmetic — one walks out from the chunk origin, the other from its
+centre. (They index identically: `[iz + ix * (n+1)]` and `[ix * (n+1) + iz]` are
+the same expression written two ways. It is the world coordinates that could
+drift, not the layout.) If those ever disagree, the car drives on ground that is
+not the ground you can see, which is a whole-game bug that no unit test of
+either function alone would find.
 
 One test: build both for the same chunk at `PHYSICS_RESOLUTION` and assert they
-agree at every shared sample. Note that the render path also applies LOD-seam
-stitching, so the assertion needs to be made against `FLAT_EDGES`.
+agree at every shared sample. The render path also applies LOD-seam stitching,
+so the assertion is made against `FLAT_EDGES`.
+
+They currently agree bitwise, across five chunks in all three regions. Perturbing
+the physics sampler by half a metre fails all fifteen. A companion assertion ties
+both back to `heightAt` itself — agreeing with each other but not with the world
+would still be wrong — and it compares through `Math.fround`, since both builders
+store into a `Float32Array` while `heightAt` computes in float64. That narrowing
+is the storage format, not a disagreement about where the ground is.
+
+The file also covers the watertight-seam claim in `buildChunkGeometry`'s
+docblock: neighbouring chunks' shared edge vertices must be bitwise identical, or
+the boundary shows as a hairline crack and prints a dashed shadow along itself.
 
 ### Explicitly not worth testing
 
@@ -238,42 +304,84 @@ exercise:
 The line is roughly: **test the things that can be silently, factually wrong.**
 Not the things that can only look bad.
 
-## 5. Tooling
+One consequence worth naming: `InputManager` is not directly constructible in
+Node, because the sources it owns reach for `window` on the way up. Rather than
+pull in jsdom for it, `tests/inputManager.test.ts` reproduces the aggregation
+rule against injected fake sources — gamepad wins when in use, otherwise the last
+active source keeps control, and an idle-but-settling source keeps writing so
+releasing a key doesn't snap the wheel straight. That rule is the part worth
+pinning; the DOM plumbing around it is not.
 
-Vitest, because Vite is already the build tool — it reuses `vite.config.ts` and
-resolves the existing TypeScript and ESM setup with no extra configuration.
+## 5. Tooling, as set up
 
-```
-npm i -D vitest
-```
+Vitest, because Vite is already the build tool — it resolves the existing
+TypeScript and ESM setup with no extra configuration.
+
+`vitest.config.ts` is kept separate from `vite.config.ts` so the app build never
+carries the test config, and so the manual vendor chunking there cannot affect
+how tests resolve `three` or Rapier. Everything under `tests/` runs in the
+`node` environment.
 
 ```json
 "scripts": {
   "test": "vitest run",
   "test:watch": "vitest",
-  "build": "tsc --noEmit && vitest run && vite build"
+  "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+  "build": "npm run typecheck && vitest run && vite build"
 }
 ```
 
-Tiers 1–3 need no environment beyond Node; only the persistence tests need a
-`localStorage` stub, which is about eight lines of `Map`. No jsdom, no browser,
-no WebGL, no headless Chrome.
+The type-check is split across two configs on purpose. The root `tsconfig.json`
+still covers `src` alone with `types: ["vite/client"]`, so the game stays
+strictly browser-typed and importing a node builtin from `src/` remains a type
+error. `tsconfig.test.json` extends it for `tests/`, adding `vitest/globals` and
+`node` — the POI suite legitimately reads `node:fs` to check that the files the
+cards point at are really on disk.
 
-Then a GitHub Actions workflow on push and PR running `tsc --noEmit` and
-`vitest run`. Vercel already builds preview deployments per branch, so the CI
-job is purely the correctness gate the pipeline currently lacks.
+No jsdom, no browser, no WebGL, no headless Chrome. The only environment shim is
+`tests/localStorageStub.ts`, a `Map` behind the `Storage` interface with a
+`failWrites` flag standing in for Safari private mode.
 
-## 6. Suggested sequence
+`.github/workflows/ci.yml` runs `npm run typecheck` and `npm test` on pushes to
+`main` and on every pull request. It deliberately does not build — Vercel already
+does that per branch; CI is the correctness gate that was missing.
 
-| Step | Work | Catches |
-|---|---|---|
-| 1 | Vitest + CI workflow | — (enables everything else) |
-| 2 | Tier 1 data invariants | §3.2, §3.3, §3.4, and the `5a8fb44` class |
-| 3 | Fix §3.1, with the round-trip test that proves it | destroyed player progress |
-| 4 | Tier 2 persistence and migration | corrupt/legacy saves, invisible truck |
-| 5 | Tier 3 terrain and vehicle maths | the `hash2` class, `NaN` in the world |
-| 6 | Tier 4 physics/render agreement | invisible-ground divergence |
+## 6. What this catches
 
-Steps 1–3 are the ones that pay for themselves immediately: they are perhaps a
-day of work, they fix live defects, and they put a gate in front of the kind of
-content edit this project makes most often.
+Each fix was verified by reverting it and watching the suite go red, rather than
+by assuming the test would have caught it:
+
+| Reverted | Result |
+|---|---|
+| `majilis.jpg` filename | 2 failures — `The Ruler's Majlis photo missing: /photos/majlis.jpg` |
+| Fossil Rock POI positions | 1 failure — `The Fossil Bed overlaps The Ramp by 55m` |
+| Region-scoped progress key | 5 failures, incl. `expected 2 to be +0` and `expected [] to deeply equal [ 'fossilbed', 'tomb' ]` |
+| `smoothstep` degenerate guard | 1 failure — `NaN` at `edge0 === edge1 === x` |
+| Physics sampler offset by 0.5 m | 15 failures across all three regions |
+
+## 7. What shipped
+
+| | |
+|---|---|
+| Test files | 8, plus one stub helper |
+| Tests | 225 |
+| Runtime | ~1.5 s |
+| Environment | Node only |
+| CI | typecheck + tests, on push to `main` and every PR |
+
+Files:
+
+```
+tests/poiData.test.ts        POI bounds, distinct kinds, lines, radii, cards, photos
+tests/ahmedLines.test.ts     pool coverage, duplicates, one-liner rule
+tests/progress.test.ts       the §3.1 round trip, legacy migration, corrupt blobs
+tests/settings.test.ts       validation, clamping, enum fallback, v3 migration, aliasing
+tests/terrain.test.ts        hash2 distribution, smoothstep edges, field invariants
+tests/vehicleMaths.test.ts   timeBand, mergeAxle, tyre pressure monotonicity
+tests/chunkAgreement.test.ts physics/render agreement, watertight seams
+tests/inputManager.test.ts   source aggregation and steering inversion
+tests/localStorageStub.ts    the Map behind Storage
+```
+
+Not done, and deliberately left: the driving feel itself (§2) is a playtest, and
+nothing here attempts to assert it.
