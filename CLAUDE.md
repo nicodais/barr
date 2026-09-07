@@ -164,10 +164,19 @@ CLAUDE.md
 
 ---
 
-## 12. Open Questions (to resolve before/during prototype phase)
+## 12. Open Questions — resolved
 
-- Exact wording/count of Ahmed's line pool beyond the starter set in §13 — expand as POIs get finalized during the narrative pass.
-- Whether Ahmed ever references the player by name/nickname, or stays generic ("ya sir," "champion," etc.) throughout — pick during the narrative pass once POI content is locked.
+- ~~Exact wording/count of Ahmed's line pool beyond the starter set in §13~~ — no
+  fixed target; `src/data/ahmedLines.ts` is the living pool and has grown well past
+  §13's starter set below (that section now reads as the original seed, not the
+  current text — check the source file for what actually ships). Last expanded
+  2026-09-07, adding depth to the highest-frequency triggers (`stuck`, `fast`,
+  `airborne`, `rollover`); more can be added anytime under the same guardrails.
+- ~~Whether Ahmed ever references the player by name/nickname~~ — **resolved: he
+  stays generic**, rotating through *habibi*, *ya sir*, *my friend*, and *champion*.
+  Full rationale recorded in `src/data/ahmedLines.ts`'s file-level comment: no UI
+  anywhere in the game captures a player name, and adding one would be exactly the
+  kind of friction §1 exists to avoid.
 
 ---
 

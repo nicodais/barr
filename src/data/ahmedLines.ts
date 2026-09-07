@@ -25,6 +25,10 @@
  * between the player and the desert is exactly the kind of friction §1 exists
  * to avoid; a fixed name would be wrong for everyone who isn't called it. The
  * rotating address does the warmth the name was wanted for, and costs nothing.
+ *
+ * `stuck`, `fast`, `airborne`, and `rollover` — the four highest-frequency
+ * triggers — got three more lines each on 2026-09-07, since those are the ones
+ * a long or repeated session actually runs into the recycle point on.
  */
 import type { BodyId } from '../vehicle/vehicleConfig';
 import type { RegionId } from '../terrain/regions';
@@ -65,6 +69,9 @@ export const AHMED_LINES: Record<LinePool, string[]> = {
     'Rock it. Back, forward, back. Slowly.',
     'Everyone gets stuck. Not everyone manages it there.',
     'Keep that foot down and you will reach Oman. Downwards.',
+    'Handbrake off first, habibi. It is always the handbrake.',
+    "You're not stuck. You're parked, badly, in the desert.",
+    'Give it less, not more. The sand has heard "more" before.',
   ],
   fast: [
     "Slow down. This isn't a rally.",
@@ -73,6 +80,9 @@ export const AHMED_LINES: Record<LinePool, string[]> = {
     'Nothing you are late for is in that direction.',
     "I can hear that from here, and I'm inside a building.",
     'The dunes have been here nine thousand years. They will wait.',
+    'There is a speed limit out here. I have simply never enforced it.',
+    'You drive like the dune owes you money.',
+    'Wallah, slow down before the dune settles this for you.',
   ],
   airborne: [
     "I saw that jump. I'm choosing to ignore it.",
@@ -81,6 +91,9 @@ export const AHMED_LINES: Record<LinePool, string[]> = {
     "That's the second one. I stopped counting after the second one.",
     'You know the suspension is not free, habibi.',
     "Beautiful. Don't tell anyone I said that.",
+    'Four wheels, no ground. My professional opinion is unchanged.',
+    "That landing sounded expensive. I'm sure it was nothing.",
+    "One day I'll be parked on the other side of that crest. Not today, apparently.",
   ],
   rollover: [
     'Khalas. Happens to everyone. Mostly out there, apparently.',
@@ -89,6 +102,9 @@ export const AHMED_LINES: Record<LinePool, string[]> = {
     "Roof, sand, roof, sand. Yes. I've seen it.",
     'Nothing broken. Nothing ever is. Carry on.',
     "I'd ask if you're alright but you're already driving again.",
+    'On your side again. The desert has opinions about your line choice.',
+    "That's twice today. I wasn't counting the first one either.",
+    'Wheels up is not a parking style, habibi, whatever you tell yourself.',
   ],
   // The shamal coming up and going down again. He is not warning anyone — the
   // storm is not a hazard (§11) — he is a man watching the same weather he has
@@ -233,5 +249,10 @@ export const AHMED_REGION_LINES: Record<RegionId, string[]> = {
     "Badayer. Everyone's first desert and half of them never go anywhere else.",
     'Crest every hundred metres here. Stop looking at the one you are on, habibi.',
     "Busiest sand in the country. If you get stuck, somebody will see it. That is the real risk.",
+  ],
+  lahbab: [
+    "Lahbab. Steepest sand of the four, and the skyline's practically watching you drive it.",
+    'This is where the tour companies send their real drivers, not their brochures.',
+    "You can see the towers from the crest. Nobody ever quite gets used to that.",
   ],
 };

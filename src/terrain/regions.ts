@@ -2,6 +2,7 @@ import type { Poi, PoiKind } from '../data/pois';
 import { LIWA_POIS } from '../data/pois';
 import { FOSSIL_ROCK_POIS } from '../data/fossilRockPois';
 import { BADAYER_POIS } from '../data/badayerPois';
+import { LAHBAB_POIS } from '../data/lahbabPois';
 
 /**
  * The places you can drive.
@@ -167,7 +168,7 @@ export interface RegionSpec {
   gravelAmount: number;
 }
 
-export type RegionId = 'liwa' | 'fossilrock' | 'badayer';
+export type RegionId = 'liwa' | 'fossilrock' | 'badayer' | 'lahbab';
 
 /**
  * Liwa, around Tal Moreeb. Deep sand sea: no rock anywhere, because an outcrop
@@ -469,13 +470,113 @@ const BADAYER: RegionSpec = {
   gravelAmount: 0.28,
 };
 
+/**
+ * Lahbab Red Desert — inland from Dubai, on the edge of the conservation
+ * reserve.
+ *
+ * The fourth region needs its own axis, not a repeat of Badayer's. Badayer is
+ * busy because dune bashing itself is busy — a hundred private 4x4s a weekend.
+ * Lahbab is busy for a different reason: it is where the commercial safari
+ * industry actually operates, tour Land Cruisers and evening BBQ camps rather
+ * than weekend hobbyists, because it is the closest serious dune field to the
+ * city. That proximity is the whole point of the place — the skyline is close
+ * enough to be a fact of the landscape, not a rumour — and it is also, not
+ * coincidentally, why its dunes get driven harder and steeper than anywhere
+ * else in the game: professional drivers testing a line for tomorrow's tour
+ * bash it today.
+ *
+ * So: the steepest great dune of the four, a dense field with barely a rock in
+ * it (this is deep sand right up to the city's edge, not a jebel), and a POI
+ * set about commercial desert tourism and the reserve boundary rather than
+ * heritage or emptiness.
+ */
+const LAHBAB: RegionSpec = {
+  id: 'lahbab',
+  name: 'Lahbab',
+  where: 'Al Lahbab, inland Dubai',
+  blurb: 'The steepest dunes of the four, and the closest to the skyline. Serious bashers only.',
+
+  // Distinct from all three others (105, 78, 18) — a dense field trending
+  // roughly NW-SE.
+  crestBearing: (145 * Math.PI) / 180,
+  // Denser than Fossil Rock's field, not quite as wall-to-wall as Badayer's
+  // bowl — this is a dune field with room for one dune to stand out from it.
+  wavelength: 105,
+  megaWavelength: 480,
+  swell: 20,
+
+  fieldFloor: 0.38,
+  fieldFreq: 0.0029,
+  fieldOffsetX: -210,
+  fieldOffsetZ: 95,
+  fieldSpread: 0.36,
+
+  sculpted: [
+    // A steep sidehill traverse, a shade sharper than Liwa's equivalent —
+    // Lahbab's whole identity is "the steep one".
+    { x: -400, z: -150, angle: 1.2, lengthR: 220, widthR: 80, height: 34 },
+    // A sharp kicker for airtime.
+    { x: 480, z: -50, angle: 0.6, lengthR: 70, widthR: 45, height: 20 },
+    // A broad ridge toward the reserve boundary.
+    { x: -100, z: 600, angle: 2.0, lengthR: 380, widthR: 130, height: 48 },
+  ],
+
+  // The steepest climb in the game on purpose — 100m over a 190m run is
+  // roughly 28 degrees mean, well past Liwa's 23 and Badayer's 19. This is the
+  // dune the professional safari drivers test their line on before anyone
+  // else gets there.
+  greatDune: {
+    x: 200,
+    z: 260,
+    bearing: (70 * Math.PI) / 180,
+    crestR: 200,
+    height: 100,
+    climbRun: 190,
+    slipRun: 130,
+    crown: 22,
+    taper: 0.5,
+  },
+  massif: null,
+
+  palette: {
+    // The reddest of the four — Lahbab's iron-oxide sand reads even more
+    // saturated than Badayer's in low sun, which is the one thing every
+    // tour-company photo of this place agrees on.
+    sandIron: 0x9c4726,
+    sandPale: 0xb87e54,
+    gravel: 0x8f7a63,
+    sabkha: 0xc4b59f,
+    duneCrest: 0x7a2f16,
+    // No massif here either; kept sand-adjacent so nothing prints a grey hole.
+    rock: 0x83705f,
+    airborne: 0xc17a48,
+  },
+  pois: LAHBAB_POIS,
+  padFootprints: {
+    ghaf: { lengthR: 5, widthR: 5, angle: 0 },
+    watchtower: { lengthR: 11, widthR: 11, angle: 0 },
+    majlis: { lengthR: 9, widthR: 9, angle: 0 },
+    teastand: { lengthR: 4.5, widthR: 4.5, angle: 0 },
+    falconry: { lengthR: 8, widthR: 6, angle: 0 },
+    cameltrack: { lengthR: 42, widthR: 8, angle: 0 },
+    coffeehearth: { lengthR: 3, widthR: 3, angle: 0 },
+  },
+  // Some scrub along the reserve edge, less than Fossil Rock's gravel plains.
+  scatterBias: 1.2,
+  // An active dune bowl right to its margins — almost no pan.
+  sabkhaAmount: 0.05,
+  // Mostly deep sand; only a trace of serir shows through.
+  gravelAmount: 0.22,
+};
+
 export const REGIONS: Record<RegionId, RegionSpec> = {
   liwa: LIWA,
   fossilrock: FOSSIL_ROCK,
   badayer: BADAYER,
+  lahbab: LAHBAB,
 };
 
-export const REGION_ORDER: RegionId[] = ['liwa', 'fossilrock', 'badayer'];
+export const REGION_ORDER: RegionId[] = ['liwa', 'fossilrock', 'badayer', 'lahbab'];
 
 let active: RegionSpec = LIWA;
 

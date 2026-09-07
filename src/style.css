@@ -1722,6 +1722,18 @@ body.high-contrast .radio {
     linear-gradient(#a89dc0 0%, #e3a97f 74%, #d79b6d 100%);
 }
 
+/*
+ * Lahbab: one steep, narrow peak rather than Badayer's two overlapping bowl
+ * crests — the whole identity is a single very steep dune. Reddest and
+ * darkest of the four, and a duskier sky than the others: the skyline is
+ * close enough here to tint the haze.
+ */
+.mapselect-art-lahbab {
+  background:
+    radial-gradient(70% 190% at 50% 150%, #6b2410 0%, #5c1e0c 40%, transparent 41%),
+    linear-gradient(#8f88ab 0%, #d1875a 62%, #b5623a 100%);
+}
+
 .mapselect-name {
   margin: 0 13px;
   font-size: 15px;
