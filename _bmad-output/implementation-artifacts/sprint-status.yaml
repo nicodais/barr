@@ -17,6 +17,7 @@
 #   - done: Retrospective has been completed
 
 # Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
 #   - in-progress: Actively being worked on
 #   - done: Completed
 
