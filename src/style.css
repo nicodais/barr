@@ -891,8 +891,9 @@ body.high-contrast .radio {
 .poi-card img {
   display: block;
   width: 100%;
-  aspect-ratio: 2.4 / 1;
-  object-fit: cover;
+  aspect-ratio: 1.8 / 1;
+  object-fit: contain;
+  background: #171b17;
 }
 
 .poi-card img[hidden] {
@@ -911,7 +912,18 @@ body.high-contrast .radio {
   margin: 0 12px 9px;
   font-size: 8.5px;
   line-height: 1.3;
-  opacity: 0.38;
+  opacity: 0.72;
+}
+
+.poi-card small a {
+  color: inherit;
+  pointer-events: auto;
+  text-underline-offset: 2px;
+}
+
+.poi-card .poi-photo-caption {
+  margin-top: 7px;
+  opacity: 0.72;
 }
 
 .poi-card small[hidden] {
@@ -2058,7 +2070,7 @@ body.high-contrast .radio {
   inset: 0;
   background: linear-gradient(90deg, rgba(12,19,23,0.82), rgba(12,19,23,0.28) 68%),
     linear-gradient(0deg, rgba(12,19,23,0.96), transparent 75%),
-    url('/photos/famousdune.jpg') center 45% / cover;
+    url('/photos/famousdune-commons.jpg') center 45% / cover;
   opacity: 0.88;
   pointer-events: none;
 }
@@ -2107,10 +2119,12 @@ body.high-contrast .radio {
   width: 100%;
   height: clamp(85px, 13vh, 135px);
   margin-bottom: 13px;
-  background: url('/photos/famousdune.jpg') center / cover;
+  background: url('/photos/famousdune-commons.jpg') center / cover;
   filter: saturate(0.62);
 }
-.mapselect-art-fossilrock { background-image: url('/photos/fossilbed.jpg'); background-position: center 65%; }
+.mapselect-art-badayer { background-image: url('/photos/bigred-commons.jpg'); }
+.mapselect-art-lahbab { background-image: url('/photos/lahbab-commons.jpg'); }
+.mapselect-art-fossilrock { background-image: url('/photos/ramp-commons.jpg'); background-position: center 65%; }
 .mapselect-art-badayer { background-position: 85% 65%; background-size: 170%; }
 .mapselect-art-lahbab { background-position: 15% 40%; background-size: 190%; }
 .mapselect-name { color: #f2ebdf; font-size: 17px; font-weight: 450; margin: 0 15px 5px; }

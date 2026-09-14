@@ -25,6 +25,8 @@ export class PoiCard {
   private title: HTMLElement;
   private body: HTMLElement;
   private credit: HTMLElement;
+  private caption: HTMLElement;
+  private displayedPoi?: Poi;
   private header: HTMLButtonElement;
   private details: HTMLElement;
   private inner: HTMLElement;
@@ -61,21 +63,14 @@ export class PoiCard {
     this.photo.alt = '';
     this.photo.decoding = 'async';
     this.photo.loading = 'lazy';
-    // Real photos live at /photos/{id}.jpg, dropped in by hand. Until one
-    // exists, fall back to the in-palette .svg postcard; if that's missing too,
-    // collapse to text-only rather than a broken icon.
-    this.photo.addEventListener('error', () => {
-      const src = this.photo.getAttribute('src') ?? '';
-      if (src.endsWith('.jpg')) {
-        this.photo.src = src.replace(/\.jpg$/, '.svg');
-      } else {
-        this.photo.hidden = true;
-      }
-    });
+    // If a local asset fails, retain readable text instead of an unrelated fallback.
+    this.photo.addEventListener('error', () => { this.photo.hidden = true; });
+    this.caption = document.createElement('small');
+    this.caption.className = 'poi-photo-caption';
 
     this.body = document.createElement('p');
     this.credit = document.createElement('small');
-    this.inner.append(this.photo, this.body, this.credit);
+    this.inner.append(this.photo, this.caption, this.body, this.credit);
     this.details.append(this.inner);
     this.element.append(this.header, this.details);
   }
@@ -85,18 +80,31 @@ export class PoiCard {
     const info = { ...POI_INFO[poi.id], ...poi.info };
     this.title.textContent = info.title;
     this.body.textContent = info.body;
-    // Credits are stored as full source URLs, which wrap to two lines of grey
-    // slug on a phone. The host is the attribution — it names who the photo
-    // came from, which is the whole obligation — and it fits on one line.
-    this.credit.textContent = info.credit ? creditHost(info.credit) : '';
-    this.credit.hidden = !info.credit;
-    if (info.photo) {
-      this.photo.hidden = false;
-      if (this.photo.getAttribute('src') !== info.photo) {
-        this.photo.src = info.photo;
+    if (this.displayedPoi !== poi) {
+      this.displayedPoi = poi;
+      this.photo.alt = info.photoAlt ?? info.title;
+      this.caption.textContent = info.photoAlt ?? '';
+      this.caption.hidden = !info.photo || !info.photoAlt;
+      this.credit.replaceChildren();
+      this.credit.hidden = !info.credit;
+      if (info.credit) {
+        const source = document.createElement('a');
+        source.textContent = info.credit;
+        source.href = info.source ?? '/photos/index.html';
+        source.target = '_blank';
+        source.rel = 'noopener noreferrer';
+        this.credit.append('Photo: ', source);
+        if (info.license && info.licenseUrl) {
+          const license = document.createElement('a');
+          license.textContent = info.license;
+          license.href = info.licenseUrl;
+          license.target = '_blank';
+          license.rel = 'noopener noreferrer';
+          this.credit.append(' · ', license);
+        }
       }
-    } else {
-      this.photo.hidden = true;
+      this.photo.hidden = !info.photo;
+      if (info.photo && this.photo.getAttribute('src') !== info.photo) this.photo.src = info.photo;
     }
     // `show` is called every frame the player is inside the radius, so it must
     // be idempotent — re-arming the dwell timer here would mean the card never
@@ -135,14 +143,5 @@ export class PoiCard {
       clearTimeout(this.timer);
       this.timer = null;
     }
-  }
-}
-
-/** "https://www.example.com/a/b" -> "example.com". Non-URLs pass through. */
-function creditHost(credit: string): string {
-  try {
-    return `Photo: ${new URL(credit).hostname.replace(/^www\./, '')}`;
-  } catch {
-    return credit;
   }
 }

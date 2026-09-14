@@ -1,3 +1,4 @@
+import { POI_PHOTOS } from './poiPhotos';
 import type { Poi } from './pois';
 
 /**
@@ -33,8 +34,7 @@ export const BADAYER_POIS: Poi[] = [
         'most people in the Emirates first drove on sand. Weekends bring a queue of 4x4s ' +
         'and quad hire at the foot of it; the iron in the sand is what gives it the colour ' +
         'and the name.',
-      photo: undefined,
-      credit: undefined,
+      ...POI_PHOTOS.bigred,
     },
   },
   {
@@ -62,8 +62,7 @@ export const BADAYER_POIS: Poi[] = [
         'from a well and a pump rather than a falaj. Date palms tolerate salt and heat ' +
         'that almost nothing else will, which is why they mark the last cultivable ground ' +
         'before the dunes take over.',
-      photo: undefined,
-      credit: undefined,
+      ...POI_PHOTOS.oasis,
     },
   },
   {

@@ -344,10 +344,16 @@ export class MenuPanel {
       this.garageButton(),
     );
     const credits=document.createElement('a');
-    credits.href=import.meta.env.BASE_URL+'audio/CREDITS.md';
-    credits.textContent='Engine recording credits';credits.target='_blank';credits.rel='noopener';
+    credits.href=import.meta.env.BASE_URL+'audio/index.html';
+    credits.textContent='Music & engine recording credits';credits.target='_blank';credits.rel='noopener';
     credits.style.cssText='display:block;margin:12px 0;color:inherit;font-size:11px;opacity:.7';
-    this.element.append(credits);
+    const photoCredits = document.createElement('a');
+    photoCredits.href = import.meta.env.BASE_URL + 'photos/index.html';
+    photoCredits.textContent = 'POI photo credits';
+    photoCredits.target = '_blank';
+    photoCredits.rel = 'noopener';
+    photoCredits.style.cssText = credits.style.cssText;
+    this.element.append(credits, photoCredits);
   }
 
   /** Called by Game once a region swap has finished rebuilding the world. */

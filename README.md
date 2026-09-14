@@ -400,3 +400,18 @@ auto-deploy on main and preview builds on branches (§10 phase 6).
   and touch schemes are verified in an emulated viewport only — that proves the layout and
   the plumbing, not the frame rate or how the controls actually feel under a thumb.
 - Photo mode composes around the truck only; there's no detached free-fly camera.
+
+## Media sources
+
+The shared-link thumbnail is a current in-game capture in `public/share-desert-2026.jpg`.
+Open Graph and Twitter tags use its new absolute Vercel URL so new previews request the new asset.
+
+All POI kinds and regional card overrides have openly licensed local photographs.
+Photographer/source and licence links appear on the cards; the menu opens the full
+[photo catalogue and attribution](public/photos/index.html). Source URLs, licences,
+download records and display modifications are in [the manifest](public/photos/manifest.json).
+Captions distinguish regional examples from exact sites, including the Bahrain oil-well reference.
+
+Background music is “Desert City” by Kevin MacLeod, CC BY 4.0, replacing the recording
+whose YouTube source could not be traced. Music and engine credits are available from
+the menu and in [audio credits](public/audio/CREDITS.md).
