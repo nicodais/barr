@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { buildGazelle, patchAnimal } from './animalGeometry';
 import { heightAt } from '../terrain/height';
 
 /**
@@ -62,8 +62,8 @@ export class Wildlife {
       return geo;
     };
 
-    this.coat = this.makeMesh(attach(parts.coat), 0xbb9d6d, capacity);
-    this.dark = this.makeMesh(attach(parts.dark), 0x4b4038, capacity);
+    this.coat = this.makeMesh(attach(parts.coat), capacity);
+    this.dark = this.makeMesh(attach(parts.dark), capacity);
     this.group.add(this.coat, this.dark);
     this.group.matrixAutoUpdate = false;
   }
@@ -165,93 +165,20 @@ export class Wildlife {
 
   private makeMesh(
     geometry: THREE.BufferGeometry,
-    color: number,
     capacity: number,
   ): THREE.InstancedMesh {
-    const material = new THREE.MeshLambertMaterial({ color, flatShading: true });
-    material.onBeforeCompile = (shader) => {
-      shader.uniforms.uTime = this.timeUniform;
-      shader.vertexShader = shader.vertexShader
-        .replace(
-          '#include <common>',
-          '#include <common>\nuniform float uTime;\nattribute float aPhase;\nattribute float aGait;',
-        )
-        .replace(
-          '#include <begin_vertex>',
-          `#include <begin_vertex>
-           // Legs swing fore/aft, diagonal pairs in antiphase; the body bobs.
-           float legMask = smoothstep( 0.62, 0.12, transformed.y );
-           float pairOffset = transformed.z > 0.0 ? 0.0 : 3.14159;
-           float cycle = uTime * 9.0 + aPhase + pairOffset;
-           transformed.z += sin( cycle ) * legMask * 0.26 * aGait;
-           transformed.y += abs( sin( uTime * 9.0 + aPhase ) ) * 0.04 * aGait;`,
-        );
-    };
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.88 });
+    material.onBeforeCompile = shader => patchAnimal(shader, this.timeUniform, false);
 
     const mesh = new THREE.InstancedMesh(geometry, material, capacity);
     mesh.count = 0;
     mesh.castShadow = true;
+    const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+    depth.onBeforeCompile = shader => patchAnimal(shader, this.timeUniform, false);
+    mesh.customDepthMaterial = depth;
     mesh.frustumCulled = false;
     return mesh;
   }
-}
-
-/** Slender, long-legged, faces +Z. Split by material so legs can be darker. */
-function buildGazelle(): { coat: THREE.BufferGeometry; dark: THREE.BufferGeometry } {
-  const coat: THREE.BufferGeometry[] = [];
-  const dark: THREE.BufferGeometry[] = [];
-
-  const body = new THREE.BoxGeometry(0.4, 0.44, 1.0);
-  body.translate(0, 0.82, 0);
-  coat.push(body);
-
-  const rump = new THREE.BoxGeometry(0.36, 0.38, 0.3);
-  rump.translate(0, 0.86, -0.55);
-  coat.push(rump);
-
-  const neck = new THREE.BoxGeometry(0.19, 0.46, 0.2);
-  neck.rotateX(-0.42);
-  neck.translate(0, 1.12, 0.44);
-  coat.push(neck);
-
-  const head = new THREE.BoxGeometry(0.16, 0.17, 0.34);
-  head.rotateX(0.2);
-  head.translate(0, 1.36, 0.62);
-  coat.push(head);
-
-  // Legs, in four pairs of upper/lower so the swing mask has something to bend.
-  for (const sx of [-1, 1]) {
-    for (const sz of [1, -1]) {
-      const leg = new THREE.BoxGeometry(0.085, 0.78, 0.1);
-      leg.translate(sx * 0.15, 0.39, sz * 0.34);
-      dark.push(leg);
-      const hoof = new THREE.BoxGeometry(0.1, 0.09, 0.12);
-      hoof.translate(sx * 0.15, 0.05, sz * 0.34);
-      dark.push(hoof);
-    }
-  }
-
-  // Horns: short, swept back.
-  for (const sx of [-1, 1]) {
-    const horn = new THREE.ConeGeometry(0.026, 0.3, 4);
-    horn.rotateX(-0.5);
-    horn.translate(sx * 0.055, 1.55, 0.55);
-    dark.push(horn);
-  }
-
-  const muzzle = new THREE.BoxGeometry(0.13, 0.11, 0.1);
-  muzzle.translate(0, 1.31, 0.79);
-  dark.push(muzzle);
-
-  const tail = new THREE.BoxGeometry(0.06, 0.2, 0.06);
-  tail.rotateX(0.3);
-  tail.translate(0, 0.86, -0.72);
-  dark.push(tail);
-
-  return {
-    coat: mergeGeometries(coat, false) ?? body,
-    dark: mergeGeometries(dark, false) ?? body,
-  };
 }
 
 function wrapAngle(a: number): number {

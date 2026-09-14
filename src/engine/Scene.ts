@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Sky } from './Sky';
+import { Environment } from './Environment';
 import type { SkyState } from './TimeOfDay';
 import type { QualityProfile } from './Quality';
 
@@ -46,6 +47,7 @@ export class SceneRig {
   readonly sky = new Sky();
 
   private fog: THREE.Fog;
+  private environment: Environment;
   private sunDir = new THREE.Vector3();
   private maxPixelRatio = 2;
   private shadowsAllowed = true;
@@ -62,33 +64,11 @@ export class SceneRig {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Tone mapping, and it is load-bearing for the palette rather than a
-    // finishing touch.
-    //
-    // The keyframes run the sun at 2.4-3.0x "normal daylight" (see LIGHT_SCALE),
-    // so sand with an albedo around 0.7 reflects well over 1.0 whenever the sun
-    // is high. Clipped, every one of those pixels lands on pure white — and
-    // white is not a lighter red, it is *no* red. The whole grain-sorting model
-    // that makes the ridges run iron-red was being thrown away at exactly the
-    // times of day the light is strongest.
-    //
-    // Neutral rather than ACES, which is the obvious pick and the wrong one
-    // here. ACES's RRT walks saturated oranges toward yellow-white — precisely
-    // the convergence this is meant to prevent, applied to precisely the hue the
-    // region is built on. Measured over the ground half of the frame, the
-    // saturation of the brightest decile of sand:
-    //
-    //             midday   afternoon   golden
-    //     ACES      0.23      0.36       0.49
-    //     Neutral   0.43      0.54       0.59
-    //
-    // Both hold at 0% railed pixels, so the highlight protection is a wash and
-    // the only thing separating them is how much of the red survives it.
-    // Neutral is near-identity below its knee, so the big flat colour fields
-    // keep their authored hue and the roll-off is held back for crests and sun
-    // glow, which is where it is actually needed.
-    this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    // Filmic highlight compression preserves detail in sunlit sand and paint.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.environment = new Environment(this.renderer, this.sky.mesh);
 
     this.fog = new THREE.Fog(0xe8b98a, 180, 950);
     this.scene.fog = this.fog;
@@ -103,16 +83,15 @@ export class SceneRig {
     this.sun.shadow.camera.right = SHADOW_EXTENT;
     this.sun.shadow.camera.top = SHADOW_EXTENT;
     this.sun.shadow.camera.bottom = -SHADOW_EXTENT;
-    this.sun.shadow.bias = -0.0006;
+    this.sun.shadow.bias = -0.00025;
     // Was 0.6, which pushed the shadow lookup 60cm along the surface normal and
     // visibly detached the truck's shadow from the truck — a direct contributor
     // to it reading as hovering.
-    this.sun.shadow.normalBias = 0.08;
+    this.sun.shadow.normalBias = 0.06;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
 
-    // The cool sky term is what puts indigo in the shadows rather than just
-    // darkening the sand — the single biggest lever on the Firewatch look (§4).
+    // Diffuse skylight and sand bounce fill the shadow side of the vehicle.
     this.hemi = new THREE.HemisphereLight(0x89a6d6, 0xb08355, 1.05);
     this.scene.add(this.hemi);
   }
@@ -130,7 +109,7 @@ export class SceneRig {
     // the sun weakens, the shadows fill in, and the whole scene loses a little
     // of its modelling. That trade is most of what a hazy day *looks* like, and
     // it costs two multiplies.
-    this.sun.intensity = state.sunIntensity * (1 - 0.26 * state.haze) * LIGHT_SCALE;
+    this.sun.intensity = state.sunIntensity * (1 - 0.26 * state.haze) * LIGHT_SCALE * 0.78;
     this.sun.position.copy(focus).addScaledVector(this.sunDir, SUN_DISTANCE);
     this.sun.target.position.copy(focus);
     this.sun.target.updateMatrixWorld();
@@ -142,7 +121,7 @@ export class SceneRig {
     // while the sky it's supposed to be coming from has gone sand-coloured.
     this.hemi.color.copy(state.hemiSky).lerp(state.hazeColor, state.haze * 0.55);
     this.hemi.groundColor.copy(state.hemiGround);
-    this.hemi.intensity = state.hemiIntensity * (1 + 0.34 * state.haze) * LIGHT_SCALE;
+    this.hemi.intensity = state.hemiIntensity * (1 + 0.34 * state.haze) * LIGHT_SCALE * 0.42;
 
     // Aerial perspective has to agree with the sky it fades into, or the
     // horizon prints a seam where the fogged terrain meets the dome.
@@ -156,6 +135,7 @@ export class SceneRig {
     this.fog.far = state.fogFar * squeeze;
 
     this.sky.update(state, this.sunDir, camera);
+    this.environment.update(this.scene, state, this.sunDir);
   }
 
   setSize(width: number, height: number) {

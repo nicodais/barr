@@ -1,12 +1,16 @@
+import { preloadAnimalGeometry } from '../world/animalGeometry';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { SceneRig } from './Scene';
 import { ChaseCamera } from './ChaseCamera';
+import { clampAboveGround } from './cameraClearance';
 import { TimeOfDay } from './TimeOfDay';
 import { TerrainStreamer } from '../terrain/TerrainStreamer';
 import { heightAt, softnessAt } from '../terrain/height';
 import { Vehicle } from '../vehicle/Vehicle';
 import { createVehicleView, isTwoWheeled, type VehicleView } from '../vehicle/vehicleMesh';
+import { SandSpray } from '../vehicle/SandSpray';
+import { emptyWheelState } from '../vehicle/twoWheeled';
 import { DustSystem } from '../vehicle/DustSystem';
 import { ContactShadow } from '../vehicle/ContactShadow';
 import { TrackSystem } from '../vehicle/TrackSystem';
@@ -70,6 +74,9 @@ export class Game {
   private vehicle: Vehicle;
   private view: VehicleView;
   private dust = new DustSystem();
+  private sandSpray=new SandSpray();
+  private visualContacts=Array.from({length:4},()=>emptyWheelState());
+  private contactCentre=new THREE.Vector3();
   private contactShadow = new ContactShadow();
   private tracks = new TrackSystem();
   private scatter = new Scatter();
@@ -79,8 +86,8 @@ export class Game {
   private avalanche = new Avalanche();
   private weather = new Weather();
   private camels = new Camels();
-  private convoys = new Convoys();
-  private dayTraffic = new DayTraffic();
+  private convoys = new Convoys(variant => createVehicleView({ body: variant ? 'pickup' : 'wagon', paint: variant ? 'slate' : 'bone', wheels: 'steel' }));
+  private dayTraffic = new DayTraffic(variant => createVehicleView({ body: variant ? 'pickup' : 'wagon', paint: variant ? 'safari' : 'bone', wheels: variant ? 'steel' : 'alloy' }));
   private headlights = new Headlights();
   private chase: ChaseCamera;
   private input: InputManager;
@@ -214,6 +221,7 @@ export class Game {
     this.rig.scene.add(this.tracks.mesh);
     this.rig.scene.add(this.contactShadow.mesh);
     this.rig.scene.add(this.dust.points);
+    this.rig.scene.add(this.sandSpray.mesh);
 
     this.worldProps.add(createLandmarks());
     // Solid, damage-free colliders for those same landmarks (§11).
@@ -503,7 +511,7 @@ export class Game {
   }
 
   static async create(canvas: HTMLCanvasElement, uiRoot: HTMLElement): Promise<Game> {
-    await RAPIER.init();
+    await Promise.all([RAPIER.init(), preloadAnimalGeometry()]);
     return new Game(canvas, uiRoot);
   }
 
@@ -532,18 +540,23 @@ export class Game {
    * angle itself, so it never stops.
    */
   private orbitPreview(dt: number) {
-    this.previewAngle += dt * 0.22;
+    this.previewAngle += dt * 0.12;
     const cam = this.chase.camera;
     const radius = 8.4;
     const target = this.renderPos;
     cam.position.set(
       target.x + Math.sin(this.previewAngle) * radius,
-      target.y + 2.5,
+      target.y + 1.8,
       target.z + Math.cos(this.previewAngle) * radius,
     );
     // Aimed a little above the sills so the car sits in the frame rather than
     // on its bottom edge, and never below the horizon.
+    cam.position.y = clampAboveGround(cam.position.x, cam.position.y, cam.position.z);
     cam.lookAt(target.x, target.y + 0.55, target.z);
+    // Reserve the left third for vehicle choices on desktop.
+    const width = window.innerWidth, height = window.innerHeight;
+    if (width > 760) cam.setViewOffset(width, height, -width * 0.18, 0, width, height);
+    else cam.clearViewOffset();
   }
 
   /**
@@ -670,6 +683,14 @@ export class Game {
       this.prevPos.copy(this.curPos);
       this.prevQuat.copy(this.curQuat);
 
+      for(let i=0;i<this.vehicle.wheels.length;i++){
+        const wheel=this.visualContacts[i];
+        // The bike's two visual contacts sit between each pair of support rays.
+        const mate=isTwoWheeled(this.settings.vehicle.body)?this.visualContacts[i^1]:wheel;
+        const contactHeight=wheel.contact&&mate.contact
+          ?this.terrain.surface.heightOffsetAt((wheel.contactX+mate.contactX)/2,(wheel.contactZ+mate.contactZ)/2):0;
+        this.vehicle.setContactSurfaceHeight(i,contactHeight);
+      }
       this.vehicle.update(controls, FIXED_DT);
       this.world.step();
 
@@ -697,6 +718,7 @@ export class Game {
     // Speed feeds the two-wheeler lean; the closed bodies ignore it.
     this.view.update(this.vehicle.wheels, this.vehicle.telemetry.speed);
 
+    if (!this.choosing && this.chase.camera.view?.enabled) this.chase.camera.clearViewOffset();
     if (this.choosing) {
       this.orbitPreview(frameDt);
     } else if (this.photo.active) {
@@ -761,11 +783,13 @@ export class Game {
     // Without the sand term the dust reads as pale smoke against red dunes.
     this.dustColor.copy(this.timeOfDay.state.sunColor).lerp(this.timeOfDay.state.horizon, 0.45);
     this.dustColor.lerp(airborneSand(this.airborneColor), 0.4);
+    this.dustColor.multiplyScalar(1 - this.timeOfDay.state.night * 0.94);
     this.dust.setColor(this.dustColor);
+    this.sandSpray.setColor(this.airborneColor);
     this.plumes.setColor(this.dustColor);
     // Sloughed sand is lit the same way, but it never left the ground, so it
     // keeps more of the dune's own colour and less of the sky's.
-    this.avalanche.setColor(this.slumpColor.copy(this.dustColor).lerp(this.airborneColor, 0.45));
+    this.avalanche.setColor(this.slumpColor.copy(this.airborneColor).multiplyScalar(1 - this.timeOfDay.state.night * 0.94).lerp(this.dustColor, 0.55));
     // Same wind that drives the sky's haze, so the weather is one thing (§6).
     this.plumes.setStorm(this.weather.intensity);
     this.plumes.update(
@@ -778,20 +802,44 @@ export class Game {
     // Ground-contact feedback. Both are driven off wheel contact points rather
     // than the body, so they mark where the truck actually meets the sand and
     // vanish the moment it doesn't.
+    // Align surface feedback to the rendered hubs. The buggy and bike have
+    // shorter visual wheelbases than the shared suspension support rays.
+    this.view.root.updateMatrixWorld(true);
+    const single=isTwoWheeled(this.settings.vehicle.body);
+    for(let i=0;i<4;i++){
+      const physical=this.vehicle.wheels[i],out=this.visualContacts[i];
+      Object.assign(out,physical);
+      const hub=this.view.wheels[single?Math.floor(i/2):i];
+      hub.getWorldPosition(this.contactCentre);
+      const radius=single?(i<2?.35:.33):this.settings.vehicle.body==='buggy'?.40:.42;
+      out.contactX=this.contactCentre.x-physical.normalX*radius;
+      out.contactZ=this.contactCentre.z-physical.normalZ*radius;
+      out.contactY=physical.contactY-(physical.normalX*(out.contactX-physical.contactX)+physical.normalZ*(out.contactZ-physical.contactZ))/Math.max(.3,physical.normalY);
+    }
+    this.terrain.surface.update(frameDt,this.renderPos.x,this.renderPos.z,this.visualContacts,this.vehicle.telemetry.speed,controls.throttle,isTwoWheeled(this.settings.vehicle.body),Math.max(controls.brake,controls.handbrake),this.vehicle.telemetry.slipAngle);
+    this.tracks.setSurfacePatch(this.terrain.sand.uPatchArea.value);
+    this.forward.set(0, 0, 1).applyQuaternion(this.renderQuat);
+    const travelSign=this.vehicle.telemetry.forwardSpeed<-.2?-1:1;
+    this.dust.setDirection(this.forward.x*travelSign, this.forward.z*travelSign);
+    this.dust.setWind(this.terrain.sand.uWind.value.x, this.terrain.sand.uWind.value.y);
     this.dust.emitFromWheels(
-      this.vehicle.wheels,
+      this.visualContacts,
       this.vehicle.telemetry.speed,
       frameDt,
       landingImpact,
       isTwoWheeled(this.settings.vehicle.body),
+      controls.throttle,
+      this.vehicle.telemetry.slipAngle,
+      Math.max(controls.brake,controls.handbrake),
     );
     this.dust.update(frameDt);
+    this.sandSpray.update(frameDt,this.visualContacts,this.vehicle.telemetry.speed,controls.throttle,this.vehicle.telemetry.slipAngle,Math.max(controls.brake,controls.handbrake),this.forward,single);
     // Sand letting go under the wheels on a slip face. Reads the same wheel
     // contacts the dust does, but keys off the *steepness* of the face rather
     // than the speed across it.
-    this.avalanche.update(frameDt, this.vehicle.wheels, this.vehicle.telemetry.speed);
+    this.avalanche.update(frameDt, this.visualContacts, this.vehicle.telemetry.speed);
     this.contactShadow.update(
-      this.vehicle.wheels,
+      this.visualContacts,
       this.renderQuat,
       frameDt,
       isTwoWheeled(this.settings.vehicle.body),
@@ -799,7 +847,7 @@ export class Game {
     // Rear wheels only: on a 4x4 the fronts run the same line, so laying all
     // four would just z-fight two ribbons against each other.
     this.tracks.update(
-      this.vehicle.wheels,
+      this.visualContacts,
       [2, 3],
       frameDt,
       isTwoWheeled(this.settings.vehicle.body),

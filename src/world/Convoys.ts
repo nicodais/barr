@@ -1,5 +1,6 @@
+import { TrafficFleet, type TrafficModelFactory } from './TrafficFleet';
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
 import {
   emptyRoutePoint, routeLead, routeScale, sampleRoute, type Route, type RoutePoint,
 } from './routes';
@@ -54,10 +55,10 @@ const ROUTES: Route[] = [
 
 /** Lamp positions on the body, relative to its centre at ground level. */
 const LAMPS = [
-  { x: 0.66, y: 0.95, z: 2.05, front: true },
-  { x: -0.66, y: 0.95, z: 2.05, front: true },
-  { x: 0.72, y: 0.95, z: -2.05, front: false },
-  { x: -0.72, y: 0.95, z: -2.05, front: false },
+  { x: 0.66, y: 1.21, z: 2.05, front: true },
+  { x: -0.66, y: 1.21, z: 2.05, front: true },
+  { x: 0.72, y: 1.21, z: -2.05, front: false },
+  { x: -0.72, y: 1.21, z: -2.05, front: false },
 ];
 
 const WHITE = new THREE.Color(0xffeccb);
@@ -66,16 +67,15 @@ const RED = new THREE.Color(0xff4a2a);
 export class Convoys {
   readonly group = new THREE.Group();
 
-  private bodies: THREE.InstancedMesh;
+  private bodies: TrafficFleet;
   private glows: THREE.InstancedMesh;
-  private bodyGeo: THREE.BufferGeometry;
   private glowGeo: THREE.CircleGeometry;
-  private bodyMat: THREE.MeshLambertMaterial;
   private glowMat: THREE.MeshBasicMaterial;
 
   private dummy = new THREE.Object3D();
   private tint = new THREE.Color();
   private toCam = new THREE.Vector3();
+  private bodyMatrix = new THREE.Matrix4();
   private point: RoutePoint = emptyRoutePoint();
   private t = 0;
   /** Routes currently switched on, from the quality tier. */
@@ -83,15 +83,10 @@ export class Convoys {
 
   private static readonly MAX_VEHICLES = ROUTES.reduce((n, r) => n + r.count, 0);
 
-  constructor() {
-    this.bodyGeo = buildAnonymousBody(0x2f2b28);
-    this.bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    this.bodies = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, Convoys.MAX_VEHICLES);
-    this.bodies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.bodies.frustumCulled = false;
-    this.bodies.castShadow = false;
+  constructor(factory: TrafficModelFactory) {
+    this.bodies = new TrafficFleet(factory, Convoys.MAX_VEHICLES);
 
-    this.glowGeo = new THREE.CircleGeometry(1, 8);
+    this.glowGeo = new THREE.CircleGeometry(1, 32);
     this.glowMat = new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 0.9,
@@ -100,6 +95,10 @@ export class Convoys {
       // The one thing in the world allowed to survive the haze — see above.
       fog: false,
     });
+    this.glowMat.onBeforeCompile = shader => {
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vGlowUV;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlowUV = uv;');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vGlowUV;').replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.a *= pow(max(0.0, 1.0 - length(vGlowUV * 2.0 - 1.0)), 2.5);');
+    };
     this.glows = new THREE.InstancedMesh(
       this.glowGeo, this.glowMat, Convoys.MAX_VEHICLES * LAMPS.length,
     );
@@ -109,7 +108,7 @@ export class Convoys {
     // is behind the dune rather than shining through it.
     this.glows.renderOrder = 9;
 
-    this.group.add(this.bodies, this.glows);
+    this.group.add(this.bodies.group, this.glows);
     this.group.visible = false;
   }
 
@@ -128,6 +127,7 @@ export class Convoys {
     const fade = Math.min(1, (night - NIGHT_ON) / 0.3);
     this.t += dt;
 
+    this.bodies.begin();
     let v = 0;
     let g = 0;
     for (let r = 0; r < this.routes; r++) {
@@ -141,23 +141,22 @@ export class Convoys {
         const { x, z, y, fx, fz, yaw, pitch } = p;
 
         this.dummy.position.set(x, y, z);
-        this.dummy.rotation.set(pitch, yaw, 0, 'YXZ');
+        this.dummy.rotation.set(pitch, yaw, p.roll, 'YXZ');
         this.dummy.scale.setScalar(1);
         this.dummy.updateMatrix();
-        this.bodies.setMatrixAt(v++, this.dummy.matrix);
+        this.bodies.setMatrixAt(v++, this.dummy.matrix, -this.t * route.speed / 0.42);
+        this.bodyMatrix.copy(this.dummy.matrix);
 
         // How square-on this vehicle is to the camera, +1 coming at you.
         this.toCam.set(camera.x - x, 0, camera.z - z);
         const dist = this.toCam.length() || 1;
         const facing = (this.toCam.x * fx + this.toCam.z * fz) / dist;
         // Sub-pixel at range unless it grows: this is what makes them read.
-        const size = 0.34 + dist * 0.0075;
+        const size = Math.min(2.2, 0.14 + dist * 0.003);
 
         for (const lamp of LAMPS) {
           // Rotate the lamp offset into world space by the vehicle's yaw.
-          const lx = x + (lamp.x * Math.cos(yaw) + lamp.z * Math.sin(yaw));
-          const lz = z + (-lamp.x * Math.sin(yaw) + lamp.z * Math.cos(yaw));
-          this.dummy.position.set(lx, y + lamp.y, lz);
+          this.dummy.position.set(lamp.x, lamp.y, lamp.z).applyMatrix4(this.bodyMatrix);
           // Object3D.lookAt points +Z at the target for non-cameras, which is
           // exactly the face of a CircleGeometry. Building the matrix by hand
           // is the same call with eye and target swapped, and gets it backwards.
@@ -177,86 +176,16 @@ export class Convoys {
       }
     }
 
-    this.bodies.count = v;
+    this.bodies.end();
     this.glows.count = g;
-    this.bodies.instanceMatrix.needsUpdate = true;
     this.glows.instanceMatrix.needsUpdate = true;
     if (this.glows.instanceColor) this.glows.instanceColor.needsUpdate = true;
   }
 
   dispose() {
-    this.bodyGeo.dispose();
     this.glowGeo.dispose();
-    this.bodyMat.dispose();
     this.glowMat.dispose();
     this.bodies.dispose();
     this.glows.dispose();
   }
-}
-
-/**
- * A generic 4x4 in five boxes, origin at ground level between the wheels.
- *
- * Kept anonymous on purpose. These are other people, and giving them one of the
- * player's own bodies would raise the question of which one — and then of why
- * you can't catch it. Shared with the daytime traffic for the same reason.
- */
-export function buildAnonymousBody(paint = 0x6d5f52): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
-
-  /** Paint a part a flat colour, move it into place, and keep it. */
-  const at = (g: THREE.BufferGeometry, colour: number, x: number, y: number, z: number) => {
-    g.translate(x, y, z);
-    const n = g.toNonIndexed();
-    g.dispose();
-    const count = n.getAttribute('position').count;
-    const c = new Float32Array(count * 3);
-    const col = new THREE.Color(colour);
-    for (let i = 0; i < count; i++) {
-      c[i * 3] = col.r;
-      c[i * 3 + 1] = col.g;
-      c[i * 3 + 2] = col.b;
-    }
-    n.setAttribute('color', new THREE.BufferAttribute(c, 3));
-    parts.push(n);
-    return n;
-  };
-
-  const glass = 0x2b3138;
-  const trim = 0x3b352f;
-  const rubber = 0x1b1a19;
-
-  // Chassis rail and the lower body, slightly narrower than the tub above it so
-  // the silhouette has a shoulder rather than being one slab.
-  at(new THREE.BoxGeometry(1.72, 0.30, 4.24), trim, 0, 0.66, 0);
-  at(new THREE.BoxGeometry(1.88, 0.62, 4.12), paint, 0, 1.06, 0);
-  // Cab: a glass band with a roof over it, which is what actually makes this
-  // read as a vehicle rather than a crate at any distance you can see it.
-  at(new THREE.BoxGeometry(1.76, 0.46, 2.30), glass, 0, 1.56, -0.22);
-  at(new THREE.BoxGeometry(1.80, 0.16, 2.36), paint, 0, 1.86, -0.22);
-  // Bonnet, forward of the cab and lower than it.
-  at(new THREE.BoxGeometry(1.80, 0.34, 1.30), paint, 0, 1.54, 1.42);
-  // Bumpers.
-  at(new THREE.BoxGeometry(1.94, 0.22, 0.24), trim, 0, 0.80, 2.10);
-  at(new THREE.BoxGeometry(1.94, 0.22, 0.24), trim, 0, 0.80, -2.10);
-
-  // Wheels. Twelve segments, not six: at six a wheel is a hexagon, and the
-  // player *can* drive up to these — the first pass was built on the assumption
-  // that nobody ever would, and it read as a broken prop the moment somebody
-  // did.
-  for (const sx of [-1, 1]) {
-    for (const sz of [-1, 1]) {
-      const w = new THREE.CylinderGeometry(0.46, 0.46, 0.34, 12);
-      w.rotateZ(Math.PI / 2);
-      at(w, rubber, sx * 0.86, 0.46, sz * 1.42);
-      // Arch over each wheel, so the body doesn't just float above them.
-      at(new THREE.BoxGeometry(0.26, 0.30, 1.16), trim, sx * 0.92, 0.92, sz * 1.42);
-    }
-  }
-
-  // Every part is non-indexed and carries a colour attribute, so the sets match
-  // and the merge cannot silently return null.
-  const merged = mergeGeometries(parts, false);
-  for (const part of parts) part.dispose();
-  return merged ?? new THREE.BoxGeometry(1.88, 1.7, 4.24);
 }

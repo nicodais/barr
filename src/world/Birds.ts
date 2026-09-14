@@ -40,9 +40,9 @@ export class Birds {
     for (let i = 0; i < capacity; i++) phases[i] = Math.random() * Math.PI * 2;
     geometry.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases, 1));
 
-    const material = new THREE.MeshLambertMaterial({
+    const material = new THREE.MeshStandardMaterial({
       color: 0x4a4740,
-      flatShading: true,
+      roughness: 0.87,
       side: THREE.DoubleSide,
     });
     material.onBeforeCompile = (shader) => {

@@ -3,31 +3,18 @@ import type { VehicleTelemetry } from '../vehicle/Vehicle';
 import type { BodyId } from '../vehicle/vehicleConfig';
 import { ENGINE_VOICES, type EngineVoice } from './engineVoices';
 
-/**
- * Diegetic vehicle audio (§6): engine note tied to RPM, tyre foley whose tone
- * follows sand density, and wind that rises with speed.
- *
- * The engine is a stack of harmonics rather than a sample loop, which means it
- * pitches continuously with no crossfade seams and costs nothing to ship. There
- * is no gearbox in the physics, so RPM is derived from speed through a fake set
- * of ratios — the shift points are audible, and that's the point: they're what
- * makes acceleration read as effort rather than a siren.
- *
- * Everything about the note's *character* comes from the current body's
- * `EngineVoice` (engineVoices.ts). This class owns how the synth behaves; that
- * table owns what each vehicle sounds like.
- */
+/** Recorded engine loops, blended with RPM and throttle; sand/wind foley stays
+ * on the existing effects bus. Recordings and licenses: public/audio/CREDITS.md. */
 const IDLE_RPM = 0.14;
 
 export class DrivingSound {
   private engineGain: GainNode;
   private engineFilter: BiquadFilterNode;
-  private oscA: OscillatorNode;
-  private oscB: OscillatorNode;
-  private oscSub: OscillatorNode;
-  private gainA: GainNode;
-  private gainB: GainNode;
-  private gainSub: GainNode;
+  private loops: Array<{ source: AudioBufferSourceNode; gain: GainNode }> = [];
+  private buffers = new Map<string, AudioBuffer>();
+  private body: BodyId = 'wagon';
+  private disposed = false;
+  readonly ready: Promise<void>;
 
   private tyreSource: AudioBufferSourceNode;
   private tyreFilter: BiquadFilterNode;
@@ -54,23 +41,22 @@ export class DrivingSound {
     this.engineGain.connect(this.engineFilter);
     this.engineFilter.connect(engine.world);
 
-    const mkOsc = (type: OscillatorType, gain: number) => {
-      const osc = ctx.createOscillator();
-      osc.type = type;
-      const g = ctx.createGain();
-      g.gain.value = gain;
-      osc.connect(g);
-      g.connect(this.engineGain);
-      osc.start();
-      return { osc, g };
-    };
-    // A big lazy diesel-ish note: strong low fundamental, softer upper harmonic.
-    const sub = mkOsc('sine', 0.55);
-    const a = mkOsc('sawtooth', 0.3);
-    const b = mkOsc('square', 0.12);
-    this.oscSub = sub.osc; this.gainSub = sub.g;
-    this.oscA = a.osc; this.gainA = a.g;
-    this.oscB = b.osc; this.gainB = b.g;
+    this.ready = Promise.all(['car-idle.wav','car-load.wav','twin.mp3'].map(async file => {
+      const response = await fetch(import.meta.env.BASE_URL+'audio/'+file);
+      if (!response.ok) throw new Error('Engine recording unavailable: '+file);
+      const buffer = await ctx.decodeAudioData(await response.arrayBuffer());
+      if (file.endsWith('.mp3')) {
+        // Remove encoder padding and crossfade a circular join after decoding.
+        const overlap=Math.floor(buffer.sampleRate*.09);
+        const loop=ctx.createBuffer(buffer.numberOfChannels,buffer.length-overlap,buffer.sampleRate);
+        for(let ch=0;ch<buffer.numberOfChannels;ch++) {
+          const original=buffer.getChannelData(ch), data=loop.getChannelData(ch);
+          data.set(original.subarray(0,data.length));
+          for(let i=0;i<overlap;i++) { const t=i/overlap;data[i]=original[data.length+i]*(1-t)+data[i]*t; }
+        }
+        this.buffers.set(file,loop);
+      } else this.buffers.set(file,buffer);
+    })).then(()=>{ if(!this.disposed) this.startLoops(); }).catch(error=>{ console.warn('Engine audio could not load',error); });
 
     // --- tyres on sand ---
     this.tyreSource = engine.createNoiseSource();
@@ -103,7 +89,39 @@ export class DrivingSound {
    * the pre-drive picker, so the truck you chose is the one you hear.
    */
   setBody(body: BodyId) {
+    this.body = body;
+    const previous=this.voice.recording;
     this.voice = ENGINE_VOICES[body] ?? ENGINE_VOICES.wagon;
+    this.rpm=IDLE_RPM;
+    if(previous!==this.voice.recording && this.buffers.size===3) this.startLoops();
+  }
+
+  get recordingsLoaded() { return this.buffers.size; }
+
+  private startLoops() {
+    const ctx=this.engine.ctx, t=ctx.currentTime;
+    for(const loop of this.loops) {
+      loop.gain.gain.setTargetAtTime(0,t,.04);
+      loop.source.stop(t+.22);
+      loop.source.onended=()=>{ loop.source.disconnect();loop.gain.disconnect(); };
+    }
+    this.voice=ENGINE_VOICES[this.body];
+    const files=this.voice.recording==='twin' ? ['twin.mp3','twin.mp3'] : ['car-idle.wav','car-load.wav'];
+    this.loops=files.map(file=>{
+      const source=ctx.createBufferSource(),gain=ctx.createGain();
+      source.buffer=this.buffers.get(file)!;source.loop=true;gain.gain.value=0;
+      source.connect(gain);gain.connect(this.engineGain);source.start();
+      return {source,gain};
+    });
+  }
+
+  dispose() {
+    this.disposed=true;
+    for(const {source,gain} of this.loops) { source.stop();source.disconnect();gain.disconnect(); }
+    this.loops=[];
+    this.tyreSource.stop();this.windSource.stop();
+    this.tyreSource.disconnect();this.windSource.disconnect();
+    this.engineGain.disconnect();this.engineFilter.disconnect();this.tyreGain.disconnect();this.windGain.disconnect();
   }
 
   update(tel: VehicleTelemetry, throttle: number, dt: number) {
@@ -123,22 +141,17 @@ export class DrivingSound {
 
     this.rpm += (targetRpm - this.rpm) * Math.min(1, dt * 7);
 
-    const base = v.idleHz + this.rpm * v.spanHz;
-    this.oscSub.frequency.setTargetAtTime(base * 0.5, t, 0.04);
-    this.oscA.frequency.setTargetAtTime(base, t, 0.04);
-    this.oscB.frequency.setTargetAtTime(base * 2.02, t, 0.04);
-
-    // Louder and brighter under load; a heavy 4x4 should sound like it's working.
-    const load = 0.28 + throttle * 0.5 + Math.min(0.25, speed / 60);
-    this.engineGain.gain.setTargetAtTime(load * v.level, t, 0.08);
-    this.engineFilter.frequency.setTargetAtTime(
-      v.cutoffHz + this.rpm * v.cutoffSpan + throttle * v.cutoffSpan * 0.4, t, 0.08,
-    );
-    // Throttle adds edge on top of each voice's own mix rather than replacing
-    // it, so a diesel under load gets clattery and a thumper gets shrill.
-    this.gainA.gain.setTargetAtTime(v.saw * (1 + throttle * 0.8), t, 0.1);
-    this.gainB.gain.setTargetAtTime(v.square * (1 + throttle * 2), t, 0.1);
-    this.gainSub.gain.setTargetAtTime(v.sub, t, 0.1);
+    const rev = Math.min(1, Math.max(0, (this.rpm-IDLE_RPM)/.9));
+    const blend = Math.min(1, rev*.75 + Math.max(0,throttle)*.45);
+    const load = .45 + Math.max(0,throttle)*.45;
+    this.engineGain.gain.setTargetAtTime(load*v.level,t,.08);
+    this.engineFilter.frequency.setTargetAtTime(v.cutoffHz+rev*v.cutoffSpan,t,.09);
+    if (this.loops.length===2) {
+      this.loops[0].gain.gain.setTargetAtTime(Math.cos(blend*Math.PI/2),t,.10);
+      this.loops[1].gain.gain.setTargetAtTime(Math.sin(blend*Math.PI/2),t,.10);
+      this.loops[0].source.playbackRate.setTargetAtTime(v.pitch*(.85+rev*.8),t,.065);
+      this.loops[1].source.playbackRate.setTargetAtTime(v.pitch*(v.recording==='twin' ? 1.35+rev*1.0 : .52+rev*.65),t,.065);
+    }
 
     // --- tyres: soft sand hisses low and broad, hardpack is grittier and higher
     const contact = tel.wheelsOnGround / 4;

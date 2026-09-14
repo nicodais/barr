@@ -270,7 +270,9 @@ const FRAGMENT = /* glsl */ `
     float dist = length( vWorld - cameraPosition );
     float a = vAlpha * ( 1.0 - smoothstep( 190.0, 330.0, dist ) );
     if ( a <= 0.004 ) discard;
-    gl_FragColor = vec4( uColor, a );
+    gl_FragColor = vec4( uColor, a * 0.72 );
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
 
@@ -318,7 +320,7 @@ export function createOldTracks(): THREE.Mesh {
   const material = new THREE.ShaderMaterial({
     // A shade cooler and darker than fresh tracks: a rut that has been sitting
     // has lost the loose bright sand off its lip and is packed inside.
-    uniforms: { uColor: { value: new THREE.Color(0x7d5d3f) } },
+    uniforms: { uColor: { value: new THREE.Color(0x000000) } },
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
     transparent: true,

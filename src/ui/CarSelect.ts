@@ -43,7 +43,7 @@ export class CarSelect {
 
     const title = document.createElement('h1');
     title.className = 'carselect-title';
-    title.textContent = 'Pick your truck';
+    title.textContent = 'Your desert companion';
 
     const sub = document.createElement('p');
     sub.className = 'carselect-sub';
@@ -172,6 +172,7 @@ export class CarSelect {
   private sync() {
     for (const el of Array.from(this.bodyList.children) as HTMLElement[]) {
       el.classList.toggle('is-active', el.dataset.value === this.config.body);
+      el.setAttribute('aria-pressed', String(el.dataset.value === this.config.body));
     }
     for (const el of Array.from(this.swatches.children) as HTMLElement[]) {
       el.classList.toggle('is-active', el.dataset.value === this.config.paint);

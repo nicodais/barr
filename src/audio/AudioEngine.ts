@@ -12,9 +12,8 @@
  * is what lets someone turn the music up without the adaptive swell immediately
  * writing over their choice on the next frame.
  *
- * Nothing here loads a file. Every sound in the game is synthesised, which keeps
- * the payload at zero bytes and sidesteps the whole streaming-audio problem on
- * mobile (§8).
+ * DrivingSound loads recorded engine loops into this graph after audio unlock.
+ * Wind, tyre foley and score retain their procedural sources.
  */
 export class AudioEngine {
   readonly ctx: AudioContext;

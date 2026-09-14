@@ -41,6 +41,8 @@ export interface WheelState {
   /** 0 = fully extended, 1 = bottomed out. Drives the visual squat. */
   compression: number;
   softness: number;
+  /** Material looseness before tyre-pressure compensation; used by displaced sand. */
+  surfaceSoftness?: number;
   /** World-space point where the wheel meets the ground. Only valid on contact. */
   contactX: number;
   contactY: number;
@@ -135,6 +137,11 @@ export class Vehicle {
   private rapier: typeof RAPIER;
   private world: RAPIER.World;
   private steerAngle = 0;
+  private sandSink = new Float32Array(4);
+  private contactSurfaceHeight = new Float32Array(4);
+
+  /** Game supplies the local sand displacement; no second physics world. */
+  setContactSurfaceHeight(wheel:number,height:number){this.contactSurfaceHeight[wheel]=clamp(height,-.12,.08);}
   private stoppedTimer = 0;
   private reverseRamp = 0;
   private lastVerticalSpeed = 0;
@@ -269,6 +276,7 @@ export class Vehicle {
     for (let i = 0; i < this.wheels.length; i++) {
       const contact = this.controller.wheelIsInContact(i);
       let softness = 0;
+      let materialSoftness = 0;
       let slopeLoss = 0;
 
       if (contact) {
@@ -276,7 +284,7 @@ export class Vehicle {
         const cp = this.controller.wheelContactPoint(i);
         // A wider contact patch does not change what the sand is, it changes
         // how soft the sand is *to this tyre*.
-        if (cp) softness = softnessAt(cp.x, cp.z) * this.tyreSoftnessScale;
+        if (cp) {materialSoftness=softnessAt(cp.x,cp.z);softness=materialSoftness*this.tyreSoftnessScale;}
         const n = this.controller.wheelContactNormal(i);
         if (n) {
           // Steeper face -> less of the tyre's load turns into usable grip.
@@ -299,6 +307,14 @@ export class Vehicle {
       this.controller.setWheelFrictionSlip(i, Math.max(0.15, grip));
       this.controller.setWheelSideFrictionStiffness(i, Math.max(0.1, sideGrip));
       this.wheels[i].softness = softness;
+      this.wheels[i].surfaceSoftness = materialSoftness;
+      // A shallow yielding contact layer lets the full visual tyre settle into
+      // the sand. Pressure already scales softness, so airing down reduces sink.
+      const digging = Math.abs(input.throttle) * (1 - Math.min(speed / 6, 1));
+      const surfaceHeight = this.contactSurfaceHeight[i];
+      const sink = contact ? (Math.abs(surfaceHeight)>.001 ? -surfaceHeight : softness * (.024 + .035 * digging)) : 0;
+      this.sandSink[i] += (sink - this.sandSink[i]) * (1 - Math.exp(-dt * 5));
+      this.controller.setWheelRadius(i, WHEEL_RADIUS - this.sandSink[i]);
     }
     const meanSoftness = contactCount > 0 ? softnessSum / contactCount : 0;
 
@@ -383,8 +399,12 @@ export class Vehicle {
     // Soft sand doesn't just reduce grip, it actively resists forward motion.
     // Without this, loose sand reads as "ice" rather than "deep".
     if (contactCount > 0 && speed > 0.2) {
-      const drag = meanSoftness * this.tuning.sinkDrag * (contactCount / this.wheels.length);
-      const scale = (-drag * dt) / speed;
+      const looseResistance = 1 + .30 * (1 - Math.min(speed / 8, 1));
+      const drag = meanSoftness * this.tuning.sinkDrag * (contactCount / this.wheels.length) * looseResistance;
+      const horizontalSpeed = Math.hypot(vel.x, vel.z);
+      // Resistance can stop the vehicle, but cannot kick it backwards at rest.
+      const impulse = Math.min(drag * dt, this.body.mass() * horizontalSpeed);
+      const scale = -impulse / Math.max(horizontalSpeed, .001);
       this.body.applyImpulse(
         { x: vel.x * scale, y: 0, z: vel.z * scale },
         true,

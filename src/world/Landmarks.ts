@@ -1,15 +1,16 @@
+import { createGhafTree } from './GhafTree';
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { surfaceMaterial } from './surfaceMaterial';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import type { Poi, PoiKind } from '../data/pois';
 import { activeRegion } from '../terrain/regions';
 import { heightAt } from '../terrain/height';
 
 /**
- * The physical landmarks at each POI (§5). Flat-shaded primitives in the same
- * limited palette as the terrain — silhouettes on a ridge, dressed with enough
- * tonal variation and grounding that they read as placed in the sand rather than
- * dropped on a flat plane.
+ * Physical landmarks with scanned masonry, weathered metal and timber, draped
+ * fabric and individually formed vegetation. Baked by material for rendering.
  *
  * Each also gets a set of static colliders (see `createLandmarkColliders`) sized
  * to its solid masses — the tower, the trunk, the pylon legs — so the truck bumps
@@ -17,19 +18,17 @@ import { heightAt } from '../terrain/height';
  * collision is tactile, never a fail state, and small dressing (cups, stakes,
  * canopy) stays collider-free so nothing snags on an invisible box.
  */
-const STONE = new THREE.MeshLambertMaterial({ color: 0x9c8b76, flatShading: true });
-const STONE_LIGHT = new THREE.MeshLambertMaterial({ color: 0xb3a189, flatShading: true });
-const DARK_STONE = new THREE.MeshLambertMaterial({ color: 0x7d6e5c, flatShading: true });
-const RUST = new THREE.MeshLambertMaterial({ color: 0x8c5a3c, flatShading: true });
-const RUST_DARK = new THREE.MeshLambertMaterial({ color: 0x6d4126, flatShading: true });
-const WOOD = new THREE.MeshLambertMaterial({ color: 0x6f5439, flatShading: true });
-const WOOD_DARK = new THREE.MeshLambertMaterial({ color: 0x554027, flatShading: true });
-const FOLIAGE = new THREE.MeshLambertMaterial({ color: 0x6b7f4a, flatShading: true });
-const FOLIAGE_DARK = new THREE.MeshLambertMaterial({ color: 0x566b3c, flatShading: true });
-const CANVAS = new THREE.MeshLambertMaterial({ color: 0xc4b49a, flatShading: true });
-const METAL = new THREE.MeshLambertMaterial({ color: 0xa9a49b, flatShading: true });
+const STONE = surfaceMaterial(0x9c8b76);
+const STONE_LIGHT = surfaceMaterial(0xb3a189);
+const DARK_STONE = surfaceMaterial(0x7d6e5c);
+const RUST = surfaceMaterial(0x8c5a3c, 0.77, 0.32, 0.16, 'metal');
+const RUST_DARK = surfaceMaterial(0x6d4126, 0.77, 0.32, 0.16, 'metal');
+const WOOD = surfaceMaterial(0x6f5439, 0.9, 0, 0.16, 'wood');
+const WOOD_DARK = surfaceMaterial(0x554027, 0.9, 0, 0.16, 'wood');
+const CANVAS = surfaceMaterial(0xc4b49a, 0.97, 0, 0.16, 'cloth');
+const METAL = surfaceMaterial(0xa9a49b, 0.32, 0.82, 0.08, 'metal');
 /** Fossil shell against the rock it sits in — paler and warmer than limestone. */
-const BONE_STONE = new THREE.MeshLambertMaterial({ color: 0xcabfa4, flatShading: true });
+const BONE_STONE = surfaceMaterial(0xcabfa4);
 // The only saturated colour in the world, and it earns its place: against ochre
 // sand a red carpet does more work than any amount of geometry, and a majlis
 // without one is a patch of swept ground.
@@ -40,25 +39,25 @@ const BONE_STONE = new THREE.MeshLambertMaterial({ color: 0xcabfa4, flatShading:
  * cutting a hard silhouette against a bright desert and throwing real shade
  * under itself.
  */
-const TENT = new THREE.MeshLambertMaterial({ color: 0x3b332c, flatShading: true });
-const TENT_LIGHT = new THREE.MeshLambertMaterial({ color: 0x4d4238, flatShading: true });
-const CARPET = new THREE.MeshLambertMaterial({ color: 0x8e2f2a, flatShading: true });
-const CARPET_DARK = new THREE.MeshLambertMaterial({ color: 0x5e2733, flatShading: true });
+const TENT = surfaceMaterial(0x3b332c, 0.97, 0, 0.16, 'cloth');
+const TENT_LIGHT = surfaceMaterial(0x4d4238, 0.97, 0, 0.16, 'cloth');
+const CARPET = surfaceMaterial(0x8e2f2a, 0.97, 0, 0.16, 'cloth');
+const CARPET_DARK = surfaceMaterial(0x5e2733, 0.97, 0, 0.16, 'cloth');
 // Saker falcon: dark brown above, pale streaked breast.
-const FALCON = new THREE.MeshLambertMaterial({ color: 0x8a6a45, flatShading: true });
-const FALCON_DARK = new THREE.MeshLambertMaterial({ color: 0x5b452c, flatShading: true });
-const FALCON_PALE = new THREE.MeshLambertMaterial({ color: 0xd9cbaf, flatShading: true });
+const FALCON = surfaceMaterial(0x8a6a45, 0.85, 0, 0.16, 'plain');
+const FALCON_DARK = surfaceMaterial(0x5b452c, 0.85, 0, 0.16, 'plain');
+const FALCON_PALE = surfaceMaterial(0xd9cbaf, 0.85, 0, 0.16, 'plain');
 // The oasis palette. Date palms are a colder, greyer green than the ghaf and
 // the scrub — that difference is most of what makes a garden read as irrigated
 // rather than as more desert vegetation.
-const PALM = new THREE.MeshLambertMaterial({ color: 0x6f8450, flatShading: true });
-const PALM_DARK = new THREE.MeshLambertMaterial({ color: 0x54663c, flatShading: true });
-const PALM_TRUNK = new THREE.MeshLambertMaterial({ color: 0x8a6f4c, flatShading: true });
-const DATES = new THREE.MeshLambertMaterial({ color: 0x9b5327, flatShading: true });
-const MUD = new THREE.MeshLambertMaterial({ color: 0xa88a68, flatShading: true });
+const PALM = surfaceMaterial(0x6f8450, 0.85, 0, 0.16, 'plain');
+const PALM_DARK = surfaceMaterial(0x54663c, 0.85, 0, 0.16, 'plain');
+const PALM_TRUNK = surfaceMaterial(0x8a6f4c, 0.9, 0, 0.16, 'wood');
+const DATES = surfaceMaterial(0x9b5327, 0.85, 0, 0.16, 'plain');
+const MUD = surfaceMaterial(0xa88a68);
 /** Standing water, and the only cool surface in the world. Deliberately dark —
     a shallow desert pool is a hole in the light, not a mirror. */
-const WATER = new THREE.MeshLambertMaterial({ color: 0x3d5a5c, flatShading: true });
+const WATER = surfaceMaterial(0x3d5a5c, 0.12, 0, 0.16, 'plain');
 
 export function createLandmarks(): THREE.Group {
   const group = new THREE.Group();
@@ -67,7 +66,9 @@ export function createLandmarks(): THREE.Group {
     const baseY = heightAt(poi.x, poi.z);
     built.position.set(poi.x, baseY, poi.z);
     drapeToTerrain(built, poi.x, poi.z, baseY);
-    group.add(bake(built));
+    const baked = bake(built);
+    baked.name = poi.id;
+    group.add(baked);
   }
   return group;
 }
@@ -92,6 +93,10 @@ function bake(built: THREE.Group): THREE.Group {
     // any primitive can share a bucket.
     const geo = cloned.index ? cloned.toNonIndexed() : cloned;
     if (geo !== cloned) cloned.dispose();
+    for (const key of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(key)) geo.deleteAttribute(key);
+    const count = geo.getAttribute('position').count;
+    if (!geo.hasAttribute('uv')) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(count * 2), 2));
+    if (!geo.hasAttribute('color')) geo.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(count * 3).fill(1), 3));
     const mat = obj.material as THREE.Material;
     let list = buckets.get(mat);
     if (!list) buckets.set(mat, list = []);
@@ -153,7 +158,7 @@ function drapeToTerrain(built: THREE.Group, ox: number, oz: number, baseY: numbe
   }
 }
 
-function buildLandmark(poi: Poi): THREE.Group {
+export function buildLandmark(poi: Poi): THREE.Group {
   switch (poi.id) {
     case 'falaj': return buildFalaj();
     case 'ghaf': return buildGhafTree();
@@ -173,6 +178,55 @@ function buildLandmark(poi: Poi): THREE.Group {
 }
 
 function mesh(geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number) {
+  if (geo instanceof THREE.BoxGeometry) {
+    const { width, height, depth } = geo.parameters;
+    const cloth = height < .12 && (mat === TENT || mat === TENT_LIGHT || mat === CANVAS || mat === CARPET || mat === CARPET_DARK);
+    const old = geo;
+    geo = cloth ? new THREE.BoxGeometry(width, height, depth, 24, 2, 20)
+      : new RoundedBoxGeometry(width, height, depth, 2, Math.min(0.07, Math.min(width, height, depth) * 0.15));
+    if (cloth) {
+      const pos = geo.getAttribute('position');
+      for (let i = 0; i < pos.count; i++) {
+        const px = pos.getX(i), pz = pos.getZ(i);
+        const sag = Math.sin((px / width + 0.5) * Math.PI) * Math.sin((pz / depth + 0.5) * Math.PI);
+        pos.setY(i, pos.getY(i) - sag * Math.min(0.36, Math.max(width, depth) * 0.045) + Math.sin(px * 11 + pz * 6) * Math.min(0.015, height * 0.2));
+      }
+      geo.computeVertexNormals();
+    }
+    if ([STONE, STONE_LIGHT, DARK_STONE, MUD, BONE_STONE].includes(mat as THREE.MeshStandardMaterial)) {
+      const p = geo.getAttribute('position');
+      for (let i=0;i<p.count;i++) {
+        const px=p.getX(i),py=p.getY(i),pz=p.getZ(i);
+        const cut = Math.sin(px*11.7+x*3.1+z)*Math.sin(py*15.3+y*2.9+pz*7.1);
+        const amount = Math.min(.035,Math.min(width,height,depth)*.09);
+        p.setXYZ(i,px+cut*amount,py+Math.sin(px*17+pz*13+x)*amount*.55,pz+cut*amount*.7);
+      }
+      geo.computeVertexNormals();
+    }
+    old.dispose();
+  } else if (geo instanceof THREE.ConeGeometry) {
+    // ConeGeometry inherits CylinderGeometry but exposes radius, not radiusTop/
+    // radiusBottom. Rebuilding it as a cylinder silently made every hood 2m wide.
+    const p=geo.parameters;geo.dispose();
+    geo=new THREE.ConeGeometry(p.radius,p.height,Math.max(24,p.radialSegments),p.heightSegments,p.openEnded,p.thetaStart,p.thetaLength);
+  } else if (geo instanceof THREE.CylinderGeometry && geo.parameters.radialSegments < 20) {
+    const p = geo.parameters;
+    geo.dispose();
+    geo = new THREE.CylinderGeometry(p.radiusTop, p.radiusBottom, p.height, 24, p.heightSegments, p.openEnded, p.thetaStart, p.thetaLength);
+  }
+  if ((geo instanceof THREE.DodecahedronGeometry || geo instanceof THREE.IcosahedronGeometry)
+    && [STONE, STONE_LIGHT, DARK_STONE, MUD, BONE_STONE].includes(mat as THREE.MeshStandardMaterial)) {
+    const radius = geo.parameters.radius;
+    geo.dispose(); geo = new THREE.IcosahedronGeometry(radius, 4);
+    const p = geo.getAttribute('position');
+    for (let i = 0; i < p.count; i++) {
+      const px = p.getX(i), py = p.getY(i), pz = p.getZ(i);
+      const weathering = 1 + 0.10 * Math.sin(px * 3.7 / radius + Math.sin(pz * 5 / radius)) + 0.045 * Math.sin(py * 15 / radius);
+      p.setXYZ(i, px * weathering, py * (0.94 + Math.sin(pz * 8 / radius) * 0.055), pz * weathering);
+    }
+    geo.deleteAttribute('normal');geo.deleteAttribute('uv');
+    const welded=mergeVertices(geo,.00001);geo.dispose();geo=welded;geo.computeVertexNormals();
+  }
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
   m.castShadow = true;
@@ -264,44 +318,7 @@ function buildFalaj(): THREE.Group {
 
 /** One improbably old ghaf, the only shade for kilometres. */
 function buildGhafTree(): THREE.Group {
-  const g = new THREE.Group();
-  const trunk = mesh(new THREE.CylinderGeometry(0.32, 0.62, 3.4, 7), WOOD, 0, 1.7, 0);
-  trunk.rotation.z = 0.07;
-  g.add(trunk);
-
-  // Root flare where the trunk meets the sand, so it grips rather than pokes in.
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2;
-    const root = mesh(new THREE.CylinderGeometry(0.08, 0.24, 0.9, 5), WOOD_DARK,
-      Math.cos(a) * 0.5, 0.18, Math.sin(a) * 0.5);
-    root.rotation.z = Math.cos(a) * 0.9;
-    root.rotation.x = -Math.sin(a) * 0.9;
-    g.add(root);
-  }
-
-  // Canopy is a cluster of low-poly blobs — wide and flat, the way a ghaf grows.
-  // Two greens layered so it reads as sunlit crown over shaded underside.
-  const blob = new THREE.IcosahedronGeometry(1, 0);
-  const canopy: Array<[number, number, number, number, THREE.Material]> = [
-    [0, 3.95, 0, 2.6, FOLIAGE], [1.7, 3.5, 0.5, 1.8, FOLIAGE],
-    [-1.6, 3.6, -0.6, 1.9, FOLIAGE], [0.4, 3.2, -1.7, 1.6, FOLIAGE_DARK],
-    [-0.6, 3.3, 1.6, 1.5, FOLIAGE_DARK], [0.9, 2.95, 1.2, 1.3, FOLIAGE_DARK],
-  ];
-  for (const [x, y, z, s, mat] of canopy) {
-    const m = mesh(blob, mat, x, y, z);
-    m.scale.set(s, s * 0.6, s);
-    m.rotation.y = Math.random() * Math.PI;
-    g.add(m);
-  }
-
-  for (let i = 0; i < 3; i++) {
-    const branch = mesh(new THREE.CylinderGeometry(0.1, 0.16, 2.2, 5), WOOD,
-      Math.cos(i * 2.1) * 0.9, 3.0, Math.sin(i * 2.1) * 0.9);
-    branch.rotation.z = Math.cos(i * 2.1) * 0.6;
-    branch.rotation.x = Math.sin(i * 2.1) * 0.6;
-    g.add(branch);
-  }
-  return g;
+  return createGhafTree();
 }
 
 /**
@@ -335,35 +352,30 @@ function buildWatchtower(): THREE.Group {
   }
 
   const H = 19;
-  const COURSES = 9;
+  const COURSES = 42;
   const baseR = 4.3;
   const topR = 2.9;
-
-  // The shaft, as stacked courses. Each is a cylinder with a slightly different
-  // radius and a small rotation, so the silhouette is hand-built rather than
-  // turned on a lathe.
+  const mortar = mesh(new THREE.CylinderGeometry(topR - 0.1, baseR - 0.1, H, 64), DARK_STONE, 0, H / 2, 0);
+  g.add(mortar);
   for (let c = 0; c < COURSES; c++) {
-    const t0 = c / COURSES;
-    const t1 = (c + 1) / COURSES;
-    const r0 = baseR + (topR - baseR) * t0;
-    const r1 = baseR + (topR - baseR) * t1;
-    const jitter = ((c * 7) % 5) * 0.035;
-    const drum = mesh(
-      new THREE.CylinderGeometry(r1 - jitter, r0 + jitter, H / COURSES + 0.05, 12),
-      c % 2 ? STONE : STONE_LIGHT,
-      0, H * (t0 + t1) / 2, 0,
-    );
-    drum.rotation.y = c * 0.13;
-    g.add(drum);
+    const y = (c + 0.5) * H / COURSES;
+    const radius = baseR + (topR - baseR) * y / H;
+    const count = Math.round(radius * Math.PI * 2 / 0.67);
+    for (let i = 0; i < count; i++) {
+      const a = (i + (c % 2) * 0.5) / count * Math.PI * 2;
+      const jitter = Math.sin(i * 71.3 + c * 38.1) * 0.027;
+      const stone = mesh(new THREE.BoxGeometry(Math.PI * 2 * radius / count - 0.018, H / COURSES - 0.025 + jitter, 0.33),
+        (i + c * 3) % 7 < 2 ? STONE_LIGHT : STONE, Math.sin(a) * (radius - 0.07 + jitter), y, Math.cos(a) * (radius - 0.07 + jitter));
+      stone.rotation.y = a;
+      g.add(stone);
+    }
   }
-
-  // A string course two thirds up: one band of darker stone, which is what
-  // stops nineteen metres of cylinder reading as a chimney.
-  g.add(mesh(new THREE.CylinderGeometry(topR + 0.34, topR + 0.42, 0.6, 12), DARK_STONE, 0, H * 0.66, 0));
-
-  // Parapet and crenellations. Half the merlons gone, weighted so one side of
-  // the tower is visibly the weather side.
-  g.add(mesh(new THREE.CylinderGeometry(topR + 0.5, topR + 0.3, 0.8, 12), STONE_LIGHT, 0, H + 0.4, 0));
+  // Open top: individual parapet stones leave a visible interior.
+  for (let row = 0; row < 2; row++) for (let i = 0; i < 32; i++) {
+    const a = (i + row * 0.5) / 32 * Math.PI * 2;
+    const stone = mesh(new THREE.BoxGeometry(0.66, 0.38, 0.62), STONE_LIGHT, Math.sin(a) * 3.1, H + 0.2 + row * 0.38, Math.cos(a) * 3.1);
+    stone.rotation.y = a; g.add(stone);
+  }
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2;
     // Standing through the lee arc, gone through the windward one.
@@ -936,8 +948,12 @@ function strutBetween(
 /** A tiny, genuinely-in-use tea stand in the middle of nowhere. */
 function buildTeaStand(): THREE.Group {
   const g = new THREE.Group();
-  g.add(mesh(new THREE.BoxGeometry(2.6, 1.15, 1.5), WOOD, 0, 0.58, 0));
-  g.add(mesh(new THREE.BoxGeometry(2.8, 0.12, 1.7), CANVAS, 0, 1.2, 0));
+  // A counter made from boards on a frame, with an open space underneath.
+  for (const side of [-1,1]) for (const end of [-1,1]) g.add(mesh(new THREE.BoxGeometry(.09,1.13,.09),WOOD_DARK,side*1.16,.565,end*.60));
+  for (let i=0;i<8;i++) g.add(mesh(new THREE.BoxGeometry(.32,.055,1.5),WOOD,-1.16+i*.33,1.15,0));
+  for (let i=0;i<15;i++) g.add(mesh(new THREE.BoxGeometry(.16,.85,.028),WOOD,-1.18+i*.168,.65,.69));
+  g.add(mesh(new THREE.BoxGeometry(2.5,.07,.07),WOOD_DARK,0,.24,.65));
+  g.add(mesh(new THREE.BoxGeometry(2.5,.07,.07),WOOD_DARK,0,1.05,.65));
 
   // Canopy on four posts, sagging to one side.
   for (const [x, z] of [[-1.2, -0.65], [1.2, -0.65], [-1.2, 0.65], [1.2, 0.65]] as const) {
@@ -948,12 +964,13 @@ function buildTeaStand(): THREE.Group {
   g.add(canopy);
 
   // A stool, a crate, and a stove — evidence someone is actually here.
-  g.add(mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.45, 6), WOOD_DARK, 1.7, 0.22, 0.9));
+  g.add(mesh(new THREE.CylinderGeometry(.24,.23,.05,24),WOOD,1.7,.47,.9));
+  for(const sx of [-1,1]) for(const sz of [-1,1]) g.add(mesh(new THREE.BoxGeometry(.045,.45,.045),WOOD_DARK,1.7+sx*.14,.225,.9+sz*.14));
   g.add(mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), WOOD_DARK, -1.8, 0.3, 0.7));
   g.add(mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.3, 6), METAL, 0.6, 1.3, 0));
 
   // A dallah on the counter and two little glasses of karak, still poured.
-  g.add(dallah(-0.7, 0.1));
+  const pot = dallah(-0.7, 0.1); pot.position.y = 1.18; g.add(pot);
   for (const gx of [0.1, 0.34]) {
     g.add(mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.11, 6), CANVAS, gx, 1.21, 0.4));
   }
@@ -996,18 +1013,19 @@ function buildFamousDune(): THREE.Group {
 /** A dallah — the long-spouted Arabic coffee pot, hospitality in metal form. */
 function dallah(x: number, z: number): THREE.Group {
   const g = new THREE.Group();
-  g.add(mesh(new THREE.CylinderGeometry(0.15, 0.19, 0.4, 8), METAL, 0, 0.2, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.16, 8), METAL, 0, 0.48, 0));
-  g.add(mesh(new THREE.ConeGeometry(0.13, 0.18, 8), METAL, 0, 0.65, 0));
-  // The signature curved spout, faked with a short angled beak.
-  const spout = mesh(new THREE.CylinderGeometry(0.02, 0.05, 0.34, 5), METAL, 0.17, 0.42, 0);
-  spout.rotation.z = -0.7;
-  g.add(spout);
-  const handle = mesh(new THREE.TorusGeometry(0.1, 0.02, 5, 8), METAL, -0.16, 0.34, 0);
-  handle.rotation.y = Math.PI / 2;
-  g.add(handle);
-  g.position.set(x, 0, z);
-  return g;
+  const profile = [[.02,0],[.12,0],[.18,.035],[.205,.11],[.19,.23],[.15,.31],[.09,.36],[.08,.47],[.13,.49],[.11,.52],[.075,.55],[.045,.60],[.018,.64]];
+  g.add(mesh(new THREE.LatheGeometry(profile.map(([r,y]) => new THREE.Vector2(r,y)),48), METAL,0,0,0));
+  const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(.14,.23,0),new THREE.Vector3(.25,.30,0),new THREE.Vector3(.29,.46,0),new THREE.Vector3(.37,.53,0)]);
+  const spout = new THREE.TubeGeometry(curve,32,1,12,false);
+  const pos = spout.getAttribute('position');
+  for (let i=0;i<=32;i++) {
+    const centre = curve.getPointAt(i/32), radius = .055*(1-i/32)+.013;
+    for (let j=0;j<=12;j++) { const k=i*13+j; pos.setXYZ(k,centre.x+(pos.getX(k)-centre.x)*radius,centre.y+(pos.getY(k)-centre.y)*radius,centre.z+(pos.getZ(k)-centre.z)*radius); }
+  }
+  spout.computeVertexNormals(); g.add(mesh(spout,METAL,0,0,0));
+  const handle = new THREE.CatmullRomCurve3([new THREE.Vector3(-.09,.44,0),new THREE.Vector3(-.27,.46,0),new THREE.Vector3(-.31,.23,0),new THREE.Vector3(-.17,.10,0)]);
+  g.add(mesh(new THREE.TubeGeometry(handle,32,.018,10,false),METAL,0,0,0));
+  g.position.set(x,0,z); return g;
 }
 
 /**
@@ -1061,10 +1079,10 @@ function buildFalconry(): THREE.Group {
     const bird = new THREE.Group();
     bird.position.set(x, 1.04, z);
     bird.rotation.y = face;
-    const body = mesh(new THREE.IcosahedronGeometry(0.3, 0), FALCON, 0, 0.28, 0);
+    const body = mesh(new THREE.SphereGeometry(0.3, 20, 14), FALCON, 0, 0.28, 0);
     body.scale.set(0.82, 1.15, 1.0);
     bird.add(body);
-    const breast = mesh(new THREE.IcosahedronGeometry(0.2, 0), FALCON_PALE, 0, 0.25, 0.16);
+    const breast = mesh(new THREE.SphereGeometry(0.2, 20, 14), FALCON_PALE, 0, 0.25, 0.16);
     breast.scale.set(0.85, 1.1, 0.7);
     bird.add(breast);
     for (const side of [-1, 1]) {
@@ -1076,7 +1094,7 @@ function buildFalconry(): THREE.Group {
     const tail = mesh(new THREE.BoxGeometry(0.2, 0.32, 0.07), FALCON_DARK, 0, 0.12, -0.26);
     tail.rotation.x = 0.55;
     bird.add(tail);
-    const head = mesh(new THREE.IcosahedronGeometry(0.15, 0), FALCON, 0, 0.6, 0.04);
+    const head = mesh(new THREE.SphereGeometry(0.15, 20, 14), FALCON, 0, 0.6, 0.04);
     bird.add(head);
     // The burqa: a little leather hood with a plume on top.
     const hood = mesh(new THREE.ConeGeometry(0.14, 0.2, 7), CARPET_DARK, 0, 0.68, 0.04);
@@ -1459,18 +1477,30 @@ function buildDatePalm(x: number, z: number, height: number, lean: number): THRE
     p.add(stub);
   }
 
-  // The crown. Fronds are long thin wedges pitched down from horizontal, in two
-  // tiers — the upper ones near-vertical and young, the lower ones drooping.
-  const frond = new THREE.BoxGeometry(0.34, 0.07, 3.3);
-  frond.translate(0, 0, 1.65);
-  for (let i = 0; i < 11; i++) {
-    const a = (i / 11) * Math.PI * 2;
-    const upper = i % 3 === 0;
-    const f = mesh(frond, upper ? PALM : PALM_DARK, 0, height - 0.1, 0);
-    f.rotation.y = a;
-    f.rotation.x = upper ? -0.55 : 0.28;
-    f.scale.set(1, 1, upper ? 0.75 : 1);
-    p.add(f);
+  for (let i = 0; i < 17; i++) {
+    const frond = new THREE.Group(), upper = i % 4 === 0;
+    const length = upper ? 2.7 : 3.8;
+    const path = new THREE.CatmullRomCurve3([new THREE.Vector3(), new THREE.Vector3(0, 0.46, length * 0.4), new THREE.Vector3(0, -0.8, length)]);
+    frond.add(mesh(new THREE.TubeGeometry(path, 20, 0.021, 5, false), PALM_TRUNK, 0, 0, 0));
+    for (let j = 1; j < 23; j++) {
+      const t = j / 24, centre = path.getPoint(t), span = Math.sin(t * Math.PI) * 0.72;
+      for (const side of [-1, 1]) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute([
+          centre.x,centre.y,centre.z - 0.065,
+          side * span,centre.y - 0.16,centre.z + 0.24,
+          centre.x,centre.y + 0.009,centre.z + 0.065,
+          side * span,centre.y - 0.16,centre.z + 0.24,
+          0,centre.y,centre.z - 0.065,
+          0,centre.y - 0.012,centre.z + 0.065,
+        ], 3)); geo.computeVertexNormals();
+        frond.add(mesh(geo, upper ? PALM : PALM_DARK, 0, 0, 0));
+      }
+    }
+    frond.position.y = height - 0.08;
+    frond.rotation.y = i / 17 * Math.PI * 2;
+    frond.rotation.x = upper ? -0.65 : 0.08;
+    p.add(frond);
   }
   // A short spray of new growth standing straight up out of the middle.
   for (let i = 0; i < 4; i++) {

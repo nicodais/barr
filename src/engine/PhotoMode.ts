@@ -56,7 +56,12 @@ const FRAGMENT = /* glsl */ `
   }
 
   void main() {
-    vec3 c = texture2D( uScene, vUv ).rgb;
+    // The offscreen target is linear HDR. Apply the same display transform as
+    // normal driving before the photographic grades, exactly once.
+    gl_FragColor = texture2D(uScene, vUv);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+    vec3 c = gl_FragColor.rgb;
     c = grade( c, uFilter );
     float d = distance( vUv, vec2( 0.5 ) );
     c *= 1.0 - smoothstep( 0.32, 0.85, d ) * uVignette;
@@ -66,8 +71,8 @@ const FRAGMENT = /* glsl */ `
 
 export class PhotoMode {
   active = false;
-  filter: PhotoFilter = 'golden';
-  vignette = 0.45;
+  filter: PhotoFilter = 'none';
+  vignette = 0.22;
 
   private target: THREE.WebGLRenderTarget;
   private quadScene = new THREE.Scene();
@@ -87,6 +92,8 @@ export class PhotoMode {
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       depthBuffer: true,
+      type: THREE.HalfFloatType,
+      samples: 4,
     });
 
     this.material = new THREE.ShaderMaterial({

@@ -343,6 +343,11 @@ export class MenuPanel {
       this.contrastRow.parentElement!,
       this.garageButton(),
     );
+    const credits=document.createElement('a');
+    credits.href=import.meta.env.BASE_URL+'audio/CREDITS.md';
+    credits.textContent='Engine recording credits';credits.target='_blank';credits.rel='noopener';
+    credits.style.cssText='display:block;margin:12px 0;color:inherit;font-size:11px;opacity:.7';
+    this.element.append(credits);
   }
 
   /** Called by Game once a region swap has finished rebuilding the world. */

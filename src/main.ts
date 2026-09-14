@@ -32,6 +32,11 @@ if (!canvas || !uiRoot) {
 void boot(canvas, uiRoot);
 
 async function boot(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
+  if (import.meta.env.DEV && new URLSearchParams(location.search).has('assets')) {
+    const { startAssetReview } = await import('./engine/AssetReview');
+    await startAssetReview(canvas, uiRoot);
+    return;
+  }
   const settings = loadSettings();
 
   // Started before the picker is even on screen, and deliberately not awaited
