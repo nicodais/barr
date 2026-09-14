@@ -60,12 +60,13 @@ export class RadioSubtitles {
     return this.phase !== 'idle';
   }
 
-  show(line: string) {
+  show(line: string, urgent = false) {
+    this.element.classList.toggle('radio-urgent', urgent);
     this.full = line;
     this.shown = 0;
     this.element.hidden = false;
     this.element.classList.remove('radio-out');
-    if (typingWanted()) {
+    if (typingWanted() && !urgent) {
       this.timer = 0;
       this.phase = 'typing';
       this.lineEl.textContent = '';

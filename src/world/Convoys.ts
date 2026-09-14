@@ -1,3 +1,5 @@
+import { heightAt } from '../terrain/height';
+import { ActorImpacts } from './ActorImpacts';
 import { TrafficFleet, type TrafficModelFactory } from './TrafficFleet';
 import * as THREE from 'three';
 
@@ -65,6 +67,7 @@ const WHITE = new THREE.Color(0xffeccb);
 const RED = new THREE.Color(0xff4a2a);
 
 export class Convoys {
+  readonly impacts = new ActorImpacts('vehicle',[.95,1.15,2.35],1.15);
   readonly group = new THREE.Group();
 
   private bodies: TrafficFleet;
@@ -119,6 +122,7 @@ export class Convoys {
 
   /** @param night 0..1 off the day curve. */
   update(dt: number, night: number, camera: THREE.Vector3) {
+    this.impacts.begin();
     const on = night > NIGHT_ON && this.routes > 0;
     this.group.visible = on;
     if (!on) return;
@@ -143,8 +147,8 @@ export class Convoys {
         this.dummy.position.set(x, y, z);
         this.dummy.rotation.set(pitch, yaw, p.roll, 'YXZ');
         this.dummy.scale.setScalar(1);
-        this.dummy.updateMatrix();
-        this.bodies.setMatrixAt(v++, this.dummy.matrix, -this.t * route.speed / 0.42);
+        const down=this.impacts.pose(v,this.dummy,dt,heightAt);
+        this.bodies.setMatrixAt(v++, this.dummy.matrix, down?0:-this.t * route.speed / 0.42);
         this.bodyMatrix.copy(this.dummy.matrix);
 
         // How square-on this vehicle is to the camera, +1 coming at you.

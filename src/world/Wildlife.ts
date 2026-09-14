@@ -1,3 +1,4 @@
+import { ActorImpacts } from './ActorImpacts';
 import * as THREE from 'three';
 import { buildGazelle, patchAnimal } from './animalGeometry';
 import { heightAt } from '../terrain/height';
@@ -33,6 +34,7 @@ interface Gazelle {
 }
 
 export class Wildlife {
+  readonly impacts = new ActorImpacts('gazelle',[.24,.82,.75],.82,.12);
   readonly group = new THREE.Group();
 
   private coat: THREE.InstancedMesh;
@@ -83,6 +85,7 @@ export class Wildlife {
   }
 
   update(dt: number, focusX: number, focusZ: number) {
+    this.impacts.begin();
     this.timeUniform.value += dt;
     if (this.herd.length === 0) return;
 
@@ -152,7 +155,8 @@ export class Wildlife {
 
       this.dummy.position.set(g.x, g.y, g.z);
       this.dummy.rotation.set(0, g.heading, 0);
-      this.dummy.updateMatrix();
+      const down=this.impacts.pose(i,this.dummy,dt,heightAt);
+      if(down)this.gait[i]=-1;
       this.coat.setMatrixAt(i, this.dummy.matrix);
       this.dark.setMatrixAt(i, this.dummy.matrix);
     }

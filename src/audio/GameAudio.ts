@@ -28,6 +28,7 @@ export class GameAudio {
   private effects = 0.7;
   /** Smoothed "how much is happening", which drives the score's presence. */
   private intensity = 0;
+  private wrecked = false;
 
   get ready(): boolean {
     return this.engine?.running ?? false;
@@ -58,7 +59,7 @@ export class GameAudio {
       // here or the player's saved balance is silently ignored until they open
       // the panel and touch a slider.
       engine.setMusicVolume(this.music);
-      engine.setEffectsVolume(this.effects);
+      engine.setEffectsVolume(this.wrecked ? 0 : this.effects);
     } catch (err) {
       // Audio is a nice-to-have; a browser refusing it must not stop the drive.
       console.warn('[dune] audio unavailable', err);
@@ -73,7 +74,7 @@ export class GameAudio {
     const target = Math.min(1, tel.speedKph / 70) * 0.8 + (tel.airborne ? 0.2 : 0);
     this.intensity += (target - this.intensity) * Math.min(1, dt * 0.6);
 
-    this.driving?.update(tel, throttle, dt);
+    if (!this.wrecked) this.driving?.update(tel, throttle, dt);
     this.score?.update(dt, this.intensity);
     if (tel.landingImpact > 0.05) this.driving?.landing(tel.landingImpact);
   }
@@ -104,6 +105,21 @@ export class GameAudio {
     this.engine?.duck(0.2, 0.06, 0.25, 0.6);
   }
 
+  setWrecked(wrecked: boolean) {
+    this.wrecked=wrecked;
+    this.engine?.setEffectsVolume(wrecked?0:this.effects);
+  }
+
+  /** A low thump and short noise burst, routed through the user's master mix. */
+  explosion() {
+    const e=this.engine;if(!e?.running)return;
+    const t=e.now,noise=e.createNoiseSource(),filter=e.ctx.createBiquadFilter(),gain=e.ctx.createGain();
+    filter.type='lowpass';filter.frequency.setValueAtTime(1800,t);filter.frequency.exponentialRampToValueAtTime(90,t+1.8);
+    gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(this.effects*.8,t+.015);gain.gain.exponentialRampToValueAtTime(.0001,t+2);
+    noise.connect(filter);filter.connect(gain);gain.connect(e.master);noise.start(t);noise.stop(t+2.1);
+    noise.onended=()=>{noise.disconnect();filter.disconnect();gain.disconnect();};
+  }
+
   setMuted(muted: boolean) {
     this.muted = muted;
     this.engine?.setMasterVolume(muted ? 0 : this.volume);
@@ -121,6 +137,6 @@ export class GameAudio {
 
   setEffectsVolume(v: number) {
     this.effects = v;
-    this.engine?.setEffectsVolume(v);
+    this.engine?.setEffectsVolume(this.wrecked?0:v);
   }
 }

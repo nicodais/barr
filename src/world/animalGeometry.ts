@@ -45,6 +45,7 @@ export function patchAnimal(shader: THREE.WebGLProgramParametersWithUniforms, ti
     uniform float uTime;
     attribute float aPhase, aGait;
     vec3 animalSkin(vec3 p) {
+      if (aGait < 0.0) return p; // Fallen animals have no walk or idle motion.
       float cycle = uTime * ${camel ? '3.1' : '9.0'} + aPhase;
       vec3 result = p;
       // Smooth partitions form a continuous skin even across the chest/hips.

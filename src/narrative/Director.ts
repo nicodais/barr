@@ -43,6 +43,8 @@ export class Director {
   /** Remaining beats of a POI call-in, delivered one at a time as it clears. */
   private pendingLines: string[] = [];
 
+  private extremeRebukeUntil = 0;
+  private extremeLine = 0;
   private cooldown = 12;
   private stuckTimer = 0;
   private fastTimer = 0;
@@ -289,6 +291,21 @@ export class Director {
     this.pendingLines.length = 0;
     this.pendingSignOff = 0;
     this.cooldown = 6;
+  }
+
+  /** Extreme-only emergency traffic interrupts ordinary radio chatter. */
+  onAnimalHit(now: number): string | null {
+    if (now < this.extremeRebukeUntil) return null;
+    this.extremeRebukeUntil=now+6500;
+    const lines=[
+      "STOP THE CAR! You just ran over an animal! What is wrong with you? That is horrible!",
+      "WATCH WHERE YOU ARE GOING! Those animals are alive! Have you no decency?",
+      "ENOUGH! This desert is their home! Stop driving like a horrible person!",
+    ];
+    const line=lines[this.extremeLine++%lines.length];
+    this.pendingLines.length=0;this.pendingSignOff=0;this.cooldown=COOLDOWN;
+    this.radio.onKeyUp();this.subtitles.show(line,true);
+    return line;
   }
 
   /** Hooked to the vehicle's damage-free auto-flip. */

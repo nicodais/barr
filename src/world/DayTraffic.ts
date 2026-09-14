@@ -1,3 +1,5 @@
+import { heightAt } from '../terrain/height';
+import { ActorImpacts } from './ActorImpacts';
 import { TrafficFleet, type TrafficModelFactory } from './TrafficFleet';
 import * as THREE from 'three';
 import { WIND_X, WIND_Z } from '../terrain/height';
@@ -89,6 +91,7 @@ const ROUTES: Route[] = [
 ];
 
 export class DayTraffic {
+  readonly impacts = new ActorImpacts('vehicle',[.95,1.15,2.35],1.15);
   readonly group = new THREE.Group();
 
   private bodies: TrafficFleet;
@@ -174,6 +177,7 @@ export class DayTraffic {
     haze: number,
   ) {
     const day = 1 - night;
+    this.impacts.begin();
     const on = day > DAY_ON && this.routes > 0 && haze < 0.85;
     this.group.visible = on;
     if (!on) return;
@@ -209,10 +213,10 @@ export class DayTraffic {
         this.dummy.position.set(car.x, car.y, car.z);
         this.dummy.rotation.set(car.pitch, car.yaw, car.roll, 'YXZ');
         this.dummy.scale.setScalar(1);
-        this.dummy.updateMatrix();
-        this.bodies.setMatrixAt(v++, this.dummy.matrix, -this.t * route.speed / 0.42);
+        const down=this.impacts.pose(v,this.dummy,dt,heightAt);
+        this.bodies.setMatrixAt(v++, this.dummy.matrix, down?0:-this.t * route.speed / 0.42);
 
-        for (let k = 0; k < PUFFS; k++) {
+        for (let k = 0; k < PUFFS && !down; k++) {
           const age = k * PUFF_DT;
           // Where the vehicle *was* that many seconds ago, on the same path.
           // Reading the route backwards rather than keeping a ring buffer of

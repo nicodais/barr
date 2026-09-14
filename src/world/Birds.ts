@@ -1,3 +1,4 @@
+import { ActorImpacts } from './ActorImpacts';
 import * as THREE from 'three';
 import { heightAt } from '../terrain/height';
 
@@ -27,15 +28,19 @@ interface Bird {
 }
 
 export class Birds {
+  readonly impacts = new ActorImpacts('bird',[.85,.2,.36],0);
   readonly mesh: THREE.InstancedMesh;
 
   private birds: Bird[] = [];
   private dummy = new THREE.Object3D();
   private timeUniform = { value: 0 };
   private active = 0;
+  private alive: THREE.InstancedBufferAttribute;
 
   constructor(capacity = 14) {
     const geometry = buildBird();
+    this.alive=new THREE.InstancedBufferAttribute(new Float32Array(capacity).fill(1),1);
+    geometry.setAttribute('aAlive',this.alive);
     const phases = new Float32Array(capacity);
     for (let i = 0; i < capacity; i++) phases[i] = Math.random() * Math.PI * 2;
     geometry.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases, 1));
@@ -50,13 +55,13 @@ export class Birds {
       shader.vertexShader = shader.vertexShader
         .replace(
           '#include <common>',
-          '#include <common>\nuniform float uTime;\nattribute float aPhase;',
+          '#include <common>\nuniform float uTime;\nattribute float aPhase, aAlive;',
         )
         .replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
            // Wingtips travel furthest, so deflection scales with span.
-           float flap = sin( uTime * 7.5 + aPhase );
+           float flap = sin( uTime * 7.5 + aPhase ) * aAlive;
            transformed.y += flap * abs( transformed.x ) * 0.62;`,
         );
     };
@@ -78,6 +83,7 @@ export class Birds {
   }
 
   update(dt: number, focusX: number, focusZ: number) {
+    this.impacts.begin();
     this.timeUniform.value += dt;
     if (this.active === 0) return;
 
@@ -105,10 +111,12 @@ export class Birds {
       this.dummy.position.set(b.x, b.y, b.z);
       this.dummy.rotation.set(0, b.heading, 0);
       this.dummy.scale.setScalar(1);
-      this.dummy.updateMatrix();
+      const down=this.impacts.pose(i,this.dummy,dt,heightAt);
+      this.alive.setX(i,down?0:1);
       this.mesh.setMatrixAt(i, this.dummy.matrix);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.alive.needsUpdate = true;
   }
 
   private spawn(focusX: number, focusZ: number, anywhere: boolean): Bird {

@@ -109,6 +109,8 @@ const RECOVER_BOUND = WORLD_HALF - 40;
  */
 export class Vehicle {
   readonly body: RAPIER.RigidBody;
+  readonly collider: RAPIER.Collider;
+  autoRecover = true;
   readonly controller: RAPIER.DynamicRayCastVehicleController;
   readonly wheels: WheelState[] = [];
   tuning: VehicleTuning = { ...DEFAULT_TUNING };
@@ -181,7 +183,7 @@ export class Vehicle {
       .setDensity(0)
       .setFriction(0.4)
       .setRestitution(0.05);
-    world.createCollider(colliderDesc, this.body);
+    this.collider = world.createCollider(colliderDesc, this.body);
 
     this.controller = world.createVehicleController(this.body);
     this.controller.indexUpAxis = 1;
@@ -522,7 +524,7 @@ export class Vehicle {
 
     if (rolled) {
       this.rolledTimer += dt;
-      if (this.rolledTimer >= t.rollRecoverDelay) {
+      if (this.autoRecover && this.rolledTimer >= t.rollRecoverDelay) {
         this.recover('rollover');
       }
       return;
@@ -539,6 +541,18 @@ export class Vehicle {
       const fwd = rotateVec(this.body.rotation(), { x: 0, y: 0, z: 1 });
       this.lastUprightYaw = Math.atan2(fwd.x, fwd.z);
     }
+  }
+
+  /** Suspend a destroyed vehicle without leaving stale speed or tyre contacts. */
+  setWrecked(wrecked: boolean) {
+    this.body.setEnabled(!wrecked);
+    if (!wrecked) return;
+    Object.assign(this.telemetry, {
+      speed: 0, speedKph: 0, forwardSpeed: 0, verticalSpeed: 0,
+      landingImpact: 0, airborne: false, airtime: 0, rolledOver: false,
+      wheelsOnGround: 0, slipAngle: 0, climbing: false,
+    });
+    for (const wheel of this.wheels) wheel.contact = false;
   }
 
   recover(reason: RecoverReason = 'manual') {

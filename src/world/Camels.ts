@@ -1,3 +1,4 @@
+import { ActorImpacts } from './ActorImpacts';
 import * as THREE from 'three';
 import { buildCamel, patchAnimal } from './animalGeometry';
 import { heightAt } from '../terrain/height';
@@ -64,6 +65,7 @@ const STRINGS: String_[] = [
 const CAPACITY = STRINGS.reduce((n, s) => n + s.count, 0);
 
 export class Camels {
+  readonly impacts = new ActorImpacts('camel',[.48,1.3,1.65],1.3,.45);
   readonly group = new THREE.Group();
 
   private coat: THREE.InstancedMesh;
@@ -100,6 +102,7 @@ export class Camels {
   }
 
   update(dt: number, focusX: number, focusZ: number) {
+    this.impacts.begin();
     this.timeUniform.value += dt;
 
     let i = 0;
@@ -145,7 +148,8 @@ export class Camels {
         this.gait[i] = this.motion[s];
         this.dummy.position.set(x, heightAt(x, z), z);
         this.dummy.rotation.set(0, Math.atan2(hx, hz), 0);
-        this.dummy.updateMatrix();
+        const down=this.impacts.pose(i,this.dummy,dt,heightAt);
+        if(down)this.gait[i]=-1;
         this.coat.setMatrixAt(i, this.dummy.matrix);
         this.dark.setMatrixAt(i, this.dummy.matrix);
       }

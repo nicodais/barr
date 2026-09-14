@@ -10,6 +10,15 @@ A relaxing open-world dune-bashing driving game for the browser (desktop and mob
 
 ---
 
+## Optional Extreme Mode (user-directed, 2026-09-14)
+
+The calm, consequence-free design below remains the default. A menu-only,
+session-only Extreme Mode is an explicit exception: collisions with animated
+animals and traffic, animal knockdowns and blood on sand, vehicle damage and
+rollovers, an explosion at zero integrity, and respawn five seconds later.
+Ahmed's animal-impact reprimands are urgent **text only**, never spoken aloud.
+The mode starts disabled on every page load and is not stored in settings.
+
 ## 1. Core Concept
 
 - **Genre:** Open-world driving / walking-sim adjacent ("driving-sim")

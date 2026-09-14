@@ -104,6 +104,8 @@ const STEERING: Array<{ label: string; mirrored: boolean }> = [
  */
 
 interface MenuCallbacks {
+  onExtreme(on: boolean): void;
+  getExtreme(): boolean;
   onRegion(id: RegionId): void;
   onBody(id: BodyId): void;
   onTime(t: number): void;
@@ -174,6 +176,7 @@ export class MenuPanel {
   readonly button: HTMLButtonElement;
   readonly element: HTMLElement;
 
+  private extremeButton: HTMLButtonElement;
   private regionRow: HTMLElement;
   private bodyRow: HTMLElement;
   private timeRow: HTMLElement;
@@ -211,6 +214,14 @@ export class MenuPanel {
     this.element.className = 'menu-panel';
     this.element.hidden = true;
 
+    const extreme = this.section('Extreme Mode');
+    this.extremeButton=this.chip('Enable Extreme Mode',()=>{this.cb.onExtreme(!this.cb.getExtreme());this.sync();});
+    this.extremeButton.setAttribute('role','switch');
+    extreme.append(this.extremeButton);
+    const extremeNote=document.createElement('span');extremeNote.className='menu-note';
+    extremeNote.textContent='Animal collisions and blood, vehicle damage, explosions and a 5-second respawn. Off at the start of every session.';
+    extreme.parentElement!.append(extremeNote);
+    this.element.append(extreme.parentElement!);
     this.regionRow = this.section('Desert');
     this.bodyRow = this.section('Truck');
     this.timeRow = this.section('Time of day');
@@ -395,6 +406,10 @@ export class MenuPanel {
   }
 
   private sync() {
+    const extreme=this.cb.getExtreme();
+    this.extremeButton.textContent=extreme?'Disable Extreme Mode':'Enable Extreme Mode';
+    this.extremeButton.setAttribute('aria-checked',String(extreme));
+    this.extremeButton.classList.toggle('is-active',extreme);
     const region = this.cb.getRegion();
     const body = this.cb.getBody();
     const time = this.cb.getTime();

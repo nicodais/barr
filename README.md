@@ -432,3 +432,17 @@ Captions distinguish regional examples from exact sites, including the Bahrain o
 Background music is “Desert City” by Kevin MacLeod, CC BY 4.0, replacing the recording
 whose YouTube source could not be traced. Music and engine credits are available from
 the menu and in [audio credits](public/audio/CREDITS.md).
+
+## Extreme Mode
+
+Open the menu and choose **Enable Extreme Mode**. This optional mode starts off
+in every session. It adds collisions with roaming traffic, camels, gazelles and
+birds; animals fall and leave blood on the sand, and Ahmed reacts in urgent radio
+text without a spoken voice. The damage gauge beneath the compass shows remaining
+vehicle integrity. Impacts, hard landings and remaining overturned reduce it;
+automatic rollover recovery is disabled. At zero, the vehicle explodes and respawns
+five seconds later with full integrity. Reset and vehicle changes cannot skip that
+countdown. Disabling the mode clears its blood, fallen actors and collision bodies.
+
+Validate with `npm run build`, `node scripts/check-extreme.mjs` (rules and real
+Rapier collisions), and `node scripts/check-assets.mjs` (model/animation geometry).

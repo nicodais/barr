@@ -1,3 +1,8 @@
+import { ExtremeRules } from './ExtremeRules';
+import { ExtremeCollisions } from './ExtremeCollisions';
+import { ExtremeEffects } from '../world/ExtremeEffects';
+import { DamageHud } from '../ui/DamageHud';
+import type { ImpactActor } from '../world/ActorImpacts';
 import { preloadAnimalGeometry } from '../world/animalGeometry';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
@@ -69,6 +74,10 @@ const RESPAWN_RADIUS = 680;
 export class Game {
   private rig: SceneRig;
   private world: RAPIER.World;
+  private extreme = new ExtremeRules();
+  private extremeCollisions: ExtremeCollisions;
+  private extremeEffects = new ExtremeEffects(heightAt);
+  private damageHud = new DamageHud();
   private terrain: TerrainStreamer;
   private timeOfDay = new TimeOfDay();
   private vehicle: Vehicle;
@@ -172,6 +181,7 @@ export class Game {
     this.rig = new SceneRig(canvas);
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.integrationParameters.dt = FIXED_DT;
+    this.extremeCollisions = new ExtremeCollisions(this.world);
 
     // Settings first, and specifically before anything samples the height
     // field: the region decides what `heightAt` *is*, so loading it later would
@@ -227,6 +237,7 @@ export class Game {
     // Solid, damage-free colliders for those same landmarks (§11).
     this.landmarkColliders = createLandmarkColliders(RAPIER, this.world);
     this.rig.scene.add(this.worldProps);
+    this.rig.scene.add(this.extremeEffects.group);
     this.rig.scene.add(this.scatter.group);
     this.rig.scene.add(this.birds.mesh);
     this.rig.scene.add(this.wildlife.group);
@@ -305,11 +316,13 @@ export class Game {
         // One panel at a time: they share the same corner, and the garage is
         // worth seeing the truck next to rather than a wall of sliders.
         this.panel?.hide();
-        this.garage.show();
+        if (!this.extreme.destroyed) this.garage.show();
       },
     );
     this.garage = new GaragePanel(this.settings, () => this.rebuildVehicleView());
     this.menu = new MenuPanel({
+      getExtreme: () => this.extreme.enabled,
+      onExtreme: on => this.setExtremeMode(on),
       getRegion: () => activeRegion().id,
       getBody: () => this.settings.vehicle.body,
       getTime: () => this.timeOfDay.time,
@@ -317,6 +330,7 @@ export class Game {
         void this.changeRegion(id).then(() => this.menu.regionSettled());
       },
       onBody: (id) => {
+        if(this.extreme.destroyed)return;
         if (id === this.settings.vehicle.body) return;
         this.settings.vehicle.body = id;
         saveSettings(this.settings);
@@ -390,7 +404,7 @@ export class Game {
         this.applyAccessibility();
       },
       getContrast: () => this.settings.highContrast,
-      onGarage: () => this.garage.show(),
+      onGarage: () => { if (!this.extreme.destroyed) this.garage.show(); },
       onPressure: (id) => this.setPressure(id),
       getHaptics: () => this.settings.haptics,
       onHaptics: (on) => {
@@ -433,7 +447,7 @@ export class Game {
     // R and P, for people without an R or a P.
     this.input.touch.setActions(
       () => {
-        if (this.photo.active) return;
+        if (this.photo.active || this.extreme.destroyed) return;
         haptics.tick();
         this.vehicle.recover('manual');
       },
@@ -456,7 +470,7 @@ export class Game {
      */
     const instruments = document.createElement('div');
     instruments.className = 'instruments';
-    instruments.append(this.compass.element, this.hud.element);
+    instruments.append(this.compass.element, this.damageHud.element, this.hud.element);
     this.instruments = instruments;
 
     uiRoot.append(
@@ -466,6 +480,7 @@ export class Game {
       this.garage.element,
       this.boundary.element,
       instruments,
+      this.damageHud.respawn,
       this.poiCard.element,
       this.firstRun.element,
       this.carSelect.element,
@@ -511,6 +526,7 @@ export class Game {
     // Browser chrome and folding can change the canvas without a window resize.
     new ResizeObserver(this.onResize).observe(canvas);
     window.visualViewport?.addEventListener('resize', this.onResize);
+
   }
 
   static async create(canvas: HTMLCanvasElement, uiRoot: HTMLElement): Promise<Game> {
@@ -662,6 +678,9 @@ export class Game {
     const frameDt = Math.min((now - this.lastTime) / 1000, 0.25);
     this.lastTime = now;
 
+    if(this.extreme.tick(now))this.respawnExtreme();
+    this.extremeEffects.update(frameDt);
+    this.damageHud.update(this.extreme.enabled,this.extreme.health,this.extreme.respawnAt,now);
     this.input.update(frameDt);
     this.handleHotkeys();
 
@@ -675,8 +694,9 @@ export class Game {
     // Frozen while the picker is up for the same reason as photo mode: the
     // truck is on screen and being looked at, and a stray key would drive it
     // out of its own preview.
-    const controls = this.photo.active || this.choosing ? this.frozenInput : this.input.vehicle;
+    const controls = this.photo.active || this.choosing || this.extreme.destroyed ? this.frozenInput : this.input.vehicle;
 
+    if(this.extreme.enabled&&!this.extreme.destroyed)this.extremeCollisions.sync(this.impactSources(),this.curPos);
     this.accumulator += frameDt;
     let steps = 0;
     // A landing lasts one physics step. If several steps run in a frame the
@@ -694,8 +714,15 @@ export class Game {
           ?this.terrain.surface.heightOffsetAt((wheel.contactX+mate.contactX)/2,(wheel.contactZ+mate.contactZ)/2):0;
         this.vehicle.setContactSurfaceHeight(i,contactHeight);
       }
-      this.vehicle.update(controls, FIXED_DT);
-      this.world.step();
+      if(!this.extreme.destroyed)this.vehicle.update(controls, FIXED_DT);
+      this.world.step(this.extreme.enabled?this.extremeCollisions.events:undefined);
+      if(this.extreme.enabled&&!this.extreme.destroyed&&!this.choosing&&!this.photo.active) {
+        const impulse=this.extremeCollisions.drain(this.vehicle.collider,this.vehicle.tuning.mass,FIXED_DT,
+          (source,actor)=>this.onExtremeHit(source,actor,now));
+        const impact=Math.max(impulse,this.vehicle.telemetry.landingImpact*14);
+        if(this.extreme.impact(impact,now))this.explodeVehicle();
+        if(this.vehicle.telemetry.rolledOver&&this.extreme.damage(12*FIXED_DT,now,false))this.explodeVehicle();
+      }
 
       landingImpact = Math.max(landingImpact, this.vehicle.telemetry.landingImpact);
       this.syncTransforms(false);
@@ -707,7 +734,7 @@ export class Game {
     // Soft world boundary: fade to haze as the player leaves the region and set
     // them back down facing the centre once fully faded. Skipped in photo mode,
     // where the truck is parked and the free camera can roam.
-    if (!this.photo.active && this.boundary.update(this.curPos.x, this.curPos.z, frameDt)) {
+    if (!this.photo.active && !this.extreme.destroyed && this.boundary.update(this.curPos.x, this.curPos.z, frameDt)) {
       this.respawnTowardCentre();
       haptics.boundary();
     }
@@ -716,6 +743,8 @@ export class Game {
     this.renderPos.lerpVectors(this.prevPos, this.curPos, alpha);
     this.renderQuat.slerpQuaternions(this.prevQuat, this.curQuat, alpha);
 
+    this.view.root.visible=!this.extreme.destroyed;
+    this.contactShadow.mesh.visible=!this.extreme.destroyed;
     this.view.root.position.copy(this.renderPos);
     this.view.root.quaternion.copy(this.renderQuat);
     // Speed feeds the two-wheeler lean; the closed bodies ignore it.
@@ -769,7 +798,7 @@ export class Game {
     sand.uSheenColor.value.copy(this.timeOfDay.state.sunColor);
     sand.uSheen.value = Math.max(0, 1 - Math.max(this.sunDir.y, 0) / 0.62) * (1 - 0.45 * haze);
     sand.uRippleStrength.value = 1 - 0.4 * haze;
-    this.headlights.setNight(this.timeOfDay.state.night);
+    this.headlights.setNight(this.extreme.destroyed?0:this.timeOfDay.state.night);
     // After the camera has been placed for this frame: the lamp glows are
     // billboards, and orienting them against last frame's camera makes them
     // visibly lag when you swing the view.
@@ -812,6 +841,7 @@ export class Game {
     for(let i=0;i<4;i++){
       const physical=this.vehicle.wheels[i],out=this.visualContacts[i];
       Object.assign(out,physical);
+      if (this.extreme.destroyed) out.contact = false;
       const hub=this.view.wheels[single?Math.floor(i/2):i];
       hub.getWorldPosition(this.contactCentre);
       const radius=single?(i<2?.35:.33):this.settings.vehicle.body==='buggy'?.40:.42;
@@ -965,7 +995,7 @@ export class Game {
 
   private handleHotkeys() {
     if (this.input.keyboard.consumePress('KeyT')) this.panel?.toggle();
-    if (this.input.keyboard.consumePress('KeyG')) this.garage.toggle();
+    if (this.input.keyboard.consumePress('KeyG') && !this.extreme.destroyed) this.garage.toggle();
     // Bracket keys, because pressure is an axis and direction matters — a
     // single cycling key makes you tap through road to get back to sand.
     if (this.input.keyboard.consumePress('BracketLeft')) this.setPressureStep(-1);
@@ -973,7 +1003,7 @@ export class Game {
     if (this.input.keyboard.consumePress('KeyP')) this.togglePhotoMode();
     if (this.input.keyboard.consumePress('Escape') && this.photo.active) this.exitPhotoMode();
     // Recovering while composing a shot would yank the subject out of frame.
-    if (!this.photo.active && this.input.keyboard.consumePress('KeyR')) {
+    if (!this.photo.active && !this.extreme.destroyed && this.input.keyboard.consumePress('KeyR')) {
       this.vehicle.recover('manual');
     }
     this.input.keyboard.endFrame();
@@ -985,6 +1015,7 @@ export class Game {
   }
 
   private enterPhotoMode() {
+    if(this.extreme.destroyed)return;
     this.photo.enter(this.renderQuat);
     this.photoBar.show();
     // Photo mode is for looking at the truck, so nothing may sit over it.
@@ -1123,6 +1154,7 @@ export class Game {
    * for the menu, where a pause is expected.
    */
   async changeRegion(id: RegionId) {
+    if(this.extreme.destroyed){this.menu.regionSettled();return;}
     if (id === activeRegion().id) return;
     // Restored rather than cleared at the end: this is reachable from the menu
     // mid-drive, and also while another panel is holding input frozen.
@@ -1139,6 +1171,8 @@ export class Game {
     disposeTree(this.worldProps);
     this.worldProps.clear();
 
+    this.resetExtremeWorld();
+    this.extreme.clear(performance.now());
     this.terrain.reset();
     this.scatter.reset();
     this.tracks.clear();
@@ -1201,6 +1235,63 @@ export class Game {
     this.world.queryPipeline.update(this.world.colliders);
     this.syncTransforms(true);
     this.chase.reset(this.curPos, this.curQuat);
+  }
+
+  private impactSources() {
+    return [
+      {name:'camels',actors:this.camels.impacts.actors},
+      {name:'gazelles',actors:this.wildlife.impacts.actors},
+      {name:'birds',actors:this.birds.impacts.actors},
+      {name:'day',actors:this.dayTraffic.impacts.actors},
+      {name:'night',actors:this.convoys.impacts.actors},
+    ];
+  }
+
+  /** Called only by the menu; deliberately absent from saved settings/URL flags. */
+  private setExtremeMode(on:boolean) {
+    if(!this.extreme.setEnabled(on,performance.now()))return;
+    this.vehicle.autoRecover=!on;
+    this.vehicle.body.enableCcd(on);
+    this.vehicle.collider.setActiveEvents(on?RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS:0);
+    this.vehicle.collider.setContactForceEventThreshold(0);
+    document.body.classList.toggle('extreme-mode',on);
+    if(!on){this.resetExtremeWorld();}
+  }
+
+  private resetExtremeWorld() {
+    this.extremeCollisions.clear();this.extremeEffects.clear();
+    this.camels.impacts.reset();this.wildlife.impacts.reset();this.birds.impacts.reset();
+    this.dayTraffic.impacts.reset();this.convoys.impacts.reset();
+  }
+
+  private onExtremeHit(source:string,actor:ImpactActor,now:number) {
+    const owners={camels:this.camels.impacts,gazelles:this.wildlife.impacts,birds:this.birds.impacts,day:this.dayTraffic.impacts,night:this.convoys.impacts};
+    const owner=owners[source as keyof typeof owners];
+    if(!owner?.hit(actor.id))return;
+    if(actor.kind!=='vehicle') {
+      this.extremeEffects.blood(actor.x,actor.z,actor.kind==='camel'?1:actor.kind==='bird'?.35:.65);
+      this.director.onAnimalHit(now);
+    }
+  }
+
+  private explodeVehicle() {
+    this.garage.hide();
+    this.panel?.hide();
+    this.extremeEffects.explode(this.vehicle.position);
+    this.audio.explosion();this.audio.setWrecked(true);
+    this.vehicle.setWrecked(true);
+    this.view.root.visible=false;
+    this.extremeCollisions.clear();
+    for(const wheel of this.visualContacts)wheel.contact=false;
+  }
+
+  private respawnExtreme() {
+    this.vehicle.setWrecked(false);
+    this.vehicle.recover('manual');
+    this.terrain.update(this.curPos.x,this.curPos.z);
+    this.world.queryPipeline.update(this.world.colliders);
+    this.view.root.visible=true;this.audio.setWrecked(false);
+    this.accumulator=0;
   }
 
   private syncTransforms(alsoPrevious: boolean) {
