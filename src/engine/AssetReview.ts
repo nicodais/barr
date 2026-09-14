@@ -48,14 +48,16 @@ export async function startAssetReview(canvas: HTMLCanvasElement, ui: HTMLElemen
     const poi = pois.find(p => p.id === id);
     if (id === 'camel' || id === 'gazelle') {
       const parts = id === 'camel' ? buildCamel() : buildGazelle();
-      for (const geo of Object.values(parts)) {
+      for (const [part, geo] of Object.entries(parts)) {
         geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(new Array(geo.getAttribute('position').count).fill(0), 1));
         geo.setAttribute('aGait', new THREE.Float32BufferAttribute(new Array(geo.getAttribute('position').count).fill(0.7), 1));
-        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 });
-        mat.onBeforeCompile = shader => patchAnimal(shader, clock, id === 'camel');
+        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: id === 'camel' ? 0.98 : 0.88 });
+        mat.onBeforeCompile = shader => patchAnimal(shader, clock, id === 'camel', part === 'coat');
+        mat.customProgramCacheKey = () => `${id}-${part}-v1`;
         const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = true;
         const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-        depth.onBeforeCompile = shader => patchAnimal(shader, clock, id === 'camel'); mesh.customDepthMaterial = depth;
+        depth.onBeforeCompile = shader => patchAnimal(shader, clock, id === 'camel', part === 'coat'); mesh.customDepthMaterial = depth;
+        depth.customProgramCacheKey = () => `${id}-depth-v1`;
         root.add(mesh);
       }
     } else if (poi) root = buildLandmark({ ...poi, x: 0, z: 0 });
@@ -100,8 +102,9 @@ export async function startAssetReview(canvas: HTMLCanvasElement, ui: HTMLElemen
     panel.querySelector('[data-audio]')!.textContent='Stop engine';
     panel.querySelector('[data-audio-status]')!.textContent=driving.recordingsLoaded===3?'3 recordings decoded · '+audio.ctx.state:'Engine recordings failed to load';
   };
-  const resize = () => { rig.setSize(window.innerWidth, window.innerHeight); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); };
+  const resize = () => { const { clientWidth: w, clientHeight: h } = canvas; if (!w || !h) return; rig.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); };
   window.addEventListener('resize', resize); resize();
+  new ResizeObserver(resize).observe(canvas);
   show(new URLSearchParams(location.search).get('assets') || 'wagon');
   let previous = performance.now(), lastStats = 0;
   const direction = new THREE.Vector3();

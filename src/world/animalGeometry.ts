@@ -37,9 +37,9 @@ export function buildGazelle() { return copyAnimal('gazelle'); }
 
 /** One continuous deformation field for skin, markings, hooves and shadow.
  * No material/triangle/leg-ID boundaries can separate during animation. */
-export function patchAnimal(shader: THREE.WebGLProgramParametersWithUniforms, time: { value: number }, camel: boolean) {
+export function patchAnimal(shader: THREE.WebGLProgramParametersWithUniforms, time: { value: number }, camel: boolean, texturedCoat = true) {
   shader.uniforms.uTime = time;
-  const hip = camel ? 1.46 : 0.86;
+  const hip = camel ? 1.67 : 0.86;
   const common = `
     varying vec3 vCoatPosition;
     uniform float uTime;
@@ -56,7 +56,7 @@ export function patchAnimal(shader: THREE.WebGLProgramParametersWithUniforms, ti
         bool isFront = (i == 0 || i == 2);
         float weight = (isLeft ? left : 1.0-left) * (isFront ? front : 1.0-front) * influence;
         float phase = cycle + (${camel ? 'isLeft' : '(isLeft == isFront)'} ? 0.0 : 3.14159265);
-        vec3 hip = vec3(isLeft ? ${camel ? '0.29' : '0.15'} : ${camel ? '-0.29' : '-0.15'}, ${hip}, isFront ? ${camel ? '0.64' : '0.30'} : ${camel ? '-0.77' : '-0.40'});
+        vec3 hip = vec3(isLeft ? ${camel ? '0.29' : '0.15'} : ${camel ? '-0.29' : '-0.15'}, ${hip}, isFront ? ${camel ? '0.66' : '0.30'} : ${camel ? '-0.85' : '-0.40'});
         float angle = sin(phase) * ${camel ? '0.26' : '0.40'} * aGait;
         vec3 limb = p - hip;
         limb.yz = mat2(cos(angle), sin(angle), -sin(angle), cos(angle)) * limb.yz;
@@ -78,6 +78,34 @@ export function patchAnimal(shader: THREE.WebGLProgramParametersWithUniforms, ti
       float fibre = sin(vCoatPosition.x*960.0+sin(vCoatPosition.z*190.0))*sin(vCoatPosition.y*165.0+vCoatPosition.z*130.0);
       diffuseColor.rgb *= .97+fibre*.025*furFade;
     `);
+  if (camel && texturedCoat) {
+    // Object-space wool stays attached during the walk, without UV seams or
+    // transparent shells. Derivative filtering removes distant grain shimmer.
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `
+      #include <common>
+      float coatHash(vec3 p) { p=fract(p*.3183099+vec3(.17,.31,.53)); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+      float coatNoise(vec3 p) {
+        vec3 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+        return mix(mix(mix(coatHash(i),coatHash(i+vec3(1,0,0)),f.x),
+          mix(coatHash(i+vec3(0,1,0)),coatHash(i+vec3(1,1,0)),f.x),f.y),
+          mix(mix(coatHash(i+vec3(0,0,1)),coatHash(i+vec3(1,0,1)),f.x),
+          mix(coatHash(i+vec3(0,1,1)),coatHash(i+vec3(1,1,1)),f.x),f.y),f.z);
+      }
+    `).replace('#include <color_fragment>', `
+      #include <color_fragment>
+      float woolLod=1.0-smoothstep(.006,.025,length(fwidth(vCoatPosition)));
+      float wool=coatNoise(vCoatPosition*vec3(165.0,85.0,165.0));
+      float clump=coatNoise(vCoatPosition*vec3(42.0,28.0,42.0));
+      diffuseColor.rgb *= mix(1.0,.78+.35*wool,woolLod) * (.94+.10*clump);
+    `).replace('#include <normal_fragment_maps>', `
+      #include <normal_fragment_maps>
+      float coatHeight=(wool*.0013+clump*.001)*woolLod;
+      vec3 sx=dFdx(-vViewPosition), sy=dFdy(-vViewPosition);
+      vec3 r1=cross(sy,normal), r2=cross(normal,sx);
+      float det=dot(sx,r1);
+      normal=normalize(abs(det)*normal-sign(det)*(dFdx(coatHeight)*r1+dFdy(coatHeight)*r2));
+    `);
+  }
   shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\n'+common)
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCoatPosition=position; transformed=animalSkin(position);')
     .replace('#include <beginnormal_vertex>', `

@@ -244,7 +244,8 @@ Camels and gazelles use independently authored, continuous sculpted surfaces.
 Their compact indexed meshes are loaded once before world construction, then
 instanced with a continuous spatial skin deformation and matching animated shadows.
 Both skin meshes include all four legs; markings use that same deformation. The
-camels have two humps as requested. The editable
+camels use a single-humped dromedary silhouette, forward-reaching neck, compact head,
+long legs and object-space short-coat shading based on the supplied reference. The editable
 sculpt definitions live in `scripts/animalSculpt.ts`; rebuild the binary assets with
 `node scripts/bake-animals.mjs`.
 
@@ -403,8 +404,9 @@ auto-deploy on main and preview builds on branches (§10 phase 6).
 
 ## Media sources
 
-The shared-link thumbnail is a current in-game capture in `public/share-desert-2026.jpg`.
-Open Graph and Twitter tags use its new absolute Vercel URL so new previews request the new asset.
+The shared-link thumbnail is full-frame promotional cover art in `public/share-cover-v2.jpg` (1200 × 630).
+Open Graph and Twitter tags use its versioned absolute URL on `shamal.app`.
+Generation provenance and the prompt are in [the cover notes](docs/share-cover.md).
 
 All POI kinds and regional card overrides have openly licensed local photographs.
 Photographer/source and licence links appear on the cards; the menu opens the full

@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 type V = [number, number, number];
 /** Anatomical surface builder; each limb keeps its hip pivot through batching. */
 class Anatomy {
+  constructor(private tubeSamples = 12) {}
   coat: THREE.BufferGeometry[] = [];
   dark: THREE.BufferGeometry[] = [];
   surfaces: Array<{ distance: (x: number, y: number, z: number) => number; color: THREE.Color }> = [];
@@ -39,11 +40,11 @@ class Anatomy {
   tube(points: V[], radii: number[], color: number, dark = false) {
     const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p)));
     if (!dark) {
-      const samples = curve.getSpacedPoints(12);
-      for (let i = 0; i < 12; i++) {
+      const count = this.tubeSamples, samples = curve.getSpacedPoints(count);
+      for (let i = 0; i < count; i++) {
         const a = samples[i], delta = samples[i + 1].clone().sub(a), length2 = delta.lengthSq();
         const radiusAt = (t: number) => { const f = t * (radii.length - 1), k = Math.min(radii.length - 2, Math.floor(f)); return THREE.MathUtils.lerp(radii[k], radii[k + 1], f - k); };
-        const r0 = radiusAt(i / 12), r1 = radiusAt((i + 1) / 12);
+        const r0 = radiusAt(i / count), r1 = radiusAt((i + 1) / count);
         this.surfaces.push({ color: new THREE.Color(color), distance: (x, y, z) => {
           x -= a.x; y -= a.y; z -= a.z;
           const t = THREE.MathUtils.clamp((x*delta.x + y*delta.y + z*delta.z) / length2, 0, 1);
@@ -111,33 +112,68 @@ class Anatomy {
 }
 
 export function buildCamel() {
-  const b = new Anatomy(), tan = 0xb28a5e, light = 0xc8a57c, shadow = 0x8b6544;
-  b.oval([0.85, 0.98, 1.95], [0, 1.61, -0.08], tan);
-  b.oval([0.65, 0.83, 0.68], [0, 1.58, 0.70], tan);
-  b.oval([0.63, 0.76, 0.70], [0, 1.56, -0.76], shadow);
-  // Two distinct humps requested for the game silhouette.
-  for (const z of [-0.56, 0.33]) b.tube([[0, 1.84, z], [0, 2.10, z], [0, 2.37, z - 0.03], [0, 2.45, z - 0.07]], [0.30, 0.235, 0.115, 0.018], tan);
-  b.tube([[0, 1.57, 0.65], [0, 1.80, 1.10], [0, 2.28, 1.30], [0, 2.76, 1.23], [0, 2.97, 1.39]], [0.29, 0.21, 0.15, 0.13, 0.12], light);
-  b.oval([0.28, 0.32, 0.49], [0, 2.96, 1.48], tan, 0.26);
-  b.oval([0.25, 0.19, 0.31], [0, 2.86, 1.74], light, 0.2);
-  b.oval([0.22, 0.075, 0.22], [0, 2.79, 1.77], shadow, 0, true);
-  for (const side of [-1, 1]) {
-    b.oval([0.10, 0.22, 0.13], [side * 0.15, 3.06, 1.29], tan, -0.25);
-    b.oval([0.035, 0.045, 0.06], [side * 0.139, 3.015, 1.58], 0x211b17, 0, true);
-    b.oval([0.025, 0.03, 0.075], [side * 0.082, 2.91, 1.86], 0x49372a, 0.2, true);
-    for (const front of [true, false]) {
-      const x = side * 0.29, z = front ? 0.64 : -0.77, kneeZ = z + (front ? 0.06 : -0.18);
-      b.leg = side > 0 ? 1 : 2; b.pivot.set(x, 1.46, z);
-      b.tube([[x, 1.52, z], [x, 1.07, z - 0.05], [x, 0.74, kneeZ], [x, 0.37, z + 0.03], [x, 0.12, z + 0.03]], [0.15, 0.09, 0.072, 0.045, 0.048], tan);
-      b.oval([0.17, 0.17, 0.18], [x, 0.74, kneeZ], shadow);
-      b.oval([0.24, 0.14, 0.30], [x, 0.075, z + 0.09], shadow, 0, true);
-      for (const toe of [-1, 1]) b.oval([0.075, 0.045, 0.07], [x + toe * 0.055, 0.06, z + 0.22], 0x534635, 0, true);
+  const b = new Anatomy(32), tan = 0xb89970, pale = 0xc3a77e, shade = 0x9c7e58;
+  // Dromedary proportions from the supplied side photograph. The neck reaches
+  // forward from a low chest; the small head sits below the single hump's peak.
+  b.oval([.94, 1.02, 1.93], [0, 1.73, -.10], tan);
+  b.oval([.84, .74, 1.45], [0, 1.48, -.20], tan);
+  b.oval([.75, .94, .68], [0, 1.72, .65], tan, -.12);
+  b.oval([.78, .81, .65], [0, 1.80, -.88], tan, .12);
+  // A broad fat pad blends into the back, with an asymmetric rounded crest.
+  b.oval([.85, 1.02, 1.48], [0, 2.00, -.14], tan);
+  b.oval([.59, .78, .81], [0, 2.29, -.22], tan, -.18);
+  b.tube([[0,1.64,.67],[0,1.56,1.03],[0,1.65,1.38],
+    [0,1.97,1.71],[0,2.29,1.87],[0,2.46,1.94]],
+    [.265,.245,.205,.165,.125,.105], tan);
+  // Compact skull, deep jaw angle, shallow bridge and soft overhanging lip.
+  b.oval([.255,.285,.34], [0,2.46,2.015], tan, -.08);
+  b.oval([.225,.18,.35], [0,2.455,2.19], tan, -.06);
+  b.oval([.215,.175,.28], [0,2.355,2.16], shade, .18);
+  b.oval([.235,.16,.20], [0,2.447,2.347], pale, -.12);
+  b.oval([.205,.10,.19], [0,2.363,2.336], pale, .04);
+  b.tube([[-.096,2.393,2.29],[-.086,2.392,2.39],[0,2.392,2.432],
+    [.086,2.392,2.39],[.096,2.393,2.29]], [.0025,.0035,.0035,.0035,.0025], 0x67513a, true);
+  for (const side of [-1,1]) {
+    // Small narrow oval ears, lying beside the poll instead of round knobs.
+    b.oval([.105,.155,.07], [side*.14,2.535,1.914], tan, -.38);
+    b.oval([.047,.080,.012], [side*.153,2.553,1.945], shade, -.38, true);
+    b.oval([.038,.075,.095], [side*.112,2.49,2.078], shade, .05);
+    b.oval([.012,.023,.033], [side*.147,2.49,2.08], 0x2b241c, .05, true);
+    // Brow is coat, not the old dark cartoon eyebrow floating above the eye.
+    b.oval([.045,.037,.085], [side*.111,2.516,2.08], tan);
+    b.oval([.012,.018,.049], [side*.111,2.487,2.356], 0x6c553c, -.28, true);
+    for (const front of [true,false]) {
+      const x=side*.29, z=front?.66:-.85;
+      b.leg=side>0?1:2; b.pivot.set(x,1.67,z);
+      // Long, mostly straight foreleg; a distinct rear hock beneath the thigh.
+      const points: V[] = front
+        ? [[x,1.76,z],[x,1.38,z-.015],[x,.96,z+.01],[x,.47,z+.035],[x,.12,z+.095]]
+        : [[x,1.80,z],[x,1.40,z+.13],[x,1.03,z-.17],[x,.51,z-.08],[x,.12,z+.045]];
+      b.tube(points, front?[.155,.115,.071,.045,.05]:[.185,.133,.072,.047,.05], tan);
+      b.oval([.14,.15,.14], [x,front?.96:1.03,z+(front?.01:-.17)], shade);
+      // Pads taper into the pastern. No ring around the ankle or button toes.
+      b.oval([.225,.125,.295], [x,.066,z+.14], pale);
+      for(const toe of [-1,1]) b.oval([.050,.024,.035],
+        [x+toe*.052,.042,z+.264], 0x877153, 0, true);
     }
   }
-  b.leg = 0;
-  b.tube([[0, 1.78, -0.94], [0.05, 1.49, -1.12], [0.12, 1.13, -1.11]], [0.045, 0.035, 0.018], tan);
-  b.oval([0.12, 0.24, 0.13], [0.12, 1.08, -1.11], shadow, 0.2, true);
-  return b.finish();
+  b.leg=0;
+  b.tube([[0,1.91,-1.08],[.015,1.62,-1.20],[.035,1.23,-1.25],[.035,.91,-1.28]],
+    [.037,.03,.019,.013], tan);
+  b.tube([[.035,1.12,-1.26],[.035,.94,-1.29],[.015,.81,-1.29]], [.026,.038,.007], 0x66513b);
+  const parts=b.finish(), p=parts.coat.getAttribute('position'), colors=parts.coat.getAttribute('color');
+  const tint=new THREE.Color(), crest=new THREE.Color(0x80694e), underside=new THREE.Color(0xa58c68);
+  for(let i=0;i<p.count;i++) {
+    const x=p.getX(i),y=p.getY(i),z=p.getZ(i);
+    tint.setRGB(colors.getX(i),colors.getY(i),colors.getZ(i));
+    // Dark coarse hair along the hump ridge and a dusty shaded underside.
+    const ridge=THREE.MathUtils.smoothstep(y,2.42,2.67)*(1-THREE.MathUtils.smoothstep(Math.abs(x),.035,.16));
+    tint.lerp(crest,ridge*.8);
+    const belly=(1-THREE.MathUtils.smoothstep(y,1.16,1.45))*(1-THREE.MathUtils.smoothstep(Math.abs(z+.1),.65,1.0));
+    tint.lerp(underside,belly*.22);
+    colors.setXYZ(i,tint.r,tint.g,tint.b);
+  }
+  return parts;
 }
 
 export function buildGazelle() {

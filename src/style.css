@@ -57,9 +57,12 @@ body {
 }
 
 #viewport {
+  position: fixed;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+  height: 100dvh;
 }
 
 #ui {
@@ -67,6 +70,16 @@ body {
   inset: 0;
   pointer-events: none;
 }
+
+/* Match the canvas as mobile browser bars expand/collapse. Safe-area padding
+   belongs on controls, so the desert still paints behind the gesture area. */
+#ui,
+.touch-controls,
+#loader {
+  height: 100dvh;
+}
+
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 #ui > * {
   pointer-events: auto;
@@ -1825,7 +1838,7 @@ body.high-contrast .radio {
   background: rgba(30, 22, 17, 0.93);
   backdrop-filter: blur(10px);
   /* Ten rows no longer fit a phone once the tuning panel's settings moved in. */
-  max-height: calc(100vh - 80px - env(safe-area-inset-top));
+  max-height: calc(100dvh - 80px - env(safe-area-inset-top));
   overflow-y: auto;
   overscroll-behavior: contain;
   opacity: 0;

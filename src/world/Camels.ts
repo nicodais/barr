@@ -94,7 +94,7 @@ export class Camels {
     };
 
     this.coat = this.makeMesh(attach(parts.coat));
-    this.dark = this.makeMesh(attach(parts.dark));
+    this.dark = this.makeMesh(attach(parts.dark), false);
     this.group.add(this.coat, this.dark);
     this.group.matrixAutoUpdate = false;
   }
@@ -157,9 +157,10 @@ export class Camels {
     (this.dark.geometry.getAttribute('aGait') as THREE.BufferAttribute).needsUpdate = true;
   }
 
-  private makeMesh(geometry: THREE.BufferGeometry): THREE.InstancedMesh {
-    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.88 });
-    material.onBeforeCompile = (shader) => this.patch(shader);
+  private makeMesh(geometry: THREE.BufferGeometry, coat = true): THREE.InstancedMesh {
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.98 });
+    material.onBeforeCompile = (shader) => patchAnimal(shader, this.timeUniform, true, coat);
+    material.customProgramCacheKey = () => coat ? 'dromedary-coat-v1' : 'dromedary-details-v1';
 
     const mesh = new THREE.InstancedMesh(geometry, material, CAPACITY);
     mesh.count = CAPACITY;
@@ -180,14 +181,11 @@ export class Camels {
      * warning when it's missing, just a shadow that doesn't move.
      */
     const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-    depth.onBeforeCompile = (shader) => this.patch(shader);
+    depth.onBeforeCompile = (shader) => patchAnimal(shader, this.timeUniform, true, coat);
+    depth.customProgramCacheKey = () => 'dromedary-depth-v1';
     mesh.customDepthMaterial = depth;
 
     return mesh;
   }
 
-  /** The gait, as vertex GLSL. Shared verbatim by the lit and depth programs. */
-  private patch(shader: THREE.WebGLProgramParametersWithUniforms) {
-    patchAnimal(shader, this.timeUniform, true);
-  }
 }

@@ -7,7 +7,9 @@ const server = await createServer({ optimizeDeps: { noDiscovery: true, include: 
 try {
   const sculpt = await server.ssrLoadModule('/scripts/animalSculpt.ts');
   await mkdir('public/models', { recursive: true });
-  for (const name of ['camel', 'gazelle']) {
+  const requested = process.argv.slice(2);
+  if (requested.some(name => !['camel', 'gazelle'].includes(name))) throw new Error('Expected camel or gazelle');
+  for (const name of requested.length ? requested : ['camel', 'gazelle']) {
     const parts = name === 'camel' ? sculpt.buildCamel() : sculpt.buildGazelle();
     const metadata = {}, buffers = [];
     let offset = 0;

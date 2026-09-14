@@ -508,6 +508,9 @@ export class Game {
     this.chase.reset(this.curPos, this.curQuat);
     this.onResize();
     window.addEventListener('resize', this.onResize);
+    // Browser chrome and folding can change the canvas without a window resize.
+    new ResizeObserver(this.onResize).observe(canvas);
+    window.visualViewport?.addEventListener('resize', this.onResize);
   }
 
   static async create(canvas: HTMLCanvasElement, uiRoot: HTMLElement): Promise<Game> {
@@ -554,7 +557,7 @@ export class Game {
     cam.position.y = clampAboveGround(cam.position.x, cam.position.y, cam.position.z);
     cam.lookAt(target.x, target.y + 0.55, target.z);
     // Reserve the left third for vehicle choices on desktop.
-    const width = window.innerWidth, height = window.innerHeight;
+    const { clientWidth: width, clientHeight: height } = this.rig.renderer.domElement;
     if (width > 760) cam.setViewOffset(width, height, -width * 0.18, 0, width, height);
     else cam.clearViewOffset();
   }
@@ -1212,8 +1215,8 @@ export class Game {
   }
 
   private onResize = () => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const { clientWidth: w, clientHeight: h } = this.rig.renderer.domElement;
+    if (w === 0 || h === 0) return;
     this.rig.setSize(w, h);
     this.chase.setAspect(w / h);
     this.photo?.setSize(w, h, this.rig.renderer.getPixelRatio());

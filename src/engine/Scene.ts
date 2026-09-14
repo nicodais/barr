@@ -60,7 +60,7 @@ export class SceneRig {
       antialias: true,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.setSize(canvas.clientWidth, canvas.clientHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -139,14 +139,16 @@ export class SceneRig {
   }
 
   setSize(width: number, height: number) {
-    this.renderer.setSize(width, height, false);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.maxPixelRatio));
+    // Update resolution atomically while CSS owns the dynamic viewport size.
+    // Quality changes and folding must never assign a fixed CSS canvas size.
+    this.renderer.setDrawingBufferSize(width, height, Math.min(window.devicePixelRatio, this.maxPixelRatio));
   }
 
   applyQuality(profile: QualityProfile) {
     this.fogLimit = profile.viewDistance * FOG_REACH;
     this.maxPixelRatio = profile.maxPixelRatio;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, profile.maxPixelRatio));
+    const canvas = this.renderer.domElement;
+    this.setSize(canvas.clientWidth, canvas.clientHeight);
 
     this.renderer.shadowMap.enabled = profile.shadows;
     this.shadowsAllowed = profile.shadows;
