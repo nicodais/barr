@@ -1,6 +1,11 @@
 import './style.css';
+import { inject } from '@vercel/analytics';
 import { MapSelect } from './ui/MapSelect';
 import { loadSettings, saveSettings } from './settings/Settings';
+
+// Start once, before the game loads, so visits to the map picker count too.
+// Local development and asset reviews must not enter the production reports.
+if (import.meta.env.PROD) inject({ mode: 'production' });
 
 /**
  * Boot order, and why it is this way round.

@@ -4,8 +4,8 @@ Relaxing open-world dune-bashing for the browser. See [CLAUDE.md](CLAUDE.md) for
 
 **Current phase: 5 complete, 6 ready to ship.** Driving feel, the streamed world, audio,
 Ahmed's radio and the ten POIs are all in, along with photo mode, touch controls,
-adaptive quality and the responsive pass. The build is configured for Vercel but has
-not been deployed — see [Deploying](#deploying).
+adaptive quality and the responsive pass. The app is hosted on Vercel at
+[shamal.app](https://shamal.app) — see [Deploying](#deploying).
 
 ```bash
 npm install
@@ -375,7 +375,8 @@ blank.
 
 ## Deploying
 
-Configured but **not deployed** — that needs your Vercel account.
+Production is hosted on Vercel at [shamal.app](https://shamal.app), which redirects
+to `www.shamal.app`. Publish changes through the project's connected production branch.
 
 ```bash
 npm run build     # typecheck + static build into dist/
@@ -386,8 +387,22 @@ npx vercel        # or connect the repo at vercel.com/new
 for hashed assets. Vendor code is split into `three` and `rapier` chunks so an app change
 re-downloads ~30 kB rather than ~900 kB.
 
-This isn't a git repo yet; `git init` and push before connecting Vercel if you want
-auto-deploy on main and preview builds on branches (§10 phase 6).
+Vercel Web Analytics is initialized once in `src/main.ts` using the vanilla
+`@vercel/analytics` integration. It tracks visits from the map picker onward in
+production builds; `npm run dev` and the development asset review do not load it.
+To activate reporting, select the project in Vercel's **Analytics** section and
+click **Enable**, then deploy the commit containing this integration. Visit the
+production site and check the dashboard for traffic. The tracking routes are
+provided by Vercel after deployment; a local Vite preview cannot verify ingestion.
+See the [official setup guide](https://vercel.com/docs/analytics/quickstart).
+
+The social thumbnail comes from `index.html`'s Open Graph and Twitter tags, pointing
+to `public/share-cover-v2.jpg`. Check **Deployments → current deployment → Open Graph**
+in Vercel and open the image URL directly when troubleshooting. If both are current
+but a messaging app still shows the old picture, its preview is likely cached.
+Try a new message with `https://www.shamal.app/?v=2` to request a fresh preview;
+already-sent messages may retain the previous card. Future image replacements
+should use a new filename and update both image tags before deployment.
 
 ## Known gaps
 
