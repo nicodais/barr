@@ -23,7 +23,7 @@ import { emptyWheelState, mergeAxle } from './twoWheeled';
  */
 const MAX_SEGMENTS = 700;
 const TRACK_HALF_WIDTH = 0.19;
-/** Minimum travel before a new segment is laid, in metres. */
+/** Spacing for retained history; the live endpoint follows every render frame. */
 const MIN_STEP = 0.8;
 /**
  * Travel beyond which a frame's movement can't be driving — it's a teleport
@@ -49,6 +49,7 @@ interface Segment {
   ax: number; ay: number; az: number;
   bx: number; by: number; bz: number;
   age: number;
+  distance: number;
   /** First segment after a ribbon break (takeoff, teleport) — no quad joins
       it to its predecessor, or the join renders as a sliver across the gap. */
   head: boolean;
@@ -56,19 +57,37 @@ interface Segment {
 
 const VERTEX = /* glsl */ `
   attribute float aAlpha;
+  attribute vec2 aTrack;
   varying float vAlpha;
+  varying vec2 vTrack;
+  varying vec2 vWorldXZ;
   void main() {
     vAlpha = aAlpha;
+    vTrack = aTrack;
+    vWorldXZ=(modelMatrix*vec4(position,1.0)).xz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
   }
 `;
 
 const FRAGMENT = /* glsl */ `
   uniform vec3 uColor;
+  uniform vec4 uPatchArea;
   varying float vAlpha;
+  varying vec2 vTrack;
+  varying vec2 vWorldXZ;
   void main() {
     if ( vAlpha <= 0.003 ) discard;
-    gl_FragColor = vec4( uColor, vAlpha );
+    float edge = smoothstep(0.0, 0.16, vTrack.x) * (1.0 - smoothstep(0.84, 1.0, vTrack.x));
+    float footprint = fwidth(vTrack.y * 8.0);
+    float tread = smoothstep(0.25, 0.45, sin(vTrack.y * 50.0 + abs(vTrack.x - 0.5) * 8.0));
+    tread = mix(tread, 0.5, smoothstep(0.2, 0.7, footprint));
+    float groove = 1.0 - smoothstep(0.02, 0.07, abs(vTrack.x - 0.5));
+    float alpha = vAlpha * edge * (0.5 + tread * 0.45 + groove * 0.12);
+    vec2 offset=abs(vWorldXZ-uPatchArea.xy);
+    if(uPatchArea.w>.5) alpha*=mix(.8,1.0,smoothstep(uPatchArea.z-2.0,uPatchArea.z,max(offset.x,offset.y)));
+    gl_FragColor = vec4(uColor, alpha);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
 
@@ -85,11 +104,14 @@ export class TrackSystem {
   private geometry: THREE.BufferGeometry;
   private material: THREE.ShaderMaterial;
   private indexCount = 0;
+  private distances = [0, 0];
+  private trackUV = new Float32Array(RIBBONS * MAX_SEGMENTS * 2 * 2);
 
   constructor() {
     this.geometry = new THREE.BufferGeometry();
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geometry.setAttribute('aAlpha', new THREE.BufferAttribute(this.alphas, 1));
+    this.geometry.setAttribute('aTrack', new THREE.BufferAttribute(this.trackUV, 2));
     this.geometry.setIndex(new THREE.BufferAttribute(this.indices, 1));
     this.geometry.setDrawRange(0, 0);
     // Tracks span wherever the player has driven, so a bounding sphere would be
@@ -97,7 +119,7 @@ export class TrackSystem {
     this.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Infinity);
 
     this.material = new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(0x8a6844) } },
+      uniforms: { uColor: { value: new THREE.Color(0x493a29) }, uPatchArea:{value:new THREE.Vector4()} },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
       transparent: true,
@@ -111,6 +133,8 @@ export class TrackSystem {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 2;
   }
+
+  setSurfacePatch(area:THREE.Vector4){ this.material.uniforms.uPatchArea.value.copy(area); }
 
   /**
    * @param rearIndices the two rear wheels, in left/right order
@@ -151,9 +175,18 @@ export class TrackSystem {
         this.headNext[r] = true;
         continue;
       }
-      if (moved >= MIN_STEP) {
-        if (last) this.pushSegment(r, w, last);
-        this.lastPos[r] = { x: w.contactX, z: w.contactZ };
+      if (last && moved > .002) {
+        const list = this.segments[r];
+        if (this.headNext[r]) {
+          // Seed the start as soon as the tyre moves, rather than waiting for
+          // two complete history intervals before a drawable quad exists.
+          const start = { ...w, contactX:last.x, contactZ:last.z };
+          this.pushSegment(r, start, {x:last.x-(w.contactX-last.x),z:last.z-(w.contactZ-last.z)});
+        }
+        const tail=list[list.length-1], anchor=list[list.length-2];
+        const replace=!!anchor && !tail.head && tail.distance-anchor.distance<MIN_STEP;
+        this.pushSegment(r,w,last,replace);
+        this.lastPos[r]={x:w.contactX,z:w.contactZ};
       }
     }
 
@@ -170,7 +203,7 @@ export class TrackSystem {
   /** Scratch for the merged bike contact, so `update` allocates nothing. */
   private mid: WheelState = emptyWheelState();
 
-  private pushSegment(r: number, w: WheelState, last: { x: number; z: number }) {
+  private pushSegment(r: number, w: WheelState, last: { x: number; z: number }, replace=false) {
     // Lay the segment across the direction of travel, in the ground plane.
     let dx = w.contactX - last.x;
     let dz = w.contactZ - last.z;
@@ -195,7 +228,9 @@ export class TrackSystem {
     const list = this.segments[r];
     const head = this.headNext[r];
     this.headNext[r] = false;
-    list.push({
+    this.distances[r] += len;
+    const segment:Segment={
+      distance: this.distances[r],
       head,
       ax: w.contactX - rx * TRACK_HALF_WIDTH + nx * LIFT,
       ay: w.contactY - ry * TRACK_HALF_WIDTH + ny * LIFT,
@@ -204,7 +239,8 @@ export class TrackSystem {
       by: w.contactY + ry * TRACK_HALF_WIDTH + ny * LIFT,
       bz: w.contactZ + rz * TRACK_HALF_WIDTH + nz * LIFT,
       age: 0,
-    });
+    };
+    if(replace)list[list.length-1]=segment;else list.push(segment);
     if (list.length > MAX_SEGMENTS) list.shift();
   }
 
@@ -227,6 +263,10 @@ export class TrackSystem {
         keptSegs.push(s);
 
         const v = base + kept * 2;
+        this.trackUV[v * 2] = 0;
+        this.trackUV[v * 2 + 1] = s.distance;
+        this.trackUV[(v + 1) * 2] = 1;
+        this.trackUV[(v + 1) * 2 + 1] = s.distance;
         this.positions[v * 3] = s.ax;
         this.positions[v * 3 + 1] = s.ay;
         this.positions[v * 3 + 2] = s.az;
@@ -269,12 +309,14 @@ export class TrackSystem {
     this.geometry.setDrawRange(0, this.indexCount);
     this.geometry.attributes.position.needsUpdate = true;
     this.geometry.attributes.aAlpha.needsUpdate = true;
+    this.geometry.attributes.aTrack.needsUpdate = true;
     if (this.geometry.index) this.geometry.index.needsUpdate = true;
   }
 
   /** Wipes every track — used when the truck is teleported or recovered. */
   clear() {
     this.segments = [[], []];
+    this.distances = [0, 0];
     this.lastPos = [null, null];
     this.headNext = [true, true];
     this.geometry.setDrawRange(0, 0);

@@ -129,7 +129,7 @@ export function airborneSand(out: THREE.Color): THREE.Color {
  * hemisphere light makes, baked in where the geometry knows the answer and the
  * lighting doesn't.
  */
-const AO_SHADOW = new THREE.Color(0x6b5a72);
+const AO_SHADOW = new THREE.Color(0x756b60);
 /** Deepest the hollows go, as a fraction of the way to AO_SHADOW. */
 const AO_STRENGTH = 0.22;
 
@@ -308,6 +308,11 @@ function stitchEdge(
     const t = rem / ratio;
     heights[at(i)] = heights[at(i0)] * (1 - t) + heights[at(i0 + ratio)] * t;
   }
+}
+
+export function writeTerrainColor(out: Float32Array, v: number, wx: number, wz: number) {
+  loadPalette();
+  writeColor(out,v,wx,wz);
 }
 
 function writeColor(out: Float32Array, v: number, wx: number, wz: number) {

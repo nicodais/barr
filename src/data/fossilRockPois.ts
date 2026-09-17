@@ -1,3 +1,4 @@
+import { POI_PHOTOS } from './poiPhotos';
 import type { Poi } from './pois';
 
 /**
@@ -95,8 +96,7 @@ export const FOSSIL_ROCK_POIS: Poi[] = [
         'climbable ramp to the top — the one line up a formation that is otherwise scarp ' +
         'on every side. It is the reason this rock is a driving destination and not just ' +
         'an archaeological one.',
-      photo: undefined,
-      credit: undefined,
+      ...POI_PHOTOS.ramp,
     },
   },
   {

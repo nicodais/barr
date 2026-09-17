@@ -29,6 +29,7 @@ export function mergeAxle(a: WheelState, b: WheelState, out: WheelState): WheelS
   out.normalY /= len;
   out.normalZ /= len;
 
+  out.surfaceSoftness=((a.surfaceSoftness??a.softness)+(b.surfaceSoftness??b.softness))/2;
   out.softness = (a.softness + b.softness) / 2;
   out.compression = (a.compression + b.compression) / 2;
   out.spin = a.spin;

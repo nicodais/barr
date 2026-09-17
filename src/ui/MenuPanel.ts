@@ -104,6 +104,8 @@ const STEERING: Array<{ label: string; mirrored: boolean }> = [
  */
 
 interface MenuCallbacks {
+  onExtreme(on: boolean): void;
+  getExtreme(): boolean;
   onRegion(id: RegionId): void;
   onBody(id: BodyId): void;
   onTime(t: number): void;
@@ -174,6 +176,7 @@ export class MenuPanel {
   readonly button: HTMLButtonElement;
   readonly element: HTMLElement;
 
+  private extremeButton: HTMLButtonElement;
   private regionRow: HTMLElement;
   private bodyRow: HTMLElement;
   private timeRow: HTMLElement;
@@ -211,6 +214,14 @@ export class MenuPanel {
     this.element.className = 'menu-panel';
     this.element.hidden = true;
 
+    const extreme = this.section('Extreme Mode');
+    this.extremeButton=this.chip('Enable Extreme Mode',()=>{this.cb.onExtreme(!this.cb.getExtreme());this.sync();});
+    this.extremeButton.setAttribute('role','switch');
+    extreme.append(this.extremeButton);
+    const extremeNote=document.createElement('span');extremeNote.className='menu-note';
+    extremeNote.textContent='Animal collisions and blood, vehicle damage, explosions and a 5-second respawn. Off at the start of every session.';
+    extreme.parentElement!.append(extremeNote);
+    this.element.append(extreme.parentElement!);
     this.regionRow = this.section('Desert');
     this.bodyRow = this.section('Truck');
     this.timeRow = this.section('Time of day');
@@ -343,6 +354,17 @@ export class MenuPanel {
       this.contrastRow.parentElement!,
       this.garageButton(),
     );
+    const credits=document.createElement('a');
+    credits.href=import.meta.env.BASE_URL+'audio/index.html';
+    credits.textContent='Music & engine recording credits';credits.target='_blank';credits.rel='noopener';
+    credits.style.cssText='display:block;margin:12px 0;color:inherit;font-size:11px;opacity:.7';
+    const photoCredits = document.createElement('a');
+    photoCredits.href = import.meta.env.BASE_URL + 'photos/index.html';
+    photoCredits.textContent = 'POI photo credits';
+    photoCredits.target = '_blank';
+    photoCredits.rel = 'noopener';
+    photoCredits.style.cssText = credits.style.cssText;
+    this.element.append(credits, photoCredits);
   }
 
   /** Called by Game once a region swap has finished rebuilding the world. */
@@ -384,6 +406,10 @@ export class MenuPanel {
   }
 
   private sync() {
+    const extreme=this.cb.getExtreme();
+    this.extremeButton.textContent=extreme?'Disable Extreme Mode':'Enable Extreme Mode';
+    this.extremeButton.setAttribute('aria-checked',String(extreme));
+    this.extremeButton.classList.toggle('is-active',extreme);
     const region = this.cb.getRegion();
     const body = this.cb.getBody();
     const time = this.cb.getTime();

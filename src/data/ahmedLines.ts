@@ -206,21 +206,6 @@ export const AHMED_VEHICLE_LINES: Record<BodyId, string[]> = {
     "A pickup with an empty bed. You're not fooling anyone, habibi.",
     'Big truck. Big engine. Big hole, when it finally stops.',
   ],
-  gwagon: [
-    'The square one. Very expensive way to get sand in everything you own.',
-    "Nice box. It'll climb anything, and roll doing it.",
-    "Third one of those I've seen this month. All the same colour as yours.",
-  ],
-  singlecab: [
-    'A work truck. Someone out here has actually done this before.',
-    'Single cab. No comfort, no speed, goes forever.',
-    "That's a farm truck, my friend. It will out-climb everyone and out-run nobody.",
-  ],
-  softtop: [
-    'No roof. Bold, at this hour.',
-    "Soft top. So when you roll it, you'll really feel involved.",
-    "Open air. Enjoy the sand — you'll be eating it either way.",
-  ],
   moto: [
     "A bike. In the dunes. Wallah, I'm keeping this radio close.",
     "Two wheels. That is half the usual number, habibi.",

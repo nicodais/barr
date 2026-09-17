@@ -39,6 +39,7 @@ export class DebugHud {
   constructor() {
     this.element = document.createElement('div');
     this.element.className = 'hud';
+    this.element.classList.toggle('hud-debug', new URLSearchParams(location.search).has('debug'));
 
     this.speedEl = document.createElement('div');
     this.speedEl.className = 'hud-speed';

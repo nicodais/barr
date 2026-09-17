@@ -5,7 +5,7 @@ import * as THREE from 'three';
  *
  * The keyframes are not evenly spaced in real time. Midday occupies a sliver of
  * the cycle and the warm low-sun bands are stretched wide, so the world sits in
- * "slightly magic hour" almost always — that's the Firewatch trick, and it's a
+ * warm evening light almost always; this is a
  * scheduling decision rather than a colour-grading one.
  */
 export interface SkyState {
@@ -103,18 +103,18 @@ const KEYFRAMES: Keyframe[] = [
   // clearest — the night has had hours to drop what the wind put up.
   key(0.05, -4, 70, 0x5a6d9e, 0.25, 0x111a3c, 0x53506e, 0x3d4c86, 0x2e2b3f, 0.85, 0x54506c, 90, 620, 0.10, 0x6b6d84, 0.45),
   // Sunrise: the sun cracks the horizon and everything goes amber.
-  key(0.10, 4, 78, 0xffab5e, 2.10, 0x1e3f80, 0xe0925c, 0x6f89c4, 0x8a6440, 1.00, 0xd68f60, 130, 790, 0.16, 0xd6a887, 0.00),
+  key(0.10, 4, 78, 0xffce98, 2.10, 0x557fa0, 0xddb999, 0xa6b9c9, 0x8a6440, 1.00, 0xd68f60, 130, 790, 0.16, 0xd6a887, 0.00),
   // Morning gold — a wide, generous band. The wind is starting to get up.
-  key(0.24, 20, 95, 0xffd39a, 2.30, 0x2f6ec4, 0xe8b98a, 0x89a6d6, 0xb08355, 1.05, 0xe3b184, 180, 920, 0.26, 0xdcc3a2, 0.00),
+  key(0.24, 20, 95, 0xffe8ca, 2.30, 0x5489b3, 0xd2d4cc, 0xb5c9dc, 0xb08355, 1.05, 0xcdd0c7, 180, 920, 0.26, 0xdcc3a2, 0.00),
   // Midday. Kept short and never fully neutral; this is the least interesting light.
-  key(0.42, 62, 150, 0xfff3dd, 2.00, 0x3f92e2, 0xd8cbb2, 0x9dbde2, 0xbf9a6e, 1.10, 0xd6c8ae, 240, 1010, 0.44, 0xd9cdb6, 0.00),
+  key(0.42, 62, 150, 0xfff3dd, 2.00, 0x4d8fbe, 0xccd8db, 0xbdcfdf, 0xbf9a6e, 1.10, 0xcdd4d1, 240, 1010, 0.44, 0xd9cdb6, 0.00),
   // Afternoon: the shamal at full strength, and the haziest hour of the day.
   // The far dunes go flat and pale and the horizon stops having an edge.
-  key(0.60, 30, 225, 0xffd9a4, 2.25, 0x3574c6, 0xe3b48b, 0x8caad8, 0xb4855a, 1.05, 0xdfae86, 190, 880, 0.56, 0xdcc4a0, 0.00),
-  // The hero light. Long shadows, saturated sand, indigo in the lee faces.
-  key(0.76, 9, 250, 0xffb26b, 2.45, 0x2455a8, 0xeaa367, 0x7593cc, 0x9c6e44, 0.95, 0xe09a64, 140, 800, 0.46, 0xd8b184, 0.00),
+  key(0.60, 30, 225, 0xffe7ca, 2.25, 0x638fab, 0xd3cec0, 0xb4c3d0, 0xb4855a, 1.05, 0xd0c7b7, 190, 880, 0.30, 0xd2cbbc, 0.00),
+  // Evening sun: warm crests against naturally filled lee faces.
+  key(0.76, 9, 250, 0xffd3a0, 2.45, 0x6689a3, 0xe3c0a0, 0xa9bbc9, 0x9c6e44, 0.95, 0xd4b69c, 140, 800, 0.23, 0xd6c8b3, 0.00),
   // Sunset proper. Dust in the air is what makes this hour the colour it is.
-  key(0.87, 1, 262, 0xff8c4a, 1.70, 0x18367c, 0xdd7d52, 0x5f78b6, 0x7a5238, 0.90, 0xcf7d55, 110, 690, 0.34, 0xc98f68, 0.12),
+  key(0.87, 1, 262, 0xffb578, 1.70, 0x4c637f, 0xc9967b, 0x91a1b9, 0x7a5238, 0.90, 0xb99789, 110, 690, 0.34, 0xc98f68, 0.12),
   // Blue hour, dusk — mirrors the opening so the loop is seamless.
   key(0.95, -5, 270, 0x6274a6, 0.30, 0x13204a, 0x585d7a, 0x42518c, 0x312e43, 0.85, 0x585472, 90, 640, 0.18, 0x70718a, 0.50),
 ];

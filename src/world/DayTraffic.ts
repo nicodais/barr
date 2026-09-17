@@ -1,6 +1,9 @@
+import { heightAt } from '../terrain/height';
+import { ActorImpacts } from './ActorImpacts';
+import { TrafficFleet, type TrafficModelFactory } from './TrafficFleet';
 import * as THREE from 'three';
 import { WIND_X, WIND_Z } from '../terrain/height';
-import { buildAnonymousBody } from './Convoys';
+
 import {
   emptyRoutePoint, routeGround, routeLead, routeScale, sampleRoute,
   type Route, type RoutePoint,
@@ -72,8 +75,8 @@ const PEAK_ALPHA = 0.62;
  * and those discs are camera-facing sheets filling the screen, which reads as
  * broken geometry rather than as dust.
  */
-const NEAR_GONE = 22;
-const NEAR_FULL = 90;
+const NEAR_GONE = 4;
+const NEAR_FULL = 20;
 
 /**
  * Three daytime runs, all outside the POI ring and none near another. Closer
@@ -82,19 +85,18 @@ const NEAR_FULL = 90;
  * feel like company.
  */
 const ROUTES: Route[] = [
-  { cx: -380, cz: 300, major: 300, minor: 52, bearing: 2.7, count: 3, speed: 13, phase: 0.7, direction: 1 },
+  { cx: -140, cz: 100, major: 210, minor: 48, bearing: 2.7, count: 3, speed: 13, phase: 0.7, direction: 1 },
   { cx: 430, cz: 120, major: 260, minor: 40, bearing: 1.35, count: 2, speed: 15, phase: 2.6, direction: -1 },
   { cx: -60, cz: -470, major: 330, minor: 64, bearing: 0.25, count: 4, speed: 11, phase: 4.1, direction: 1 },
 ];
 
 export class DayTraffic {
+  readonly impacts = new ActorImpacts('vehicle',[.95,1.15,2.35],1.15);
   readonly group = new THREE.Group();
 
-  private bodies: THREE.InstancedMesh;
+  private bodies: TrafficFleet;
   private puffs: THREE.InstancedMesh;
-  private bodyGeo: THREE.BufferGeometry;
   private puffGeo: THREE.CircleGeometry;
-  private bodyMat: THREE.MeshLambertMaterial;
   private puffMat: THREE.MeshBasicMaterial;
   /** Per-puff opacity. `setColorAt` cannot carry this — three's instanceColor
    *  is RGB — and scaling the colour instead just renders dark discs. */
@@ -109,15 +111,10 @@ export class DayTraffic {
 
   private static readonly MAX_VEHICLES = ROUTES.reduce((n, r) => n + r.count, 0);
 
-  constructor() {
-    this.bodyGeo = buildAnonymousBody(0x7d6b58);
-    this.bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    this.bodies = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, DayTraffic.MAX_VEHICLES);
-    this.bodies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.bodies.frustumCulled = false;
-    this.bodies.castShadow = false;
+  constructor(factory: TrafficModelFactory) {
+    this.bodies = new TrafficFleet(factory, DayTraffic.MAX_VEHICLES);
 
-    this.puffGeo = new THREE.CircleGeometry(1, 7);
+    this.puffGeo = new THREE.CircleGeometry(1, 24);
     this.puffMat = new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 1,
@@ -135,13 +132,13 @@ export class DayTraffic {
     });
     this.puffMat.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute float aAlpha;\nvarying float vAlpha;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAlpha = aAlpha;');
+        .replace('#include <common>', '#include <common>\nattribute float aAlpha;\nvarying float vAlpha; varying vec2 vPuffUV;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAlpha = aAlpha; vPuffUV = uv;');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying float vAlpha;')
+        .replace('#include <common>', '#include <common>\nvarying float vAlpha; varying vec2 vPuffUV;')
         // Last chunk in the basic material's fragment shader, so nothing
         // downstream overwrites the alpha again.
-        .replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.a *= vAlpha;');
+        .replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.a *= vAlpha * pow(max(0.0, 1.0 - length(vPuffUV * 2.0 - 1.0)), 1.7);');
     };
     this.alphaAttr = new THREE.InstancedBufferAttribute(
       new Float32Array(DayTraffic.MAX_VEHICLES * PUFFS), 1,
@@ -156,7 +153,7 @@ export class DayTraffic {
     // Behind the player's own dust, which is nearer and should win.
     this.puffs.renderOrder = 7;
 
-    this.group.add(this.bodies, this.puffs);
+    this.group.add(this.bodies.group, this.puffs);
     this.group.visible = false;
   }
 
@@ -180,6 +177,7 @@ export class DayTraffic {
     haze: number,
   ) {
     const day = 1 - night;
+    this.impacts.begin();
     const on = day > DAY_ON && this.routes > 0 && haze < 0.85;
     this.group.visible = on;
     if (!on) return;
@@ -200,6 +198,7 @@ export class DayTraffic {
     const wx = WIND_X / windLen;
     const wz = WIND_Z / windLen;
 
+    this.bodies.begin();
     let v = 0;
     let p = 0;
     for (let r = 0; r < this.routes; r++) {
@@ -212,12 +211,12 @@ export class DayTraffic {
         const car = sampleRoute(route, u, this.point);
 
         this.dummy.position.set(car.x, car.y, car.z);
-        this.dummy.rotation.set(car.pitch, car.yaw, 0, 'YXZ');
+        this.dummy.rotation.set(car.pitch, car.yaw, car.roll, 'YXZ');
         this.dummy.scale.setScalar(1);
-        this.dummy.updateMatrix();
-        this.bodies.setMatrixAt(v++, this.dummy.matrix);
+        const down=this.impacts.pose(v,this.dummy,dt,heightAt);
+        this.bodies.setMatrixAt(v++, this.dummy.matrix, down?0:-this.t * route.speed / 0.42);
 
-        for (let k = 0; k < PUFFS; k++) {
+        for (let k = 0; k < PUFFS && !down; k++) {
           const age = k * PUFF_DT;
           // Where the vehicle *was* that many seconds ago, on the same path.
           // Reading the route backwards rather than keeping a ring buffer of
@@ -259,18 +258,15 @@ export class DayTraffic {
       }
     }
 
-    this.bodies.count = v;
+    this.bodies.end();
     this.puffs.count = p;
-    this.bodies.instanceMatrix.needsUpdate = true;
     this.puffs.instanceMatrix.needsUpdate = true;
     this.alphaAttr.needsUpdate = true;
     if (this.puffs.instanceColor) this.puffs.instanceColor.needsUpdate = true;
   }
 
   dispose() {
-    this.bodyGeo.dispose();
     this.puffGeo.dispose();
-    this.bodyMat.dispose();
     this.puffMat.dispose();
     this.bodies.dispose();
     this.puffs.dispose();

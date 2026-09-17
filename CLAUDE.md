@@ -6,9 +6,18 @@ working title and could never have shipped: it is an active Herbert/Legendary
 franchise with current games, so it is both a trademark problem and completely
 unsearchable.
 
-A relaxing open-world dune-bashing driving game for the browser (desktop and mobile web, responsive), in the visual and tonal tradition of *Firewatch* — but set in the UAE desert. No combat, no fail states, no timers. The player drives across a vast stylized dune landscape while an oud-led ambient score plays and an occasional radio call-in from Ahmed — a good-natured, weary local police officer — gives the world texture. The goal is decompression, not challenge.
+A relaxing open-world dune-bashing driving game for the browser (desktop and mobile web, responsive), set in the UAE desert, with realistic natural-light rendering and an unhurried tone. No combat, no fail states, no timers. The player drives across a vast dune landscape while an oud-led ambient score plays and an occasional radio call-in from Ahmed — a good-natured, weary local police officer — gives the world texture. The goal is decompression, not challenge.
 
 ---
+
+## Optional Extreme Mode (user-directed, 2026-09-14)
+
+The calm, consequence-free design below remains the default. A menu-only,
+session-only Extreme Mode is an explicit exception: collisions with animated
+animals and traffic, animal knockdowns and blood on sand, vehicle damage and
+rollovers, an explosion at zero integrity, and respawn five seconds later.
+Ahmed's animal-impact reprimands are urgent **text only**, never spoken aloud.
+The mode starts disabled on every page load and is not stored in settings.
 
 ## 1. Core Concept
 
@@ -26,7 +35,7 @@ This is the single most important system in the game. Everything else (art, audi
 
 **Fidelity target:** arcade-forgiving, Forza Horizon-offroad inspired — accessible and fun to pick up immediately, but with *real* weight-transfer and suspension behavior underneath so dunes feel physically convincing rather than like a flat-plane racer with a height-mapped floor. Not a full sim (not BeamNG-depth), but not weightless either.
 
-**Vehicle:** modeled after a **Nissan Patrol Super Safari** — boxy, high-clearance, live-axle-era silhouette. This is a visual reference for the low-poly model (proportions, stance, wheel arches, roofline), not a licensed asset; model it independently in the flat-shaded style rather than using any official Nissan 3D assets, badging, or trademarked design files.
+**Vehicle:** modeled after a **Nissan Patrol Super Safari** — boxy, high-clearance, live-axle-era silhouette. This is a visual reference for the independently built model (proportions, stance, wheel arches, roofline), not a licensed asset; model it independently with rounded bodywork and physically based materials rather than using any official Nissan 3D assets, badging, or trademarked design files.
 
 **Core physics requirements:**
 - **Weight transfer:** visible body roll on sidehills and cresting dunes, nose-dip under braking, squat under acceleration. This is the main thing that sells "big, heavy 4x4" over "go-kart with a skin."
@@ -55,12 +64,14 @@ This is the single most important system in the game. Everything else (art, audi
 
 ## 4. Visual Style
 
-- **Firewatch-literal direction:** low-poly, flat-shaded geometry, no PBR realism. Large flat color fields, baked ambient occlusion via vertex color or simple gradient shaders, warm limited palette (ochre, rust, dusty rose, deep indigo shadows).
-- **Lighting:** single dominant directional light (sun) + soft sky ambient. Time-of-day system biased toward golden hour and blue hour — the "always slightly magic hour" look, like Firewatch's forest.
-- **Dunes:** procedurally generated heightfield terrain, low-poly faceted shading (flat normals per triangle, not smoothed) so dune ridges read as crisp graphic shapes, not photoreal sand.
-- **Skybox:** gradient-based procedural sky (not a photo skybox) to match the flat-shaded illustration language.
-- **Vehicle:** a single well-modeled low-poly 4x4, styled after a Nissan Patrol Super Safari (boxy proportions, high clearance, live-axle stance — see §2 for the full physics/reference brief) with a small dust/sand particle trail (billboarded sprites, not full particle sim, for perf).
-- **UI:** minimal, diegetic where possible (a dashboard compass, a CB-radio-style call indicator) rather than menu-heavy HUD.
+- **Direction (updated 2026-09-13):** realistic UAE desert presentation, as requested by the user. Physically based materials, smooth terrain normals, natural colour, and convincing differences between sand, glass, paint, rubber, stone and metal.
+- **Lighting:** a dominant sun, soft skylight and ground bounce, filmic highlight compression, and a prefiltered reflection environment derived from the current sky. Golden and blue hour remain central to the mood.
+- **Dunes:** streamed heightfields with continuous smooth normals, world-space mineral detail and wind ripples. Detail must fade with pixel footprint to avoid shimmer. Visual work must keep the existing terrain collision surface aligned.
+- **Sky:** procedural atmosphere with a solar disc, dust scattering, high cloud layers, stars and a moon. Environment reflections follow time and weather without rebuilding each frame.
+- **Vehicles:** independently modelled silhouettes with rounded panel edges, clearcoat paint, reflective tinted glass, weathered lower bodywork and detailed tyres. Keep geometry merged by material and retain suspension articulation.
+- **World:** sparse, open vegetation; weathered stone, fabric and metal; soft dust and patterned tyre impressions.
+- **UI:** restrained expedition styling, existing location photography in the landscape picker, compact vehicle selection, and minimal driving instruments. Debug metrics remain available with the local preview's ?debug query.
+
 
 ---
 
@@ -114,7 +125,7 @@ Detection logic: default to keyboard/mouse on non-touch desktop viewports, defau
 - Adaptive quality: detect device/GPU tier at load (or via a runtime fps-based auto-adjust) and scale shadow resolution, draw distance, and particle density accordingly rather than shipping a single fixed-quality build.
 - Terrain: chunked heightfield with distance-based LOD, frustum culling, no per-frame full-terrain regeneration.
 - Draw call budget: keep scene under ~150 draw calls per frame via geometry merging/instancing (especially dune tiles and any repeated dressing like rocks/scrub); tighten further on mobile-tier profile.
-- Texture-light approach: flat-shaded/vertex-color materials reduce texture memory pressure — helps both mobile GPU limits and initial page load size.
+- Texture-light approach: procedural surface detail and vertex colours reduce texture memory pressure — helps both mobile GPU limits and initial page load size.
 - Load size: keep initial bundle + first-terrain-chunk payload reasonable for web delivery (target a first-interaction budget, e.g. a few seconds on decent broadband) since there's no app-store pre-install — assets stream in as needed rather than all upfront.
 - Profile on real mobile Safari/Chrome early, not just desktop — mobile WebGL performance characteristics differ meaningfully from desktop.
 
@@ -136,7 +147,7 @@ Detection logic: default to keyboard/mouse on non-touch desktop viewports, defau
 /assets
   /models        - low-poly vehicle, props (well, camp, pylons, rocks)
   /audio         - oud score stems, ambient beds, radio static/click cues, foley
-  /shaders       - flat-shade terrain shader, sky gradient shader
+  /shaders       - PBR terrain shader, atmospheric sky shader
 CLAUDE.md
 ```
 
@@ -145,7 +156,7 @@ CLAUDE.md
 ## 10. Development Phases
 
 1. **Prototype (movement feel first):** flat gray-box terrain plus a few sculpted dune shapes (flat alone won't validate weight transfer/rollover), vehicle controller built to the full spec in §2 — weight transfer, per-wheel suspension, sand traction, momentum-dependent climbing, damage-free rollover — tuned by feel before anything else is built. Keyboard/mouse wired to the shared input abstraction first (fastest to iterate on desktop), then gamepad and touch schemes layered in. No art, no audio. This phase doesn't end until the driving feel is genuinely satisfying. Runs via `vite dev` locally.
-2. **World pass:** procedural dune heightfield + chunk streaming + flat-shaded terrain shader + sky system + time-of-day.
+2. **World pass:** procedural dune heightfield + chunk streaming + PBR terrain shader + atmospheric sky system + time-of-day.
 3. **Audio pass:** ambient bed + oud score integration + engine/tire foley + adaptive mixing.
 4. **Narrative pass:** POI placement (5–7 for v1), radio-static trigger system, Ahmed's scripted dialogue (text-only, comedic/weary tone), scrolling-text UI.
 5. **Polish/UX:** photo mode, responsive layout pass (desktop + mobile viewport), control-scheme auto-detection/picker, settings persistence, adaptive-quality performance pass across device tiers.
@@ -160,7 +171,7 @@ CLAUDE.md
 - No combat, damage-based fail states, or scoring/leaderboards.
 - No native app wrapper in v1 (browser-only for now; Electron/Capacitor wrapping is a later-stage option, not current scope).
 - No official/licensed Nissan assets, badging, or trademarked design files — the Patrol Super Safari is a visual reference only; the model is built independently in-house.
-- No photoreal/PBR rendering — flat-shaded stays flat-shaded even under scrutiny; resist scope creep toward realism.
+- Realistic rendering is now the visual target (§4); preserve browser performance and the forgiving driving experience while improving fidelity.
 
 ---
 

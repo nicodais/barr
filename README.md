@@ -4,8 +4,8 @@ Relaxing open-world dune-bashing for the browser. See [CLAUDE.md](CLAUDE.md) for
 
 **Current phase: 5 complete, 6 ready to ship.** Driving feel, the streamed world, audio,
 Ahmed's radio and the ten POIs are all in, along with photo mode, touch controls,
-adaptive quality and the responsive pass. The build is configured for Vercel but has
-not been deployed — see [Deploying](#deploying).
+adaptive quality and the responsive pass. The app is hosted on Vercel at
+[shamal.app](https://shamal.app) — see [Deploying](#deploying).
 
 ```bash
 npm install
@@ -112,15 +112,33 @@ handling.
 ## Selling ground contact
 
 Correct physics are not enough on their own: with nothing marking the point of contact the
-truck reads as hovering regardless of what the solver is doing. Three cues, all driven from
+truck reads as hovering regardless of what the solver is doing. Ground-contact cues, driven from
 the wheels' **world-space contact points** rather than the body, so they appear exactly
 where rubber meets sand and vanish the instant it doesn't:
 
 | | file | says |
 | --- | --- | --- |
-| Dust | [`DustSystem.ts`](src/vehicle/DustSystem.ts) | touching *now* — volume scales with speed and sand softness |
+| Sand spray | [`SandSpray.ts`](src/vehicle/SandSpray.ts) | connected, scene-lit 3D curtains following ballistic arcs and settling on the dune |
+| Grains and trailing dust | [`DustSystem.ts`](src/vehicle/DustSystem.ts) | small ballistic grains plus faint airborne dust; no dense smoke billboards |
 | Contact patch | [`ContactShadow.ts`](src/vehicle/ContactShadow.ts) | touching *here* — fades out within ~90ms of takeoff |
+| Deformed sand | [`SandSurface.ts`](src/terrain/SandSurface.ts) | shallow ruts, raised edges and compacted tread relief in a 48m contact patch |
 | Tyre tracks | [`TrackSystem.ts`](src/vehicle/TrackSystem.ts) | touched *there* — ribbons break across jumps |
+
+New impressions upload in the same render frame; live ribbon endpoints follow the tyres
+without waiting for the 80cm spacing used by older track history. Contact effects align
+with the rendered hubs, including the shorter buggy and motorcycle wheelbases. Dirty contact cells update
+immediately, while full-patch ageing runs twice a second. Braking/sliding widen the grooves,
+and sustained wheelspin excavates progressively.
+
+The local surface preserves impressions on firm sand too; softer ground produces deeper
+ruts, up to 11.5cm. The wheel solver receives signed contact-height offsets so tyres and
+suspension respond when crossing ruts and raised edges. Large dunes and chassis collision
+keep their original heightfield: this is a thin yielding layer, not a full granular simulation.
+The surface keeps at most 30,000 contact cells and fades old marks over 100–240 seconds.
+
+Run `node scripts/check-sand.mjs` and `node scripts/check-sand-physics.mjs` for surface and
+wheel-contact regressions. See
+[the rendering refactor proposal](docs/rendering-refactor-proposal.md) for stack alternatives.
 
 The sun's cast shadow cannot do this job alone. At the low sun angles this game lives in it
 lands metres to the side, leaving nothing under the vehicle. Its `shadow.normalBias` was
@@ -185,11 +203,11 @@ Two things worth knowing before editing it:
 
 ## Life in the world
 
-Three systems keep the desert from reading as an empty surface, and all of them
-are instanced — together they add **6 draw calls**, not six hundred.
+Vegetation, gravel, wildlife and traffic use instancing. Daytime traffic and
+night convoys share the garage vehicle models, grouped by material and wheel.
 
-- **[`Scatter`](src/world/Scatter.ts)** — scrub, tussock grass and stones, ~760 instances
-  live at any time. Placement is deterministic from a cell hash, so a bush is in the same
+- **[`Scatter`](src/world/Scatter.ts)** — clustered scrub, tussock grass, stones and patches of gravel
+  within 225 metres, with density scaled by quality. Placement is deterministic from a cell hash, so a bush is in the same
   spot every time you pass it and nothing is stored. Plants avoid slopes past ~24° and
   anything looser than 0.62 softness, and thin out inside dune fields: they grow in the
   corridors between, not on active faces. Cells fill in on a per-frame budget, because a
@@ -202,6 +220,41 @@ are instanced — together they add **6 draw calls**, not six hundred.
   away when the truck comes within 62m. That flight response is the point: a herd that
   ignores you is scenery, one that notices you makes the desert somewhere you're visiting.
   The walk cycle is shader-driven off per-instance phase and gait, so there's no skeleton.
+
+## Visual assets and verification
+
+The four garage bodies have hollow cabins, inset glazing, formed wheel openings,
+spoke wheels, tread, underbody hardware and clearcoat paint. `Game.ts` injects the
+same model factory into the daytime and nighttime traffic systems; world systems
+never construct a vehicle system directly.
+
+Sand, masonry and tree bark use locally served 1K albedo, normal and roughness scans.
+A photographic arid landscape contributes to daylight material reflections; its
+contribution fades into the procedural sky probe as night and haze increase. Texture
+files and CC0 attribution are in [`public/textures/CREDITS.md`](public/textures/CREDITS.md).
+`src/rendering/` contains shared rendering resources without gameplay ownership.
+Landmarks combine these surfaces with irregular masonry, sagging woven fabric,
+open timber framing, shaped metal vessels, eroded rock and feathered palm fronds.
+The ghaf has a connected hierarchy of tapering branches, UV-mapped scanned bark
+and individually formed compound leaflets under six centimetres long. Vehicle
+rooflines are checked against their metre-scale footprints; open vehicles use
+moulded bucket seats, bent tube hoops and helical suspension springs.
+
+Camels and gazelles use independently authored, continuous sculpted surfaces.
+Their compact indexed meshes are loaded once before world construction, then
+instanced with a continuous spatial skin deformation and matching animated shadows.
+Both skin meshes include all four legs; markings use that same deformation. The
+camels use a single-humped dromedary silhouette, forward-reaching neck, compact head,
+long legs and object-space short-coat shading based on the supplied reference. The editable
+sculpt definitions live in `scripts/animalSculpt.ts`; rebuild the binary assets with
+`node scripts/bake-animals.mjs`.
+
+- `npm run build` checks TypeScript and creates the production build.
+- `node scripts/check-assets.mjs` checks all 12 body/wheel combinations, traffic
+  transforms, every region's POIs and both animal assets.
+- With `npm run dev`, open `/?assets=wagon` for a turntable containing every vehicle,
+  animal and POI, with pause/step, suspension articulation and recorded-engine
+  playback controls. This review route is excluded from production.
 
 ## Cameras and the ground
 
@@ -255,19 +308,18 @@ completely silent and just makes the truck float.
 
 ## Audio
 
-**Every sound is synthesised — the game ships zero audio bytes.** No samples, no music
-files, no voice. That keeps the payload tiny (§8) and sidesteps streaming audio on mobile
-entirely. [`AudioEngine`](src/audio/AudioEngine.ts) runs four buses (world / score / radio
-under a master) so the adaptive mix has something to move: the oud comes up while you're
-driving and ducks under an incoming call (§6).
+The engine uses locally served recordings, decoded after audio unlock.
+[`AudioEngine`](src/audio/AudioEngine.ts) retains world / score / radio buses under
+a master, including the existing player volume controls and radio ducking.
 
-- **Engine** is a harmonic stack pitched off a faked gearbox, not a sample loop — it glides
-  continuously with no crossfade seams, and the audible shift points are what make
-  acceleration read as effort.
+- **Engine** blends a recorded idle with a recorded rev loop using RPM and load.
+  Car profiles vary pitch, EQ and gearbox ratios; bike and UTV profiles use a
+  motorcycle recording. These are three source recordings, not independently
+  recorded engines for each model. Sources, licenses and modifications are in
+  [`public/audio/CREDITS.md`](public/audio/CREDITS.md), also linked from the menu.
 - **Tyres** are filtered noise whose tone tracks sand softness, so the traction model is
   audible as well as visible. **Wind** rises with speed.
-- **The score** is generative in maqam Hijaz on D — the augmented second between Eb and F#
-  is what places it geographically. It never repeats over a long drive.
+- **The score** uses the existing streamed background-music track.
 - **Ahmed** is never voiced (§6): a squelch when he keys up, a shorter one when he signs
   off, and the line scrolls as text.
 
@@ -323,7 +375,8 @@ blank.
 
 ## Deploying
 
-Configured but **not deployed** — that needs your Vercel account.
+Production is hosted on Vercel at [shamal.app](https://shamal.app), which redirects
+to `www.shamal.app`. Publish changes through the project's connected production branch.
 
 ```bash
 npm run build     # typecheck + static build into dist/
@@ -334,8 +387,22 @@ npx vercel        # or connect the repo at vercel.com/new
 for hashed assets. Vendor code is split into `three` and `rapier` chunks so an app change
 re-downloads ~30 kB rather than ~900 kB.
 
-This isn't a git repo yet; `git init` and push before connecting Vercel if you want
-auto-deploy on main and preview builds on branches (§10 phase 6).
+Vercel Web Analytics is initialized once in `src/main.ts` using the vanilla
+`@vercel/analytics` integration. It tracks visits from the map picker onward in
+production builds; `npm run dev` and the development asset review do not load it.
+To activate reporting, select the project in Vercel's **Analytics** section and
+click **Enable**, then deploy the commit containing this integration. Visit the
+production site and check the dashboard for traffic. The tracking routes are
+provided by Vercel after deployment; a local Vite preview cannot verify ingestion.
+See the [official setup guide](https://vercel.com/docs/analytics/quickstart).
+
+The social thumbnail comes from `index.html`'s Open Graph and Twitter tags, pointing
+to `public/share-cover-v2.jpg`. Check **Deployments → current deployment → Open Graph**
+in Vercel and open the image URL directly when troubleshooting. If both are current
+but a messaging app still shows the old picture, its preview is likely cached.
+Try a new message with `https://www.shamal.app/?v=2` to request a fresh preview;
+already-sent messages may retain the previous card. Future image replacements
+should use a new filename and update both image tags before deployment.
 
 ## Known gaps
 
@@ -349,3 +416,33 @@ auto-deploy on main and preview builds on branches (§10 phase 6).
   and touch schemes are verified in an emulated viewport only — that proves the layout and
   the plumbing, not the frame rate or how the controls actually feel under a thumb.
 - Photo mode composes around the truck only; there's no detached free-fly camera.
+
+## Media sources
+
+The shared-link thumbnail is full-frame promotional cover art in `public/share-cover-v2.jpg` (1200 × 630).
+Open Graph and Twitter tags use its versioned absolute URL on `shamal.app`.
+Generation provenance and the prompt are in [the cover notes](docs/share-cover.md).
+
+All POI kinds and regional card overrides have openly licensed local photographs.
+Photographer/source and licence links appear on the cards; the menu opens the full
+[photo catalogue and attribution](public/photos/index.html). Source URLs, licences,
+download records and display modifications are in [the manifest](public/photos/manifest.json).
+Captions distinguish regional examples from exact sites, including the Bahrain oil-well reference.
+
+Background music is “Desert City” by Kevin MacLeod, CC BY 4.0, replacing the recording
+whose YouTube source could not be traced. Music and engine credits are available from
+the menu and in [audio credits](public/audio/CREDITS.md).
+
+## Extreme Mode
+
+Open the menu and choose **Enable Extreme Mode**. This optional mode starts off
+in every session. It adds collisions with roaming traffic, camels, gazelles and
+birds; animals fall and leave blood on the sand, and Ahmed reacts in urgent radio
+text without a spoken voice. The damage gauge beneath the compass shows remaining
+vehicle integrity. Impacts, hard landings and remaining overturned reduce it;
+automatic rollover recovery is disabled. At zero, the vehicle explodes and respawns
+five seconds later with full integrity. Reset and vehicle changes cannot skip that
+countdown. Disabling the mode clears its blood, fallen actors and collision bodies.
+
+Validate with `npm run build`, `node scripts/check-extreme.mjs` (rules and real
+Rapier collisions), and `node scripts/check-assets.mjs` (model/animation geometry).

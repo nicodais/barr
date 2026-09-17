@@ -1,3 +1,4 @@
+import { POI_PHOTOS } from './poiPhotos';
 import type { Poi } from './pois';
 
 /**
@@ -29,8 +30,7 @@ export const LAHBAB_POIS: Poi[] = [
         'Lahbab\'s steepest dune, and the one the tour-company drivers use to test a new ' +
         'truck before it goes anywhere near a paying customer. No queue at the bottom like ' +
         'Big Red\'s — the people who come here already know what they are doing.',
-      photo: undefined,
-      credit: undefined,
+      ...POI_PHOTOS.lahbab,
     },
   },
   {
@@ -50,8 +50,7 @@ export const LAHBAB_POIS: Poi[] = [
         'towers is a different order of magnitude from a rural corridor, which is most of ' +
         'why they are here at all: the city is close enough that running power out this far ' +
         'was worth doing.',
-      photo: undefined,
-      credit: undefined,
+      ...POI_PHOTOS.pylons,
     },
   },
   {
@@ -68,8 +67,7 @@ export const LAHBAB_POIS: Poi[] = [
         'A commercial evening camp rather than a family majlis — carpets, a stage, a dinner ' +
         'buffet, timed to the sunset drive. Dozens of these operate out of Lahbab, because it ' +
         'is close enough to the city to make it back for the second seating.',
-      photo: undefined,
-      credit: undefined,
+      ...POI_PHOTOS.safaricamp,
     },
   },
   {
@@ -133,8 +131,7 @@ export const LAHBAB_POIS: Poi[] = [
         'A lookout post on the Dubai Desert Conservation Reserve boundary, not a historic ' +
         'watchtower — this one is decades old, not centuries, and it watches for animals ' +
         'straying out rather than raiders coming in.',
-      photo: undefined,
-      credit: undefined,
+      ...POI_PHOTOS.reserve,
     },
   },
 ];

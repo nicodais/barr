@@ -3,10 +3,10 @@ import type { VehicleTelemetry } from '../vehicle/Vehicle';
 import { clampAboveGround, minCameraY } from './cameraClearance';
 
 const BASE_DISTANCE = 9.5;
-const BASE_HEIGHT = 3.6;
+const BASE_HEIGHT = 2.65;
 const LOOK_AHEAD = 6.0;
-const BASE_FOV = 62;
-const SPEED_FOV = 12;
+const BASE_FOV = 55;
+const SPEED_FOV = 9;
 
 /**
  * Chase camera tuned to sell speed and weight rather than to track the car
