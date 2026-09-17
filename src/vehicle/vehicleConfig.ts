@@ -15,7 +15,7 @@
  * without dragging Three.js into the settings path.
  */
 
-export type BodyId = 'wagon' | 'pickup' | 'gwagon' | 'singlecab' | 'softtop' | 'moto' | 'buggy';
+export type BodyId = 'wagon' | 'pickup' | 'moto' | 'buggy';
 export type WheelStyleId = 'steel' | 'alloy' | 'beadlock';
 export type PaintId =
   | 'safari'
@@ -67,35 +67,15 @@ export const BODY_OPTIONS: BodyOption[] = [
     stats: { speed: 0.52, grip: 0.72, weight: 0.95, agility: 0.3 },
   },
   {
-    id: 'gwagon',
-    label: 'Box Wagon',
-    blurb: 'Tall, square and grippy. Superb on a ridge, nervous across one.',
-    stats: { speed: 0.58, grip: 0.82, weight: 0.62, agility: 0.55 },
-  },
-  {
-    id: 'singlecab',
-    // What these are actually called across the Gulf, and it names the one
-    // thing separating it from the crew cab above — no badge required (§11).
-    label: 'Single Cab',
-    blurb: 'Leaf-sprung and slow. Grinds up whatever you point it at.',
-    stats: { speed: 0.42, grip: 0.8, weight: 0.66, agility: 0.46 },
-  },
-  {
-    id: 'softtop',
-    label: 'Soft Top',
-    blurb: 'Roof off, doors off. Wonderful right up until you cross a slope.',
-    stats: { speed: 0.66, grip: 0.7, weight: 0.38, agility: 0.8 },
-  },
-  {
     id: 'moto',
     label: 'Desert Bike',
-    blurb: 'Two wheels and no excuses. Quickest thing here, and the twitchiest.',
+    blurb: 'A tall-suspension dirt bike. Quickest thing here, and the twitchiest.',
     stats: { speed: 0.99, grip: 0.34, weight: 0.04, agility: 1 },
   },
   {
     id: 'buggy',
     label: 'Dune Buggy',
-    blurb: 'Half a tonne. Floats over soft sand and changes its mind instantly.',
+    blurb: 'A two-seat side-by-side. Light on soft sand and quick to turn.',
     stats: { speed: 0.92, grip: 0.42, weight: 0.12, agility: 0.95 },
   },
 ];
@@ -146,81 +126,6 @@ export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
     // what stops it bogging is the momentum, not floating over the top.
     sinkDrag: 1480,
     climbBleed: 0.86,
-  },
-
-  // Short, tall and grippy. Best mechanical traction of the six, but the tall
-  // body and high COM mean a sidehill is genuinely tense.
-  gwagon: {
-    mass: 2250,
-    comHeight: 0.42,
-    rollInertia: 1150,
-    engineForce: 3500,
-    topSpeed: 31,
-    hardpackGrip: 1.18,
-    sandGrip: 1.16,
-    hardpackSideGrip: 1.2,
-    sandSideGrip: 1.18,
-    maxSteerAngle: 0.60,
-  },
-
-  // The working truck. Leaf-sprung, narrow-tyred and geared low: it is the
-  // slowest thing here by a distance and the least comfortable over chop, and
-  // it will crawl up a face that has already stalled two of the others.
-  singlecab: {
-    mass: 2000,
-    comHeight: 0.34,
-    rollInertia: 1150,
-    pitchInertia: 4500,
-    yawInertia: 2900,
-    engineForce: 3250,
-    topSpeed: 26,
-    brakeForce: 1950,
-    steerRate: 3.0,
-    maxSteerAngle: 0.55,
-    // Leaf springs: the stiffest and shortest-travel setup of the six. It
-    // skitters over corrugations the coil-sprung bodies absorb, and lands hard
-    // — which is most of what separates it from the wagon by feel.
-    suspensionStiffness: 38,
-    suspensionTravel: 0.24,
-    suspensionCompression: 4.4,
-    suspensionRelaxation: 5.6,
-    hardpackGrip: 1.5,
-    sandGrip: 0.82,
-    // Narrow tyres on a loaded truck dig in where the wide-tyred bodies float.
-    sinkDrag: 1500,
-    // The trade, and the reason to pick it: low gearing barely notices a climb.
-    climbBleed: 0.6,
-  },
-
-  // Open, light and sat up high. The only body here whose grip and whose
-  // stability point in opposite directions: it holds a line across a face
-  // better than anything except the box wagon, and having held it, tips. That
-  // tension is the whole reason to drive it, and it costs nothing (§2 — a
-  // rollover is a beat, never a penalty).
-  softtop: {
-    mass: 1680,
-    // Highest of the six. No roof to lower the mass, and you sit on the tub
-    // rather than down in it.
-    comHeight: 0.46,
-    rollInertia: 880,
-    pitchInertia: 3100,
-    yawInertia: 2000,
-    engineForce: 3300,
-    topSpeed: 34,
-    brakeForce: 2100,
-    steerRate: 4.0,
-    maxSteerAngle: 0.66,
-    suspensionRest: 0.52,
-    suspensionTravel: 0.44,
-    suspensionStiffness: 20,
-    hardpackGrip: 1.24,
-    sandGrip: 0.95,
-    // Above baseline, deliberately. Grip is what lets it get far enough over
-    // to be in trouble; a body that just slid away would never tip at all.
-    hardpackSideGrip: 0.74,
-    sandSideGrip: 0.42,
-    sinkDrag: 820,
-    climbBleed: 0.7,
   },
 
   // A tenth of the pickup's mass, which changes what every other number means.

@@ -191,10 +191,59 @@ const BADAYER_ROUTES: Route[] = [
   },
 ];
 
+/**
+ * Lahbab's tracks converge from two directions rather than one: the safari
+ * camps that need the wide, braided line a coach-load of Land Cruisers wears
+ * in, and a second, quieter line the professional drivers use to reach The
+ * Wall without going anywhere near the tourist run.
+ */
+const LAHBAB_ROUTES: Route[] = [
+  // In toward the safari camp — wide and heavily braided, the commercial-tour
+  // equivalent of Badayer's weekend crowd.
+  {
+    points: [
+      { x: -700, z: -420 },
+      { x: -560, z: -400 },
+      { x: -410, z: -330 },
+      { x: -260, z: -250 },
+      { x: -80, z: -210 },
+      { x: 120, z: -190 },
+      { x: 300, z: -185 },
+      { x: 420, z: -180 },
+    ],
+    traffic: 1,
+    braid: 6,
+    braidSpread: 10,
+  },
+  // The professionals' line to The Wall — a single clean approach, no braid,
+  // because these drivers all take the same measured run at it.
+  {
+    points: [
+      { x: 300, z: -185 },
+      { x: 260, z: 20 },
+      { x: 230, z: 150 },
+      { x: 210, z: 220 },
+    ],
+    traffic: 0.85,
+  },
+  // Out to the falconer's ground and the racing track, the quieter corner
+  // away from the camps.
+  {
+    points: [
+      { x: -260, z: -250 },
+      { x: -400, z: -50 },
+      { x: -480, z: 100 },
+      { x: -470, z: 220 },
+    ],
+    traffic: 0.5,
+  },
+];
+
 const ROUTES_BY_REGION: Record<RegionId, Route[]> = {
   liwa: LIWA_ROUTES,
   fossilrock: FOSSIL_ROCK_ROUTES,
   badayer: BADAYER_ROUTES,
+  lahbab: LAHBAB_ROUTES,
 };
 
 const VERTEX = /* glsl */ `
@@ -221,7 +270,9 @@ const FRAGMENT = /* glsl */ `
     float dist = length( vWorld - cameraPosition );
     float a = vAlpha * ( 1.0 - smoothstep( 190.0, 330.0, dist ) );
     if ( a <= 0.004 ) discard;
-    gl_FragColor = vec4( uColor, a );
+    gl_FragColor = vec4( uColor, a * 0.72 );
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
 
@@ -269,7 +320,7 @@ export function createOldTracks(): THREE.Mesh {
   const material = new THREE.ShaderMaterial({
     // A shade cooler and darker than fresh tracks: a rut that has been sitting
     // has lost the loose bright sand off its lip and is packed inside.
-    uniforms: { uColor: { value: new THREE.Color(0x7d5d3f) } },
+    uniforms: { uColor: { value: new THREE.Color(0x000000) } },
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
     transparent: true,

@@ -40,6 +40,7 @@ export interface RoutePoint {
   fz: number;
   yaw: number;
   pitch: number;
+  roll: number;
 }
 
 /** Mean radius, used as the circumference basis so a spacing in metres can be
@@ -77,13 +78,21 @@ export function sampleRoute(route: Route, u: number, out: RoutePoint, wheelbase 
   out.yaw = Math.atan2(out.fx, out.fz);
 
   out.y = heightAt(out.x, out.z);
-  const ahead = heightAt(out.x + out.fx * wheelbase, out.z + out.fz * wheelbase);
-  out.pitch = -Math.atan2(ahead - out.y, wheelbase);
+  const half = wheelbase / 2;
+  // Fit the resting plane to the four tyre footprints, including side slope.
+  const corner=(front: number, side: number)=>heightAt(
+    out.x+out.fx*half*front+out.fz*.8*side,
+    out.z+out.fz*half*front-out.fx*.8*side,
+  );
+  const fl=corner(1,1),fr=corner(1,-1),bl=corner(-1,1),br=corner(-1,-1);
+  out.pitch=-Math.atan2((fl+fr-bl-br)/2,wheelbase);
+  out.roll=Math.atan2((fl+bl-fr-br)/2,1.6);
+  out.y=(fl+fr+bl+br)/4;
   return out;
 }
 
 export function emptyRoutePoint(): RoutePoint {
-  return { x: 0, z: 0, y: 0, fx: 0, fz: 1, yaw: 0, pitch: 0 };
+  return { x: 0, z: 0, y: 0, fx: 0, fz: 1, yaw: 0, pitch: 0, roll: 0 };
 }
 
 /**

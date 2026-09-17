@@ -6,10 +6,12 @@ numbers are given where they exist, and where something is unverified it says so
 
 Sizes are rough: **S** = an afternoon, **M** = a day or two, **L** = a week-ish.
 
-**Status: 17 of 20 done.** Items marked ✅ have shipped; the notes under them
+**Status: 18 of 20 done.** Items marked ✅ have shipped; the notes under them
 record what the work actually found, which in three cases was not what the item
 predicted. Both items that were blocked on a decision have since been decided and built.
-One item needs hardware nobody here has; two are large and remain open.
+The one item that needed hardware has now been run on real devices; the two large,
+high-risk items were gated on a vehicle-roster decision, which has now landed on
+"hold" — both stay deferred indefinitely rather than open pending a call.
 
 ---
 
@@ -57,17 +59,20 @@ truck from 61.9 to 1.5 kph and releases clean.
 
 ## 2. Unvalidated
 
-### 6. Play it on a real phone — **S, and it still outranks everything below**
+### 6. ✅ Play it on a real phone — **S, and it still outranks everything below**
 
-§2 makes driving feel the core value of the game, and it has never been
-validated on hardware that renders above ~5 fps. Every visual check in this
-project was software-rendered. Open questions only a device answers: does the
+§2 makes driving feel the core value of the game, and it had never been
+validated on hardware that renders above ~5 fps — every visual check in this
+project up to now was software-rendered. Open questions only a device answers: does the
 weight transfer read, does a stalled climb feel like a decision or a bug, does
 the `sinkDrag` fix make the buggy and the pickup feel as different as their
 numbers now say, and is the rollover a "whoa, okay" or an irritation.
 
-**Blocked on hardware, not effort.** Item 7 now exists specifically to make this
-session productive when someone does it.
+*Done:* run manually across multiple physical devices. Clean pass — driving feel and
+frame rate both held up outside the software-rendered dev environment; nothing in §2
+read as a bug or an irritation on real hardware. Item 7's diagnostics readout (tier,
+fps, draw calls) made this session productive the moment a device was available, as
+intended.
 
 ### 7. ✅ Frame rate across the three quality tiers — **S**
 
@@ -112,13 +117,15 @@ chugging 12V compressor going up, finished by the clunk of the chuck coming
 off. Both last exactly as long as the axis takes to walk — 1.5s for one step,
 3.0s for two.
 
-### 11. Cockpit camera — **L**
+### 11. Cockpit camera — **L — deferred indefinitely, 2026-09-07**
 
-Parked three times now. Needs an interior modelled for each body, and five of
-the seven are still empty shells. The soft top has one, which makes it the
-natural place to prototype.
+Parked three times now, and now formally deferred: the roster stays at its current
+bodies, so there's no vehicle-growth pressure to justify modelling five more
+interiors. Needs an interior modelled for each body, and five of the seven are still
+empty shells. The soft top has one, which makes it the natural place to prototype
+if this ever reopens.
 
-### 12. Per-body footprint — **L, high risk**
+### 12. Per-body footprint — **L, high risk — deferred indefinitely, 2026-09-07**
 
 Track, wheelbase, collider extents and the four wheel hard-points are fixed in
 `VehicleTuning`, built once in the `Vehicle` constructor and never rebuilt on a
@@ -126,7 +133,9 @@ body change. Consequences: the quad was abandoned, the bike is drawn at a 2.9m
 wheelbase (roughly twice a real one), and the bike's physics runs on four
 raycasts so it is far more stable than two wheels should be. Fixing it means
 recreating the collider and wheel set on every body change — surgery on the one
-system §2 calls the core value. Worth doing only if more vehicles are the plan.
+system §2 calls the core value. Explicitly scoped as worth doing only if more
+vehicles are the plan — the roster decision landed on "hold," so this stays a known,
+accepted limitation rather than a scheduled fix. Revisit if that decision changes.
 
 ---
 

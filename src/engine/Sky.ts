@@ -1,18 +1,12 @@
 import * as THREE from 'three';
 import type { SkyState } from './TimeOfDay';
 
-/**
- * Procedural gradient sky (§4) — no photo skybox, because a photographic sky
- * over flat-shaded terrain reads as a mistake rather than a style.
- *
- * It's a single inverted sphere that renders before everything with depth
- * writes off, so it costs one draw call and never fights the depth buffer.
- */
+/** Atmospheric sky shared by the backdrop and reflection probe. */
 const VERTEX = /* glsl */ `
   varying vec3 vDirection;
   void main() {
     // Direction from the camera to this vertex, in world space.
-    vDirection = ( modelMatrix * vec4( position, 1.0 ) ).xyz;
+    vDirection = mat3(modelMatrix) * position;
     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
   }
 `;
@@ -34,21 +28,6 @@ const FRAGMENT = /* glsl */ `
     return fract( ( p.x + p.y ) * p.z );
   }
 
-  /**
-   * Stars, procedural.
-   *
-   * Geometry would be the obvious approach and it's the wrong one here: a
-   * points cloud is another draw call, another buffer, and it has to be
-   * parented to something that doesn't rotate with the camera. Hashing the view
-   * direction into cells and putting at most one star in each costs a handful
-   * of instructions, is fixed in world space for free, and can size each star
-   * against the pixel footprint — which matters, because a star smaller than a
-   * pixel doesn't look distant, it looks like a stuck sensor.
-   *
-   * The desert is the reason to bother. There is no light out here for a
-   * hundred kilometres, and what you get on a clear night in the Empty Quarter
-   * is genuinely the thing people drive out to see.
-   */
   float starField( vec3 dir ) {
     vec3 p = dir * 190.0;
     vec3 cell = floor( p );
@@ -68,89 +47,49 @@ const FRAGMENT = /* glsl */ `
     return smoothstep( radius, 0.0, d ) * mag * mag;
   }
 
-  void main() {
-    vec3 dir = normalize( vDirection );
-
-    // Vertical gradient. The exponent decides how quickly the zenith blue takes
-    // over from the warm horizon: *below* 1.0 pulls the blue down toward the
-    // horizon, above 1.0 lets the warm band climb. The chase camera only ever
-    // sees the first ~25 degrees of sky, so this needs to be low or the visible
-    // strip is warm the whole way across.
-    float h = clamp( dir.y, -1.0, 1.0 );
-    float t = pow( clamp( h, 0.0, 1.0 ), 0.42 );
-
-    // Blending a warm horizon straight into a blue zenith runs the midtones
-    // through purple — orange and blue average to mud. A real sky passes
-    // through a pale, desaturated haze band instead, so that band is built
-    // explicitly and the gradient goes horizon -> pale -> zenith.
-    // Rec.709 weights, not the 0.299/0.587/0.114 display-space ones: these
-    // uniforms are linear (THREE.Color converts on construction), and the
-    // display weights over-count green against a linear value, which tipped the
-    // band khaki under the pale tan midday horizon. The old 1.1 gain on top
-    // pushed it into the tone-map knee as well, desaturating it further to milk.
-    vec3 pale = mix( uHorizon, uZenith, 0.55 );
-    float lum = dot( pale, vec3( 0.2126, 0.7152, 0.0722 ) );
-    pale = mix( pale, vec3( lum * 0.94, lum * 1.0, lum * 1.16 ), 0.58 );
-
-    vec3 color = mix( uHorizon, pale, smoothstep( 0.0, 0.55, t ) );
-    color = mix( color, uZenith, smoothstep( 0.42, 1.0, t ) );
-    // A tight haze band right on the horizon, where the air is thickest.
-    color = mix( color, uHorizon, smoothstep( 0.07, 0.0, h ) * 0.5 );
-
-    // Below the horizon, settle toward a slightly darker haze so the ground
-    // plane edge never shows a hard line against the sky.
-    color = mix( color, uHorizon * 0.82, smoothstep( 0.0, -0.22, h ) );
-
-    // The shamal. Dust blowing off the Rub' al Khali is the defining sky of this
-    // coast — the air carries so much of it that the horizon never resolves to
-    // blue, it just goes milky and warm and the far dunes disappear into it.
-    //
-    // Mie scattering off dust is far less wavelength-selective than Rayleigh off
-    // air, so the effect is: the whole dome washes toward one pale sand colour,
-    // strongly near the horizon (where the air path is longest) and weakly
-    // overhead. Pulling the zenith down toward the same colour is what stops a
-    // hazy sky from reading as a clean sky with fog stuck to the bottom of it.
-    float airMass = mix( 1.0, 0.28, smoothstep( 0.0, 0.75, t ) );
-    color = mix( color, uHazeColor, uHaze * airMass * 0.82 );
-
-    // Broad atmospheric glow around the sun, plus a tighter core. No disc:
-    // a hard-edged sun would be the only photoreal object in the frame.
-    float sunDot = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
-    float glow = pow( sunDot, 6.0 ) * 0.30 + pow( sunDot, 128.0 ) * 0.85;
-    // Dust spreads the sun into a wide aureole and eats the core — on a hazy
-    // afternoon out there you can look straight at it. Trading the tight term
-    // for the broad one keeps the total light roughly constant while the shape
-    // of it changes, which is what actually reads as "the air is full of sand".
-    float aureole = pow( sunDot, 2.2 ) * 0.42;
-    glow = mix( glow, aureole + pow( sunDot, 22.0 ) * 0.18, uHaze );
-    // Fade the glow out as the sun sinks, so it doesn't burn through the ground.
-    float above = smoothstep( -0.12, 0.06, normalize( uSunDirection ).y );
-    color += uSunColor * glow * uSunIntensity * above;
-
-    // Stars go in before nothing else — under the sun glow, over the gradient,
-    // and cut by both the dust and the last of the daylight. Dust is what
-    // actually kills a desert night sky, so it's weighted heavily.
-    float starVisible = uNight * ( 1.0 - uHaze * 0.85 );
-    if ( starVisible > 0.004 ) {
-      // Thinned near the horizon, where you are looking through the most air
-      // and, out here, the most blown sand.
-      float lift = smoothstep( -0.02, 0.30, dir.y );
-      color += vec3( 0.95, 0.97, 1.0 ) * starField( dir ) * starVisible * lift * 1.35;
+  float cloudNoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash13(vec3(i, 1)), hash13(vec3(i + vec2(1,0), 1)), f.x),
+               mix(hash13(vec3(i + vec2(0,1), 1)), hash13(vec3(i + vec2(1,1), 1)), f.x), f.y);
+  }
+  float clouds(vec2 p) {
+    float n = 0.0, weight = 0.5;
+    for (int i = 0; i < 5; i++) {
+      n += cloudNoise(p) * weight;
+      p = mat2(1.6, 1.2, -1.2, 1.6) * p + 17.3;
+      weight *= 0.5;
     }
-
-    gl_FragColor = vec4( color, 1.0 );
-
-    // Every built-in three material ends with these two chunks; a hand-written
-    // ShaderMaterial gets the prefix that defines them but has to include them
-    // itself. Omitting them meant the sky alone skipped the pipeline everything
-    // else goes through: THREE.Color converts on construction, so these uniforms
-    // hold LINEAR values, and writing them straight to an sRGB framebuffer
-    // displayed them at roughly a third of their authored brightness. The
-    // 0x3f92e2 midday zenith arrived as rgb(13,73,194) — a heavy navy instead of
-    // azure — so the ground rendered brighter than the sky and the whole value
-    // structure was inverted. Adding tone mapping to the renderer made the
-    // mismatch worse, not better: the ground started rolling off while the sky
-    // still clipped raw. The sun glow gets to roll off now too.
+    return n;
+  }
+  void main() {
+    vec3 dir = normalize(vDirection);
+    float h = max(dir.y, 0.0);
+    vec3 color = mix(uHorizon, uZenith, pow(h, 0.42));
+    float opticalDepth = exp(-h * 7.0);
+    color = mix(color, uHazeColor, opticalDepth * uHaze * 0.55);
+    float sunDot = clamp(dot(dir, normalize(uSunDirection)), -1.0, 1.0);
+    float above = smoothstep(-0.08, 0.04, uSunDirection.y);
+    float day = 1.0 - uNight;
+    // Angular solar disc with forward scattering through desert dust.
+    float g = 0.86;
+    float mie = (1.0 - g*g) / pow(1.0 + g*g - 2.0*g*sunDot, 1.5);
+    color += uSunColor * mie * (0.007 + uHaze * 0.009) * above * day;
+    float disc = smoothstep(0.999976, 0.999991, sunDot);
+    color += uSunColor * disc * 8.0 * above * day * (1.0 - uHaze * 0.6);
+    // Project high cirrus into a plane, compressed toward the horizon.
+    if (dir.y > 0.015) {
+      vec2 p = dir.xz / (dir.y + 0.16);
+      float cloud = clouds(p * vec2(1.7, 4.5) + vec2(3.2, 19.0));
+      float density = smoothstep(0.55, 0.76, cloud) * smoothstep(0.02, 0.15, h);
+      vec3 cloudLight = mix(uHorizon, vec3(0.92, 0.94, 0.96), 0.52) * (1.0 - uNight * 0.95);
+      color = mix(color, cloudLight, density * (0.42 - uHaze * 0.18));
+    }
+    color = mix(color, uHazeColor * (0.48 - uNight * 0.38), smoothstep(0.0, 0.20, -dir.y));
+    float stars = uNight * (1.0 - uHaze * 0.85) * smoothstep(0.0, 0.3, dir.y);
+    if (stars > 0.004) color += vec3(0.82, 0.88, 1.0) * starField(dir) * stars;
+    color += vec3(0.55, 0.63, 0.76) * smoothstep(0.99994, 0.999965, sunDot) * uNight;
+    gl_FragColor = vec4(color, 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }

@@ -22,12 +22,12 @@ import { heightAt } from '../terrain/height';
  * about four draw calls (§8).
  */
 
-const RUST = new THREE.MeshLambertMaterial({ color: 0x8c5a3c, flatShading: true });
-const RUBBER = new THREE.MeshLambertMaterial({ color: 0x3f3a36, flatShading: true });
-const PLASTIC = new THREE.MeshLambertMaterial({ color: 0xb85f52, flatShading: true });
-const BONE = new THREE.MeshLambertMaterial({ color: 0xcfc3ad, flatShading: true });
-const STONE = new THREE.MeshLambertMaterial({ color: 0x9c8b76, flatShading: true });
-const CLOTH = new THREE.MeshLambertMaterial({ color: 0x7d8a9b, flatShading: true });
+const RUST = new THREE.MeshStandardMaterial({ color: 0x8c5a3c, roughness: 0.87 });
+const RUBBER = new THREE.MeshStandardMaterial({ color: 0x3f3a36, roughness: 0.87 });
+const PLASTIC = new THREE.MeshStandardMaterial({ color: 0xb85f52, roughness: 0.87 });
+const BONE = new THREE.MeshStandardMaterial({ color: 0xcfc3ad, roughness: 0.87 });
+const STONE = new THREE.MeshStandardMaterial({ color: 0x9c8b76, roughness: 0.87 });
+const CLOTH = new THREE.MeshStandardMaterial({ color: 0x7d8a9b, roughness: 0.87 });
 
 /** How close you have to get before Ahmed says anything. */
 export const DISCOVERY_RADIUS = 22;

@@ -58,6 +58,8 @@ const FRAGMENT = /* glsl */ `
     float a = smoothstep( 0.5, 0.0, d ) * vAlpha;
     if ( a <= 0.001 ) discard;
     gl_FragColor = vec4( uColor, a );
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
 

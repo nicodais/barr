@@ -1,3 +1,4 @@
+import { SandSurface } from './SandSurface';
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { heightAt } from './height';
@@ -48,9 +49,10 @@ export interface TerrainStats {
  */
 export class TerrainStreamer {
   readonly group = new THREE.Group();
-  readonly material: THREE.MeshLambertMaterial;
+  readonly material: THREE.MeshStandardMaterial;
   /** Live shader uniforms for ripples and sheen — driven by SceneRig each frame. */
   readonly sand: SandUniforms;
+  readonly surface: SandSurface;
   readonly stats: TerrainStats = { resident: 0, colliders: 0, pending: 0 };
 
   private chunks = new Map<string, Chunk>();
@@ -67,6 +69,7 @@ export class TerrainStreamer {
     this.material = sand.material;
     this.sand = sand.uniforms;
     this.sand.uWind.value.set(WIND_X, WIND_Z);
+    this.surface=new SandSurface(this.sand);this.group.add(this.surface.mesh);
     this.group.matrixAutoUpdate = false;
   }
 
@@ -139,6 +142,7 @@ export class TerrainStreamer {
    * worth keeping and a stale chunk would render a slice of the old map.
    */
   reset() {
+    this.surface.clear();
     for (const chunk of this.chunks.values()) {
       if (chunk.mesh) {
         this.group.remove(chunk.mesh);

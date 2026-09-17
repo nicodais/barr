@@ -1,4 +1,5 @@
 import { REGIONS, REGION_ORDER, type RegionId } from '../terrain/regions';
+import { GAME_NAME, GAME_NAME_AR } from '../brand';
 import { haptics } from '../input/Haptics';
 
 /**
@@ -42,15 +43,18 @@ export class MapSelect {
 
     const title = document.createElement('h1');
     title.className = 'carselect-title';
-    title.textContent = 'Where are we going?';
+    title.textContent = GAME_NAME;
+
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'mapselect-eyebrow';
+    eyebrow.textContent = GAME_NAME_AR + '  /  UNITED ARAB EMIRATES';
+    const intro = document.createElement('p');
+    intro.className = 'mapselect-intro';
+    intro.textContent = 'Follow the wind.';
 
     const sub = document.createElement('p');
     sub.className = 'carselect-sub';
-    // Counted, not spelled out by hand — the copy said "Two deserts" for a
-    // while after the third one shipped.
-    const COUNTS = ['No', 'One', 'Two', 'Three', 'Four', 'Five'];
-    const n = COUNTS[REGION_ORDER.length] ?? String(REGION_ORDER.length);
-    sub.textContent = `${n} deserts, and they drive nothing like each other.`;
+    sub.textContent = 'Four landscapes. An open horizon. Take your time.';
 
     this.cards = document.createElement('div');
     this.cards.className = 'mapselect-cards';
@@ -61,9 +65,7 @@ export class MapSelect {
       card.className = 'mapselect-card';
       card.dataset.value = id;
 
-      // A drawn thumbnail rather than a photo: the rest of the game is
-      // flat-shaded and a photograph on the front of it would set an
-      // expectation the world then fails to meet.
+      // Existing location photography introduces the four landscapes.
       const art = document.createElement('span');
       art.className = `mapselect-art mapselect-art-${id}`;
       art.setAttribute('aria-hidden', 'true');
@@ -92,13 +94,19 @@ export class MapSelect {
     this.go = document.createElement('button');
     this.go.type = 'button';
     this.go.className = 'carselect-go';
-    this.go.textContent = 'Drive there';
+    this.go.textContent = 'Explore the desert';
     this.go.onclick = () => {
       haptics.tick();
       this.confirm();
     };
 
-    panel.append(title, sub, this.cards, this.go);
+    const routes = document.createElement('div');
+    routes.className = 'mapselect-route-label';
+    routes.textContent = '01 — CHOOSE YOUR LANDSCAPE';
+    const footer = document.createElement('p');
+    footer.className = 'mapselect-footer';
+    footer.textContent = 'No destination required.  /  Keyboard · controller · touch';
+    panel.append(eyebrow, title, intro, sub, routes, this.cards, this.go, footer);
     this.element.appendChild(panel);
     this.sync();
   }
@@ -154,6 +162,7 @@ export class MapSelect {
   };
 
   private sync() {
+    this.element.dataset.region = this.picked;
     for (const card of Array.from(this.cards.children) as HTMLElement[]) {
       card.classList.toggle('is-active', card.dataset.value === this.picked);
     }

@@ -73,6 +73,8 @@ const FRAGMENT = /* glsl */ `
     float a = smoothstep( 0.5, 0.24, d ) * vAlpha;
     if ( a <= 0.001 ) discard;
     gl_FragColor = vec4( uColor, a );
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
 
@@ -137,7 +139,8 @@ export class Avalanche {
   update(dt: number, wheels: WheelState[], speed: number) {
     if (this.activeLimit > 0 && speed > MIN_SPEED) {
       for (const w of wheels) {
-        if (!w.contact || w.softness < MIN_SOFTNESS) continue;
+        const loose=w.surfaceSoftness??w.softness;
+        if (!w.contact || loose < MIN_SOFTNESS) continue;
         if (w.normalY > MIN_STEEP) continue;
 
         // How far past the letting-go angle this face is, 0..1. Squared so a
@@ -145,7 +148,7 @@ export class Avalanche {
         // properly — the difference between the two is the whole point.
         const steep = Math.min(1, (MIN_STEEP - w.normalY) / STEEP_WINDOW);
         const drive = Math.min(1, (speed - MIN_SPEED) / 6);
-        this.budget += SHED_RATE * steep * steep * drive * w.softness * dt;
+        this.budget += SHED_RATE * steep * steep * drive * loose * dt;
 
         // Capped so a long frame can't spend the entire pool at once and blink
         // every existing grain out of the world.

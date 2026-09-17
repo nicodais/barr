@@ -57,9 +57,12 @@ body {
 }
 
 #viewport {
+  position: fixed;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+  height: 100dvh;
 }
 
 #ui {
@@ -67,6 +70,16 @@ body {
   inset: 0;
   pointer-events: none;
 }
+
+/* Match the canvas as mobile browser bars expand/collapse. Safe-area padding
+   belongs on controls, so the desert still paints behind the gesture area. */
+#ui,
+.touch-controls,
+#loader {
+  height: 100dvh;
+}
+
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 #ui > * {
   pointer-events: auto;
@@ -891,8 +904,9 @@ body.high-contrast .radio {
 .poi-card img {
   display: block;
   width: 100%;
-  aspect-ratio: 2.4 / 1;
-  object-fit: cover;
+  aspect-ratio: 1.8 / 1;
+  object-fit: contain;
+  background: #171b17;
 }
 
 .poi-card img[hidden] {
@@ -911,7 +925,18 @@ body.high-contrast .radio {
   margin: 0 12px 9px;
   font-size: 8.5px;
   line-height: 1.3;
-  opacity: 0.38;
+  opacity: 0.72;
+}
+
+.poi-card small a {
+  color: inherit;
+  pointer-events: auto;
+  text-underline-offset: 2px;
+}
+
+.poi-card .poi-photo-caption {
+  margin-top: 7px;
+  opacity: 0.72;
 }
 
 .poi-card small[hidden] {
@@ -1722,6 +1747,18 @@ body.high-contrast .radio {
     linear-gradient(#a89dc0 0%, #e3a97f 74%, #d79b6d 100%);
 }
 
+/*
+ * Lahbab: one steep, narrow peak rather than Badayer's two overlapping bowl
+ * crests — the whole identity is a single very steep dune. Reddest and
+ * darkest of the four, and a duskier sky than the others: the skyline is
+ * close enough here to tint the haze.
+ */
+.mapselect-art-lahbab {
+  background:
+    radial-gradient(70% 190% at 50% 150%, #6b2410 0%, #5c1e0c 40%, transparent 41%),
+    linear-gradient(#8f88ab 0%, #d1875a 62%, #b5623a 100%);
+}
+
 .mapselect-name {
   margin: 0 13px;
   font-size: 15px;
@@ -1801,7 +1838,7 @@ body.high-contrast .radio {
   background: rgba(30, 22, 17, 0.93);
   backdrop-filter: blur(10px);
   /* Ten rows no longer fit a phone once the tuning panel's settings moved in. */
-  max-height: calc(100vh - 80px - env(safe-area-inset-top));
+  max-height: calc(100dvh - 80px - env(safe-area-inset-top));
   overflow-y: auto;
   overscroll-behavior: contain;
   opacity: 0;
@@ -1984,4 +2021,189 @@ body.high-contrast .radio {
   .radio {
     top: calc(146px + env(safe-area-inset-top));
   }
+}
+
+/* Natural-light edition: quiet, legible instruments and an expedition journal. */
+:root {
+  --sand: #c9b18e;
+  --ink: #151b1d;
+  --panel: rgba(17, 23, 25, 0.87);
+  --panel-line: rgba(231, 234, 224, 0.17);
+  --text: #f0eee7;
+  --accent: #d5ba87;
+}
+.carselect {
+  background: linear-gradient(90deg, rgba(12, 19, 23, 0.94), rgba(12, 19, 23, 0.70) 33%, transparent 73%);
+  padding: 5vh 4vw;
+}
+.carselect-panel { gap: 12px; scrollbar-width: thin; scrollbar-color: #747a75 transparent; }
+.carselect-title { font-weight: 400; letter-spacing: -0.035em; font-size: 30px; color: var(--text); }
+.carselect-sub { line-height: 1.6; color: #bcc0bc; font-size: 12px; }
+.carselect-bodies { gap: 5px; }
+.carselect-card {
+  border-radius: 3px;
+  padding: 10px 13px;
+  border-color: rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.025);
+}
+.carselect-card:hover { background: rgba(255,255,255,0.075); }
+.carselect-card.is-active { border-color: #c9b38c; background: rgba(208,191,156,0.11); }
+.carselect-card-name { font-size: 13px; font-weight: 500; letter-spacing: 0.01em; }
+.carselect-card:not(.is-active) .carselect-card-blurb,
+.carselect-card:not(.is-active) .carselect-stats { display: none; }
+.carselect-card-blurb { line-height: 1.5; }
+.carselect-stat { font-size: 9px; }
+.carselect-bar { height: 2px; }
+.carselect-go {
+  flex-shrink: 0;
+  min-height: 48px;
+  border-radius: 3px;
+  background: #ddcfb1;
+  color: #17201f;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  font-weight: 650;
+}
+.carselect-go:hover { background: #f0e6d2; }
+.carselect-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.13em; }
+.carselect-hint { font-size: 10px; line-height: 1.6; }
+.carselect-swatch { width: 25px; height: 25px; }
+.carselect-swatch.is-active { outline-color: #f5ecdc; }
+.mapselect {
+  background: #182127;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 5vh 6vw;
+}
+.mapselect::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(12,19,23,0.82), rgba(12,19,23,0.28) 68%),
+    linear-gradient(0deg, rgba(12,19,23,0.96), transparent 75%),
+    url('/photos/famousdune-commons.jpg') center 45% / cover;
+  opacity: 0.88;
+  pointer-events: none;
+}
+.mapselect .carselect-panel { position: relative; width: min(1200px, 100%); max-height: none; overflow: visible; gap: 0; }
+.mapselect-eyebrow { margin: 0 0 16px; font-size: 10px; letter-spacing: 0.24em; color: #d6d5cc; }
+.mapselect .carselect-title {
+  font-size: clamp(64px, 8.5vw, 120px);
+  font-weight: 300;
+  line-height: 0.95;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-left: -4px;
+}
+.mapselect-intro {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(22px, 2.5vw, 34px);
+  color: #eadcc5;
+  margin: 22px 0 8px;
+}
+.mapselect .carselect-sub { margin: 0; font-size: 12px; }
+.mapselect-route-label { margin: clamp(25px, 6vh, 64px) 0 14px; font-size: 9px; letter-spacing: 0.20em; color: #c4c7bf; }
+.mapselect-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 0 0 24px; }
+.mapselect-card {
+  position: relative;
+  border-radius: 3px;
+  border-color: rgba(232,231,214,0.23);
+  background: rgba(13,22,26,0.75);
+  padding-bottom: 16px;
+  transition: background 180ms, border-color 180ms, transform 180ms;
+}
+.mapselect-card:hover { background: rgba(45,51,48,0.85); transform: translateY(-3px); }
+.mapselect-card.is-active { border-color: #e4d2af; background: rgba(53,53,44,0.9); }
+.mapselect-card.is-active::after {
+  content: 'SELECTED';
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 7px;
+  background: rgba(17,26,27,0.78);
+  color: #f0e6cf;
+  font-size: 8px;
+  letter-spacing: 0.13em;
+}
+.mapselect-art {
+  width: 100%;
+  height: clamp(85px, 13vh, 135px);
+  margin-bottom: 13px;
+  background: url('/photos/famousdune-commons.jpg') center / cover;
+  filter: saturate(0.62);
+}
+.mapselect-art-badayer { background-image: url('/photos/bigred-commons.jpg'); }
+.mapselect-art-lahbab { background-image: url('/photos/lahbab-commons.jpg'); }
+.mapselect-art-fossilrock { background-image: url('/photos/ramp-commons.jpg'); background-position: center 65%; }
+.mapselect-art-badayer { background-position: 85% 65%; background-size: 170%; }
+.mapselect-art-lahbab { background-position: 15% 40%; background-size: 190%; }
+.mapselect-name { color: #f2ebdf; font-size: 17px; font-weight: 450; margin: 0 15px 5px; }
+.mapselect-where { margin: 0 15px; font-size: 8px; line-height: 1.5; letter-spacing: 0.07em; opacity: 0.65; }
+.mapselect-blurb { margin: 8px 15px 0; font-size: 11px; line-height: 1.55; color: #c2c7bf; }
+.mapselect .carselect-go { width: 260px; }
+.mapselect-footer { margin: 14px 0 0; color: #9ba49e; font-size: 9px; letter-spacing: 0.055em; }
+.hud:not(.hud-debug) { min-width: 0; width: auto; padding: 16px 20px; gap: 7px; border-radius: 4px; }
+.hud:not(.hud-debug) .hud-stats,
+.hud:not(.hud-debug) .hud-bars { display: none; }
+.hud:not(.hud-debug) .hud-speed b { font-size: 48px; font-weight: 300; line-height: 1; letter-spacing: -0.045em; }
+.hud:not(.hud-debug) .hud-speed small { font-size: 9px; letter-spacing: 0.08em; margin-left: 6px; text-transform: uppercase; }
+.hud:not(.hud-debug) .hud-psi { font-size: 10px; color: #d2c4a9; }
+.hud, .compass { background: rgba(18,25,27,0.58); backdrop-filter: blur(12px); border: 1px solid rgba(239,234,215,0.15); }
+.compass { border-radius: 3px; }
+.menu-button { border-radius: 4px; }
+button:focus-visible { outline: 2px solid #eee2c7; outline-offset: 4px; }
+@media (max-width: 760px) {
+  .mapselect { padding: 28px 22px; align-items: flex-start; }
+  .mapselect .carselect-title { font-size: clamp(48px, 12vw, 84px); }
+  .mapselect-eyebrow { margin-bottom: 14px; font-size: 8px; }
+  .mapselect-intro { margin-top: 14px; font-size: 22px; }
+  .mapselect-route-label { margin-top: 28px; }
+  .mapselect-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .mapselect-art { height: 80px; }
+  .mapselect-name { font-size: 15px; margin-left: 11px; }
+  .mapselect-where { margin-left: 11px; margin-right: 11px; font-size: 7px; }
+  .mapselect-blurb { margin-left: 11px; margin-right: 11px; font-size: 10px; }
+  .mapselect .carselect-go { width: 100%; }
+  .mapselect-footer { font-size: 8px; line-height: 1.8; }
+  .carselect:not(.mapselect) { background: linear-gradient(90deg, rgba(12,19,23,0.94), rgba(12,19,23,0.48)); }
+  .carselect-title { font-size: 25px; }
+  .hud:not(.hud-debug) .hud-speed b { font-size: 33px; }
+  .hud:not(.hud-debug) { padding: 10px 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mapselect-card { transition: none; }
+}
+
+/* Extreme mode is an explicit menu choice; the gauge follows the compass. */
+.damage-hud {
+  position: fixed; top: calc(53px + env(safe-area-inset-top)); left: 50%;
+  transform: translateX(-50%); width: min(272px, 62vw); padding: 7px 10px;
+  display: grid; grid-template-columns: 1fr auto; gap: 5px;
+  background: var(--panel); border: 1px solid #bf6c4c66; border-radius: 5px;
+  color: #f3d7bb; font: 9px system-ui; letter-spacing: .08em;
+  pointer-events: none;
+}
+.damage-hud[hidden], .extreme-respawn[hidden] { display: none; }
+.damage-hud meter { grid-column: 1 / -1; width: 100%; height: 8px; border: 0; appearance: none; background: #302821; }
+.damage-hud meter::-webkit-meter-bar { background: #302821; border: 0; border-radius: 2px; }
+.damage-hud meter::-webkit-meter-optimum-value { background: #cf9c62; }
+.damage-hud meter::-moz-meter-bar { background: #cf9c62; }
+.damage-critical { color: #ff8870; border-color: #d74431; }
+.damage-critical meter::-webkit-meter-optimum-value { background: #dc5036; }
+.damage-critical meter::-moz-meter-bar { background: #dc5036; }
+.extreme-respawn {
+  position: fixed; left: 50%; top: 43%; transform: translate(-50%,-50%);
+  width: min(360px,85vw); padding: 24px; white-space: pre-line; text-align: center;
+  background: #241813e8; color: #ffe7ce; border: 1px solid #ce683e88;
+  font: 600 17px/2 system-ui; letter-spacing: .08em; pointer-events: none;
+}
+#ui > .extreme-respawn { pointer-events: none; }
+.radio.radio-urgent { border-color: #e76541; color: #ffe4d2; }
+.radio-urgent .radio-name { color: #ff8665; }
+@media (pointer: coarse) and (max-width: 720px) {
+  .instruments .damage-hud { position: relative; top: auto; left: auto; transform: none; margin: 4px 0; }
+  body.extreme-mode .radio { top: calc(195px + env(safe-area-inset-top)); }
 }
