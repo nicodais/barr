@@ -1,0 +1,15 @@
+{
+  // Split from the app config so `src/` stays strictly browser-typed. The tests
+  // run in Node and legitimately reach for `node:fs` to check that the files
+  // the POI cards point at are really on disk; putting those types in the root
+  // config would also hand them to the game, where importing a node builtin is
+  // a bug the type checker should still be catching.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "vitest/globals", "node"],
+    // Test doubles omit fields the real interfaces declare, on purpose.
+    "noUnusedLocals": true,
+    "noUnusedParameters": false
+  },
+  "include": ["tests", "vitest.config.ts"]
+}

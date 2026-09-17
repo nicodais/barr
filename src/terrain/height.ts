@@ -67,6 +67,13 @@ export function hash2(ix: number, iz: number): number {
 }
 
 export function smoothstep(edge0: number, edge1: number, x: number): number {
+  // A degenerate window is 0/0 at exactly the edge, and `clamp01` passes NaN
+  // straight through — which lands in the height field as a hole in the world
+  // and a physics explosion, from two tuning numbers a region author happened
+  // to set equal. Off the edge the infinities already resolve to 0 and 1, so
+  // collapsing the whole thing to that step is the behaviour this is reaching
+  // for anyway.
+  if (edge0 === edge1) return x < edge0 ? 0 : 1;
   const t = clamp01((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
 }
