@@ -275,15 +275,17 @@ interior from a fixed in-cabin viewpoint
 **And** the remaining bodies without a modeled interior either fall back gracefully
 (e.g. chase cam) or are explicitly out of scope for this story, not silently broken.
 
-## Epic 3: UX Behavior Verification & Closure — **Stories 3.1–3.3 CLOSED 2026-09-07**
+## Epic 3: UX Behavior Verification & Closure — **CLOSED 2026-09-08**
 
 Resolve `EXPERIENCE.md`'s four open behavioral questions (UX-DR12) and verify the
 accessibility pass against real assistive technology (PRD §9 OQ4) — all currently
 "implemented but unconfirmed" states, not missing features. Stories 3.1–3.3 were
-closed by reading the actual source (no behavior changed, only documentation);
-findings are recorded in `EXPERIENCE.md` State Patterns / Responsive & Platform and
-`DESIGN.md` Components. Story 3.4 remains open — it needs a human with real assistive
-technology, not a code read.
+closed 2026-09-07 by reading the actual source (no behavior changed, only
+documentation); findings are recorded in `EXPERIENCE.md` State Patterns / Responsive
+& Platform and `DESIGN.md` Components. **Story 3.4 is deferred indefinitely
+(2026-09-08): not required.** Screen-reader validation needs a human with real
+assistive technology, not a code read — revisit if/when that access is available,
+rather than treating the accessibility implementation as unverified indefinitely.
 
 ### Story 3.1: Define and verify call-in interrupt behavior
 
@@ -337,7 +339,7 @@ recorded in `EXPERIENCE.md` Responsive & Platform
 **And** both files' `[ASSUMPTION]` tags for these two items are removed or replaced
 with the confirmed answer.
 
-### Story 3.4: Verify the accessibility pass against real assistive technology
+### Story 3.4: Verify the accessibility pass against real assistive technology — **DEFERRED INDEFINITELY (2026-09-08): not required, see Epic 3 header**
 
 As a player using a screen reader,
 I want Shamal's accessibility features (PRD FR-29) to actually work with real

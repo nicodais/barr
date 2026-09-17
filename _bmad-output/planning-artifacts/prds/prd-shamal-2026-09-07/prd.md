@@ -609,8 +609,11 @@ invented fresh.
    same roster decision as #2. The motorcycle's four-raycast simplification (vs.
    two-wheel dynamics) and its oversized wheelbase (`BACKLOG.md` item 12) remain
    known, accepted limitations rather than a scheduled fix.
-4. Screen-reader validation — accessibility pass is implemented (FR-29) but never
-   tested against real assistive technology.
+4. ~~Screen-reader validation~~ — **RESOLVED 2026-09-08: deferred indefinitely, not
+   required.** Accessibility pass is implemented (FR-29) but never tested against
+   real assistive technology; no reported issue or user need justifies the manual
+   validation effort right now. Revisit if/when real assistive-tech access or a
+   concrete report surfaces.
 5. ~~Whether Ahmed ever references the player by name/nickname~~ — **RESOLVED
    2026-09-07 (discovered already decided in shipped code):** he stays fully generic
    (*habibi, ya sir, my friend, champion*). `data/ahmedLines.ts`'s own file comment
