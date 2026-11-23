@@ -27,6 +27,8 @@ import { DebugHud } from '../ui/DebugHud';
 import { TuningPanel } from '../ui/TuningPanel';
 import { GaragePanel } from '../ui/GaragePanel';
 import { CarSelect } from '../ui/CarSelect';
+import { Toast } from '../ui/Toast';
+import { firstConnectedPad, padLabel } from '../input/GamepadSource';
 import { MenuPanel } from '../ui/MenuPanel';
 import { BODY_TUNING } from '../vehicle/vehicleConfig';
 import {
@@ -109,6 +111,7 @@ export class Game {
   private panel: TuningPanel | null = null;
   private garage: GaragePanel;
   private carSelect: CarSelect;
+  private toast = new Toast();
   private menu: MenuPanel;
   /**
    * True until the player has picked a truck. Gates input rather than the
@@ -486,7 +489,23 @@ export class Game {
       this.carSelect.element,
       this.menu.button,
       this.menu.element,
+      this.toast.element,
     );
+
+    // A controller, announced when it arrives (§7). Browsers keep a paired pad
+    // hidden until a button on it is pressed, so "connected" here really means
+    // "just spoke for the first time" — which over Bluetooth is the only
+    // confirmation the player gets that the pairing took.
+    const padControls = 'RT drive · LT brake · A handbrake · Y recover · LB/RB tyres · View photo';
+    this.input.gamepad.onConnection = (label) => {
+      if (label) this.toast.show(`${label} connected`, padControls);
+      else this.toast.show('Controller disconnected', '', 3000);
+    };
+    // One that spoke up on the landscape picker did so before this existed.
+    const early = firstConnectedPad();
+    if (early) this.toast.show(`${padLabel(early.id)} connected`, padControls);
+    // Rumble goes to the pad only while the pad is what is being driven with.
+    haptics.usePad(() => (this.input.activeId === 'gamepad' ? this.input.gamepad.activePad : null));
 
     // Browsers only allow audio to start from a real gesture, so the first
     // input of any kind unlocks it.
@@ -1007,6 +1026,18 @@ export class Game {
       this.vehicle.recover('manual');
     }
     this.input.keyboard.endFrame();
+
+    // The same actions on a controller. The pedals and the handbrake are read
+    // as axes by the input source; these are the buttons that are left.
+    const pad = this.input.gamepad;
+    if (pad.consumePress('lb')) this.setPressureStep(-1);
+    if (pad.consumePress('rb')) this.setPressureStep(1);
+    if (pad.consumePress('view')) this.togglePhotoMode();
+    if (pad.consumePress('b') && this.photo.active) this.exitPhotoMode();
+    if (!this.photo.active && !this.extreme.destroyed && pad.consumePress('y')) {
+      this.vehicle.recover('manual');
+    }
+    pad.endFrame();
   }
 
   private togglePhotoMode() {

@@ -15,7 +15,7 @@
  * without dragging Three.js into the settings path.
  */
 
-export type BodyId = 'wagon' | 'pickup' | 'moto' | 'buggy';
+export type BodyId = 'wagon' | 'suhail' | 'pickup' | 'moto' | 'buggy';
 export type WheelStyleId = 'steel' | 'alloy' | 'beadlock';
 export type PaintId =
   | 'safari'
@@ -40,6 +40,8 @@ export interface BodyOption {
   blurb: string;
   /** Display bars, 0..1. Derived from the tuning below, not invented. */
   stats: { speed: number; grip: number; weight: number; agility: number };
+  /** The body wears its own livery, so the paint swatch does not apply to it. */
+  fixedLivery?: boolean;
 }
 
 export interface PaintOption {
@@ -59,6 +61,13 @@ export const BODY_OPTIONS: BodyOption[] = [
     label: 'Safari Wagon',
     blurb: 'The reference. Nothing it does badly, nothing it does first.',
     stats: { speed: 0.6, grip: 0.62, weight: 0.6, agility: 0.58 },
+  },
+  {
+    id: 'suhail',
+    label: 'Suhail Mobile',
+    blurb: 'The Safari Wagon in full rally dress, Suhail blue from star to tail. Drives exactly like the reference.',
+    stats: { speed: 0.6, grip: 0.62, weight: 0.6, agility: 0.58 },
+    fixedLivery: true,
   },
   {
     id: 'pickup',
@@ -106,6 +115,9 @@ export const BODY_OPTIONS: BodyOption[] = [
 export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
   // The baseline. Empty on purpose.
   wagon: {},
+
+  // The wagon under a livery, so the wagon's numbers: also empty on purpose.
+  suhail: {},
 
   // Heavy: hard to stop, hard to turn, and almost impossible to bog because it
   // carries so much momentum into a climb. The high COM is the cost — this is
@@ -229,6 +241,11 @@ export const DEFAULT_VEHICLE: VehicleConfig = {
   paint: 'safari',
   wheels: 'steel',
 };
+
+/** True for a body whose colour is its livery rather than the paint choice. */
+export function hasFixedLivery(body: BodyId): boolean {
+  return BODY_OPTIONS.find((o) => o.id === body)?.fixedLivery === true;
+}
 
 export function paintColor(id: PaintId): number {
   return (PAINT_OPTIONS.find((p) => p.id === id) ?? PAINT_OPTIONS[0]).color;

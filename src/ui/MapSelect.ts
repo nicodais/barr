@@ -1,4 +1,5 @@
 import { REGIONS, REGION_ORDER, type RegionId } from '../terrain/regions';
+import { watchPadMenu } from '../input/padMenu';
 import { GAME_NAME, GAME_NAME_AR } from '../brand';
 import { haptics } from '../input/Haptics';
 
@@ -30,6 +31,7 @@ export class MapSelect {
   private resolve: ((id: RegionId) => void) | null = null;
   private picked: RegionId;
   private go!: HTMLButtonElement;
+  private stopPad: (() => void) | null = null;
 
   constructor(initial: RegionId) {
     this.picked = initial;
@@ -116,6 +118,19 @@ export class MapSelect {
     document.body.classList.add('choosing-car');
     requestAnimationFrame(() => this.element.classList.add('is-open'));
     window.addEventListener('keydown', this.onKey);
+    this.stopPad = watchPadMenu((action) => {
+      if (action === 'confirm') {
+        this.confirm();
+        return;
+      }
+      if (action !== 'prev' && action !== 'next') return;
+      // Stepped through the cards themselves, so the order on screen is the
+      // order the D-pad walks, whatever it happens to be.
+      const cards = Array.from(this.cards.children) as HTMLElement[];
+      const index = cards.findIndex((card) => card.dataset.value === this.picked);
+      const next = cards[(index + (action === 'next' ? 1 : -1) + cards.length) % cards.length];
+      next?.click();
+    });
     return new Promise((resolve) => {
       this.resolve = resolve;
     });
@@ -151,6 +166,8 @@ export class MapSelect {
     if (!resolve) return;
     this.resolve = null;
     window.removeEventListener('keydown', this.onKey);
+    this.stopPad?.();
+    this.stopPad = null;
     resolve(this.picked);
   }
 

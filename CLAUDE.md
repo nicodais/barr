@@ -19,6 +19,19 @@ rollovers, an explosion at zero integrity, and respawn five seconds later.
 Ahmed's animal-impact reprimands are urgent **text only**, never spoken aloud.
 The mode starts disabled on every page load and is not stored in settings.
 
+## Suhail Mobile (user-directed, 2026-11-23)
+
+A fifth entry in the vehicle picker: the Safari Wagon in a rally livery, built
+around the Suhail mark's blues. It is the wagon — same shell, same handling —
+with a livery and bolt-on rally kit. Unlike every other body it carries real
+third-party marks (Suhail, the Abu Dhabi Department of Government Enablement,
+EPAM, "Evolving Together"), supplied by the user and shipped from
+`public/livery/suhail/`. That is an explicit exception to the no-badging rule
+in §11, which is about not reproducing a *car maker's* marks; it does not make
+those logos free to use elsewhere in the game. The livery is painted at runtime
+and projected, not UV-mapped — see `src/vehicle/suhailLivery.ts`. The paint
+swatch does not apply to this body.
+
 ## 1. Core Concept
 
 - **Genre:** Open-world driving / walking-sim adjacent ("driving-sim")
@@ -109,7 +122,7 @@ This is the single most important system in the game. Everything else (art, audi
 All input methods drive the same underlying input abstraction (`SteeringInput: -1..1`, `ThrottleInput: 0..1`, `BrakeInput: 0..1`) so the vehicle controller is control-scheme-agnostic. The game auto-detects available input and lets the player switch at any time in options.
 
 1. **Keyboard + mouse (desktop default):** WASD/arrow keys for steering + throttle/brake, mouse-drag for free-look camera in photo mode.
-2. **Gamepad (desktop/any browser with Gamepad API):** left stick steering, triggers/face buttons for throttle/brake — auto-detected on connect via the standard Gamepad API, with a connection toast/prompt.
+2. **Gamepad (desktop/any browser with Gamepad API):** left stick steering, triggers/face buttons for throttle/brake — auto-detected on connect via the standard Gamepad API, with a connection toast/prompt. The Xbox Wireless Controller over Bluetooth is the reference pad: RT/LT pedals, A (or X) handbrake, Y recover, LB/RB tyre pressure, View for photo mode, B to leave it; D-pad/stick and A drive the landscape and vehicle pickers; rumble follows the existing haptic cues. Unmapped layouts (triggers as axes) are handled in `src/input/GamepadSource.ts`.
 3. **Touch (mobile browser):** on first touch-capable session, prompt a one-time picker between:
    - Virtual joystick (single analog stick, handedness option)
    - On-screen steering wheel (drag-rotate widget + pedals)

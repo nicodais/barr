@@ -17,6 +17,7 @@ import {
   type VehicleConfig,
   type WheelStyleId,
 } from './vehicleConfig';
+import { SUHAIL_LIVERY_GLSL, acquireSuhailLivery, releaseSuhailLivery } from './suhailLivery';
 
 /**
  * Four independently authored vehicle bodies, with shaped panels, hollow
@@ -71,38 +72,46 @@ function mat(color: number, roughness = 0.8, metalness = 0): THREE.MeshStandardM
 
 /** Clearcoat is a separate specular layer over pigment. Dust gathers low on
  * the body and breaks up that reflection without painting over the windows. */
-function paintMat(color: number): THREE.MeshPhysicalMaterial {
+function paintMat(color: number, livery?: THREE.Texture): THREE.MeshPhysicalMaterial {
   const material = new THREE.MeshPhysicalMaterial({
     color, roughness: 0.24, metalness: 0.10,
     clearcoat: 0.85, clearcoatRoughness: 0.10, envMapIntensity: 1.15,
   });
   material.onBeforeCompile = (shader) => {
+    // A livery replaces the pigment and nothing else: it goes in ahead of the
+    // dust, so a liveried truck gets dirty along its sills like any other.
+    if (livery) shader.uniforms.uLivery = { value: livery };
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
-        varying vec3 vBodyPosition;`)
+        varying vec3 vBodyPosition;
+        varying vec3 vBodyNormal;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
-        vBodyPosition = position;`);
+        vBodyPosition = position;
+        vBodyNormal = normal;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
-        varying vec3 vBodyPosition;`)
+        varying vec3 vBodyPosition;
+        varying vec3 vBodyNormal;
+        ${livery ? SUHAIL_LIVERY_GLSL : ''}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
+        ${livery ? 'diffuseColor.rgb = suhailLivery(vBodyPosition, normalize(vBodyNormal));' : ''}
         float dust = (1.0 - smoothstep(-0.45, 0.38, vBodyPosition.y))
           * (0.22 + 0.06 * sin(vBodyPosition.z * 31.0 + vBodyPosition.y * 8.0));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.25, 0.17), dust);`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor = mix(roughnessFactor, 0.85, dust);`);
   };
-  material.customProgramCacheKey = () => 'shamal-dusty-clearcoat-v1';
+  material.customProgramCacheKey = () => (livery ? 'shamal-dusty-clearcoat-livery-v1' : 'shamal-dusty-clearcoat-v1');
   return material;
 }
 
 type Materials = ReturnType<typeof createMaterials>;
 type MatKey = keyof Materials;
 
-function createMaterials(paint: number) {
+function createMaterials(paint: number, livery?: THREE.Texture) {
   const dark = new THREE.Color(paint).multiplyScalar(0.82);
   return {
-    body: paintMat(paint),
+    body: paintMat(livery ? 0xffffff : paint, livery),
     bodyDark: paintMat(dark.getHex()),
     glass: new THREE.MeshPhysicalMaterial({
       color: 0x344647, roughness: 0.095, metalness: 0.06, transparent: true, opacity: 0.78, depthWrite: false, side: THREE.DoubleSide,
@@ -118,6 +127,11 @@ function createMaterials(paint: number) {
     amber: mat(FIXED_PALETTE.amber, 0.26, 0.12),
     brake: mat(FIXED_PALETTE.brake, 0.2, 0.18),
     cargo: mat(FIXED_PALETTE.cargo, 0.94),
+    // Rims are their own entry so one body can paint them without repainting
+    // every other piece of bare steel on the truck.
+    rim: livery ? mat(0xdfe5ea, 0.42, 0.25) : mat(FIXED_PALETTE.steel, 0.34, 0.82),
+    // The livery's accent, for the hardware that is coloured rather than wrapped.
+    accent: mat(0x2fd2ee, 0.5, 0.08),
   };
 }
 
@@ -304,7 +318,10 @@ interface BodySpec {
 
 export function createVehicleView(config: VehicleConfig = DEFAULT_VEHICLE): VehicleView {
   const root = new THREE.Group();
-  const materials = createMaterials(paintColor(config.paint));
+  // The Suhail Mobile is the one body that ignores the paint swatch: its colour
+  // is its livery, and the panels left unwrapped take the livery's navy.
+  const livery = config.body === 'suhail' ? acquireSuhailLivery() : null;
+  const materials = createMaterials(livery ? SUHAIL_NAVY : paintColor(config.paint), livery ?? undefined);
   const spec = BODIES[config.body];
   const twoWheeled = spec.twoWheeled === true;
   const b = new PartBuilder(materials, twoWheeled || config.body === 'buggy' ? 0 : 0.18);
@@ -361,7 +378,7 @@ export function createVehicleView(config: VehicleConfig = DEFAULT_VEHICLE): Vehi
     tyre.castShadow = true;
     spinGroup.add(tyre);
 
-    const rim = new THREE.Mesh((twoWheeled && i === 1 ? rearWheelGeos : wheelGeos).rim, materials.steel);
+    const rim = new THREE.Mesh((twoWheeled && i === 1 ? rearWheelGeos : wheelGeos).rim, materials.rim);
     rim.castShadow = true;
     spinGroup.add(rim);
 
@@ -466,6 +483,7 @@ export function createVehicleView(config: VehicleConfig = DEFAULT_VEHICLE): Vehi
       if (rearWheelGeos !== wheelGeos) { rearWheelGeos.tyre.dispose(); rearWheelGeos.rim.dispose(); }
       axleGeo.dispose();linkGeo.dispose();coilGeo.dispose();
       for (const m of Object.values(materials)) m.dispose();
+      if (livery) releaseSuhailLivery(livery);
     },
   };
 }
@@ -732,6 +750,60 @@ function buildWagon(b: PartBuilder) {
   }
   b.strut('steel', [-0.58, -0.51, -2.13], [-0.58, -0.60, -2.30], 0.065);
 
+}
+
+/** The livery's darkest blue, for the panels the wrap does not reach. */
+const SUHAIL_NAVY = 0x0a2278;
+
+/**
+ * The Suhail Mobile: the wagon, in rally dress.
+ *
+ * Deliberately the same shell and the same handling — it is a branded Safari
+ * Wagon, not a fifth vehicle — so everything that makes it its own is either
+ * the livery (suhailLivery.ts) or bolted on here. The kit is the standard
+ * desert-raid set and each piece is where it would be on a real one: lamps
+ * where the light is needed, flaps behind every wheel, a whip so the truck can
+ * be found over a crest.
+ */
+function buildSuhail(b: PartBuilder) {
+  buildWagon(b);
+
+  // Sun strip. Body-coloured so it takes the wrap: the lettering on it is
+  // drawn by the livery, not modelled.
+  b.add(box(1.5, 0.15, 0.02), 'body', [0, 1.141, 0.883], [-0.24, 0, 0]);
+
+  // Roof light bar, on feet, just behind the head of the screen.
+  b.add(box(1.16, 0.085, 0.11), 'trim', [0, 1.405, 0.44]);
+  for (let i = 0; i < 6; i++) {
+    b.add(box(0.165, 0.058, 0.02), 'lamp', [-0.475 + i * 0.19, 1.405, 0.5]);
+  }
+  b.addPair(() => box(0.05, 0.07, 0.07), 'trim', [0.5, 1.345, 0.44]);
+
+  // Four spot lamps on a bar over the bumper.
+  b.strut('trim', [-0.56, -0.115, 2.25], [0.56, -0.115, 2.25], 0.016);
+  for (const x of [-0.45, -0.16, 0.16, 0.45]) {
+    const housing = new THREE.CylinderGeometry(0.105, 0.085, 0.09, 24);
+    housing.rotateX(Math.PI / 2);
+    b.add(housing, 'trim', [x, -0.005, 2.27]);
+    const lens = new THREE.CylinderGeometry(0.092, 0.092, 0.012, 24);
+    lens.rotateX(Math.PI / 2);
+    b.add(lens, 'lamp', [x, -0.005, 2.318]);
+    b.add(new THREE.TorusGeometry(0.097, 0.008, 6, 24), 'chrome', [x, -0.005, 2.318]);
+    b.strut('trim', [x, -0.115, 2.25], [x, -0.07, 2.26], 0.012);
+  }
+  // Recovery points, in the accent so they can be found in a hurry.
+  b.addPair(() => box(0.05, 0.1, 0.09), 'accent', [0.34, -0.5, 2.24]);
+
+  // Mud flaps behind every wheel.
+  for (const z of [HALF_WHEELBASE - 0.63, -HALF_WHEELBASE - 0.6]) {
+    b.addPair(() => box(0.34, 0.32, 0.022), 'accent', [HALF_TRACK + 0.01, -0.71, z], [0.1, 0, 0]);
+    b.addPair(() => box(0.36, 0.035, 0.03), 'trim', [HALF_TRACK + 0.01, -0.555, z + 0.018]);
+  }
+
+  // Whip aerial with a pennant.
+  b.strut('steel', [0.56, 1.3, -1.72], [0.56, 2.42, -1.86], 0.007);
+  b.add(box(0.008, 0.09, 0.17), 'accent', [0.56, 2.34, -1.95]);
+  b.add(box(0.05, 0.04, 0.05), 'trim', [0.56, 1.31, -1.72]);
 }
 
 /**
@@ -1027,6 +1099,7 @@ export function isTwoWheeled(body: BodyId): boolean {
 
 const BODIES: Record<BodyId, BodySpec> = {
   wagon: { build: buildWagon },
+  suhail: { build: buildSuhail },
   pickup: { build: buildPickup },
   moto: { build: buildMoto, twoWheeled: true, wheelWidth: 0.42 },
   buggy: { build: buildBuggy },

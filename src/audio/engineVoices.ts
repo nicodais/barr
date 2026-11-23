@@ -12,6 +12,7 @@ export interface EngineVoice {
 }
 export const ENGINE_VOICES: Record<BodyId,EngineVoice> = {
   wagon: {recording:'car',pitch:1,gears:5,gearTop:33,cutoffHz:1300,cutoffSpan:3200,level:.95},
+  suhail: {recording:'car',pitch:1.04,gears:5,gearTop:33,cutoffHz:1400,cutoffSpan:3300,level:1},
   pickup: {recording:'car',pitch:.78,gears:4,gearTop:30,cutoffHz:1050,cutoffSpan:2900,level:1.05},
   moto: {recording:'twin',pitch:1.16,gears:6,gearTop:43,cutoffHz:2500,cutoffSpan:4300,level:.70},
   buggy: {recording:'twin',pitch:.92,gears:4,gearTop:39,cutoffHz:2100,cutoffSpan:3900,level:.80},

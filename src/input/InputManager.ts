@@ -22,12 +22,14 @@ export class InputManager {
   private _activeId = 'keyboard';
 
   readonly touch = new TouchSource();
+  /** Public for the same reason the keyboard is: its buttons are hotkeys too. */
+  readonly gamepad = new GamepadSource();
 
   constructor(private settings: GameSettings) {
     // Order matters: later sources override earlier ones when both are active.
     // Gamepad is last so a controller wins over anything else it's used with,
     // on desktop and mobile alike (§7).
-    this.sources = [this.keyboard, this.touch, new GamepadSource()];
+    this.sources = [this.keyboard, this.touch, this.gamepad];
   }
 
   get activeId(): string {
