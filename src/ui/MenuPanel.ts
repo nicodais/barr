@@ -1,4 +1,4 @@
-import { BODY_OPTIONS, type BodyId } from '../vehicle/vehicleConfig';
+import { SELECTABLE_BODIES, type BodyId } from '../vehicle/vehicleConfig';
 import { REGIONS, REGION_ORDER, type RegionId } from '../terrain/regions';
 import type { JoystickPosition } from '../input/TouchSource';
 import { haptics } from '../input/Haptics';
@@ -255,7 +255,7 @@ export class MenuPanel {
         this.cb.onRegion(id);
       }));
     }
-    for (const option of BODY_OPTIONS) {
+    for (const option of SELECTABLE_BODIES) {
       this.bodyRow.appendChild(this.chip(option.label, () => this.cb.onBody(option.id)));
     }
     for (const t of TIMES) {
@@ -414,7 +414,7 @@ export class MenuPanel {
     const body = this.cb.getBody();
     const time = this.cb.getTime();
     mark(this.regionRow, (i) => REGION_ORDER[i] === region);
-    mark(this.bodyRow, (i) => BODY_OPTIONS[i].id === body);
+    mark(this.bodyRow, (i) => SELECTABLE_BODIES[i].id === body);
     // Nearest, wrapped: 0.97 is night, and so is 0.02. Skips the `Moving` chip,
     // which owns the row outright whenever the cycle is running.
     let best = 0;

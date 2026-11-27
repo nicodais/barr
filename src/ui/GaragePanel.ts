@@ -1,7 +1,7 @@
 import type { GameSettings } from '../settings/Settings';
 import { saveSettings } from '../settings/Settings';
 import {
-  BODY_OPTIONS,
+  SELECTABLE_BODIES,
   PAINT_OPTIONS,
   WHEEL_OPTIONS,
   hasFixedLivery,
@@ -50,7 +50,7 @@ export class GaragePanel {
     bodySection.appendChild(
       buildChoice(
         'Shape',
-        BODY_OPTIONS.map((o) => ({ value: o.id, label: o.label })),
+        SELECTABLE_BODIES.map((o) => ({ value: o.id, label: o.label })),
         () => this.config.body,
         (v) => this.set({ body: v as VehicleConfig['body'] }),
       ),

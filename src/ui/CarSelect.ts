@@ -1,5 +1,5 @@
 import {
-  BODY_OPTIONS,
+  SELECTABLE_BODIES,
   PAINT_OPTIONS,
   WHEEL_OPTIONS,
   hasFixedLivery,
@@ -56,7 +56,7 @@ export class CarSelect {
 
     this.bodyList = document.createElement('div');
     this.bodyList.className = 'carselect-bodies';
-    for (const option of BODY_OPTIONS) {
+    for (const option of SELECTABLE_BODIES) {
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'carselect-card';
@@ -219,8 +219,8 @@ export class CarSelect {
   }
 
   private stepBody(direction: number) {
-    const index = BODY_OPTIONS.findIndex((o) => o.id === this.config.body);
-    const next = BODY_OPTIONS[(index + direction + BODY_OPTIONS.length) % BODY_OPTIONS.length];
+    const index = SELECTABLE_BODIES.findIndex((o) => o.id === this.config.body);
+    const next = SELECTABLE_BODIES[(index + direction + SELECTABLE_BODIES.length) % SELECTABLE_BODIES.length];
     this.config.body = next.id;
     this.sync();
     this.onChange();

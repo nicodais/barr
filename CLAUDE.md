@@ -21,7 +21,7 @@ The mode starts disabled on every page load and is not stored in settings.
 
 ## Suhail Mobile (user-directed, 2026-11-23)
 
-A fifth entry in the vehicle picker: the Safari Wagon in a rally livery, built
+A fifth vehicle: the Safari Wagon in a rally livery, built
 around the Suhail mark's blues. It is the wagon — same shell, same handling —
 with a livery and bolt-on rally kit. Unlike every other body it carries real
 third-party marks (Suhail, the Abu Dhabi Department of Government Enablement,
@@ -31,6 +31,11 @@ in §11, which is about not reproducing a *car maker's* marks; it does not make
 those logos free to use elsewhere in the game. The livery is painted at runtime
 and projected, not UV-mapped — see `src/vehicle/suhailLivery.ts`. The paint
 swatch does not apply to this body.
+
+**Currently hidden (user-directed, 2026-11-27):** the body is flagged `hidden`
+in `src/vehicle/vehicleConfig.ts`, so no picker offers it and a save that names
+it falls back to the default. Everything else is intact; removing the flag
+brings it back.
 
 ## 1. Core Concept
 
