@@ -15,7 +15,7 @@
  * without dragging Three.js into the settings path.
  */
 
-export type BodyId = 'wagon' | 'pickup' | 'moto' | 'buggy';
+export type BodyId = 'wagon' | 'suhail' | 'pickup' | 'moto' | 'buggy';
 export type WheelStyleId = 'steel' | 'alloy' | 'beadlock';
 export type PaintId =
   | 'safari'
@@ -40,6 +40,14 @@ export interface BodyOption {
   blurb: string;
   /** Display bars, 0..1. Derived from the tuning below, not invented. */
   stats: { speed: number; grip: number; weight: number; agility: number };
+  /** The body wears its own livery, so the paint swatch does not apply to it. */
+  fixedLivery?: boolean;
+  /**
+   * Built and kept working, but not offered. The body, its livery and its
+   * tuning all stay; it is only left off the pickers, so bringing it back is
+   * deleting this flag rather than rebuilding a vehicle.
+   */
+  hidden?: boolean;
 }
 
 export interface PaintOption {
@@ -59,6 +67,14 @@ export const BODY_OPTIONS: BodyOption[] = [
     label: 'Safari Wagon',
     blurb: 'The reference. Nothing it does badly, nothing it does first.',
     stats: { speed: 0.6, grip: 0.62, weight: 0.6, agility: 0.58 },
+  },
+  {
+    id: 'suhail',
+    label: 'Suhail Mobile',
+    blurb: 'The Safari Wagon in full rally dress, Suhail blue from star to tail. Drives exactly like the reference.',
+    stats: { speed: 0.6, grip: 0.62, weight: 0.6, agility: 0.58 },
+    fixedLivery: true,
+    hidden: true,
   },
   {
     id: 'pickup',
@@ -106,6 +122,9 @@ export const BODY_OPTIONS: BodyOption[] = [
 export const BODY_TUNING: Record<BodyId, Record<string, number>> = {
   // The baseline. Empty on purpose.
   wagon: {},
+
+  // The wagon under a livery, so the wagon's numbers: also empty on purpose.
+  suhail: {},
 
   // Heavy: hard to stop, hard to turn, and almost impossible to bog because it
   // carries so much momentum into a climb. The high COM is the cost — this is
@@ -230,6 +249,17 @@ export const DEFAULT_VEHICLE: VehicleConfig = {
   wheels: 'steel',
 };
 
+/**
+ * The bodies a player can choose. Every menu that offers a vehicle reads this
+ * rather than BODY_OPTIONS, which also holds the ones that are switched off.
+ */
+export const SELECTABLE_BODIES: BodyOption[] = BODY_OPTIONS.filter((o) => !o.hidden);
+
+/** True for a body whose colour is its livery rather than the paint choice. */
+export function hasFixedLivery(body: BodyId): boolean {
+  return BODY_OPTIONS.find((o) => o.id === body)?.fixedLivery === true;
+}
+
 export function paintColor(id: PaintId): number {
   return (PAINT_OPTIONS.find((p) => p.id === id) ?? PAINT_OPTIONS[0]).color;
 }
@@ -245,7 +275,10 @@ export function sanitizeVehicleConfig(saved: unknown): VehicleConfig {
   if (!saved || typeof saved !== 'object') return config;
   const raw = saved as Record<string, unknown>;
 
-  if (BODY_OPTIONS.some((o) => o.id === raw.body)) config.body = raw.body as BodyId;
+  // Selectable, not merely known: a save that still names a body since taken
+  // off the menus would otherwise leave the player in a vehicle no picker
+  // shows as chosen.
+  if (SELECTABLE_BODIES.some((o) => o.id === raw.body)) config.body = raw.body as BodyId;
   if (PAINT_OPTIONS.some((o) => o.id === raw.paint)) config.paint = raw.paint as PaintId;
   if (WHEEL_OPTIONS.some((o) => o.id === raw.wheels)) config.wheels = raw.wheels as WheelStyleId;
 

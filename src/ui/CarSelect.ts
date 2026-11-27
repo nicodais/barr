@@ -1,10 +1,12 @@
 import {
-  BODY_OPTIONS,
+  SELECTABLE_BODIES,
   PAINT_OPTIONS,
   WHEEL_OPTIONS,
+  hasFixedLivery,
   type VehicleConfig,
 } from '../vehicle/vehicleConfig';
 import { haptics } from '../input/Haptics';
+import { watchPadMenu } from '../input/padMenu';
 
 
 /**
@@ -28,7 +30,10 @@ export class CarSelect {
   readonly element: HTMLElement;
   private bodyList: HTMLElement;
   private swatches: HTMLElement;
+  private paintRow: HTMLElement;
+  private liveryNote: HTMLElement;
   private resolve: (() => void) | null = null;
+  private stopPad: (() => void) | null = null;
 
   constructor(
     private config: VehicleConfig,
@@ -51,7 +56,7 @@ export class CarSelect {
 
     this.bodyList = document.createElement('div');
     this.bodyList.className = 'carselect-bodies';
-    for (const option of BODY_OPTIONS) {
+    for (const option of SELECTABLE_BODIES) {
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'carselect-card';
@@ -119,7 +124,14 @@ export class CarSelect {
       };
       this.swatches.appendChild(dot);
     }
-    paintRow.append(paintLabel, this.swatches);
+    // Shown in place of the swatches for a body that wears its own livery.
+    // Greying the swatches out instead would leave eight dots that look
+    // clickable and repaint nothing.
+    this.liveryNote = document.createElement('span');
+    this.liveryNote.className = 'carselect-livery-note';
+    this.liveryNote.textContent = 'Rally livery';
+    paintRow.append(paintLabel, this.swatches, this.liveryNote);
+    this.paintRow = paintRow;
 
     const kit = document.createElement('div');
     kit.className = 'carselect-kit';
@@ -136,7 +148,7 @@ export class CarSelect {
 
     const hint = document.createElement('p');
     hint.className = 'carselect-hint';
-    hint.textContent = 'You can change all of this later — press G for the garage.';
+    hint.textContent = 'You can change all of this later — press G for the garage. On a controller: D-pad to choose, A to head out.';
 
     panel.append(title, sub, this.bodyList, paintRow, kit, go, hint);
     this.element.appendChild(panel);
@@ -170,6 +182,10 @@ export class CarSelect {
 
   /** Marks the current choices active across every control on the screen. */
   private sync() {
+    const livery = hasFixedLivery(this.config.body);
+    this.swatches.hidden = livery;
+    this.liveryNote.hidden = !livery;
+    this.paintRow.classList.toggle('is-livery', livery);
     for (const el of Array.from(this.bodyList.children) as HTMLElement[]) {
       el.classList.toggle('is-active', el.dataset.value === this.config.body);
       el.setAttribute('aria-pressed', String(el.dataset.value === this.config.body));
@@ -190,13 +206,30 @@ export class CarSelect {
     // Deferred a frame so the fade-in has a starting state to animate from.
     requestAnimationFrame(() => this.element.classList.add('is-open'));
     window.addEventListener('keydown', this.onKey);
+    // A controller picks a vehicle the way it would anywhere else: D-pad,
+    // bumpers or stick to move along the row, A to take it.
+    this.stopPad = watchPadMenu((action) => {
+      if (action === 'confirm') this.confirm();
+      else if (action === 'prev') this.stepBody(-1);
+      else if (action === 'next') this.stepBody(1);
+    });
     return new Promise((resolve) => {
       this.resolve = resolve;
     });
   }
 
+  private stepBody(direction: number) {
+    const index = SELECTABLE_BODIES.findIndex((o) => o.id === this.config.body);
+    const next = SELECTABLE_BODIES[(index + direction + SELECTABLE_BODIES.length) % SELECTABLE_BODIES.length];
+    this.config.body = next.id;
+    this.sync();
+    this.onChange();
+  }
+
   private confirm() {
     window.removeEventListener('keydown', this.onKey);
+    this.stopPad?.();
+    this.stopPad = null;
     this.element.classList.remove('is-open');
     // Left in the DOM until the fade finishes, then taken out of the layout so
     // it can never eat a pointer event aimed at the touch controls underneath.

@@ -22,6 +22,17 @@
  *    repeat. Texture is therefore *event*-driven — a tick when a wheel actually
  *    takes a hit — and hard rate-limited.
  *
+ * ## And a controller, which is the opposite case
+ *
+ * A pad's rumble motors are everything the phone's is not — two of them, with
+ * amplitude — and they are reached through a different API entirely
+ * (`vibrationActuator`), which works over Bluetooth as well as a cable. Rather
+ * than a second set of cues, the same ones are translated: each keeps its
+ * priority and its rhythm's total length, and the priority picks how hard the
+ * two motors run. So a landing on a pad is the same event as a landing on a
+ * phone, felt through better hardware. While a pad is the thing being driven
+ * with, it gets the cues and the phone motor is left alone.
+ *
  * iOS is the notable gap: Safari implements no vibration API at all, on any
  * version, so `supported` is false on every iPhone and iPad and the setting
  * hides itself rather than offering a switch that does nothing. Android Chrome,
@@ -96,6 +107,8 @@ export class Haptics {
   private bumpTimer = 0;
   private bogTimer = 0;
   private compression = [0, 0, 0, 0];
+  /** The controller being driven with, if there is one. */
+  private padSource: (() => Gamepad | null) | null = null;
 
   constructor() {
     this.supported =
@@ -118,6 +131,20 @@ export class Haptics {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.stop();
     });
+  }
+
+  /**
+   * Hands over the controller in use. A function rather than a pad, because
+   * Gamepad objects are snapshots in most browsers — the one from last frame
+   * is already stale — and because which pad it is can change mid-drive.
+   */
+  usePad(source: () => Gamepad | null) {
+    this.padSource = source;
+  }
+
+  private actuator(): GamepadHapticActuator | null {
+    const actuator = this.padSource?.()?.vibrationActuator;
+    return actuator && typeof actuator.playEffect === 'function' ? actuator : null;
   }
 
   setEnabled(on: boolean) {
@@ -190,7 +217,7 @@ export class Haptics {
    * while the throttle is open and the truck isn't going anywhere.
    */
   update(tel: VehicleTelemetry, wheels: WheelState[], throttle: number, dt: number) {
-    if (!this.supported || !this.on) return;
+    if ((!this.supported && !this.actuator()) || !this.on) return;
 
     this.bumpTimer -= dt;
     this.bogTimer -= dt;
@@ -233,6 +260,7 @@ export class Haptics {
   }
 
   private stop() {
+    void this.actuator()?.reset?.().catch(() => {});
     if (!this.supported) return;
     navigator.vibrate(0);
     this.busyUntil = 0;
@@ -240,7 +268,9 @@ export class Haptics {
   }
 
   private fire(pattern: Pattern, priority: Priority) {
-    if (!this.supported || !this.on || !this.armed || document.hidden) return;
+    if (!this.on || document.hidden) return;
+    const actuator = this.actuator();
+    if (!actuator && (!this.supported || !this.armed)) return;
 
     const now = performance.now();
     // The motor is a single shared resource and `vibrate` pre-empts rather than
@@ -249,11 +279,48 @@ export class Haptics {
     // one, not like the first one finishing.
     if (now < this.busyUntil && priority < this.busyPriority) return;
 
+    if (actuator) {
+      const rumble = RUMBLE[priority];
+      // A menu tick through a rumble motor is a thump, not punctuation.
+      if (!rumble) return;
+      // The phone patterns are tens of milliseconds, sized for a motor with no
+      // amplitude. A rumble motor needs longer than that just to spin up.
+      const duration = Math.min(650, Math.max(rumble.floor, span(pattern) * 3));
+      // The only cue with a strength of its own is the landing, and it carries
+      // it in its length (14ms for a touch, 60 for a slam).
+      const scale = priority === P.land && typeof pattern === 'number'
+        ? 0.35 + 0.65 * Math.min(1, (pattern - 14) / 46)
+        : 1;
+      void actuator.playEffect('dual-rumble', {
+        startDelay: 0,
+        duration,
+        weakMagnitude: rumble.weak * scale,
+        strongMagnitude: rumble.strong * scale,
+      }).catch(() => {});
+      this.busyUntil = now + duration;
+      this.busyPriority = priority;
+      return;
+    }
+
     navigator.vibrate(pattern);
     this.busyUntil = now + span(pattern);
     this.busyPriority = priority;
   }
 }
+
+/**
+ * How hard each priority runs a pad's two motors: `strong` is the heavy
+ * low-frequency one in the left grip, `weak` the light buzzy one in the right.
+ * Surface texture is all buzz; a landing is mostly thud; `floor` is the
+ * shortest effect worth sending, in ms.
+ */
+const RUMBLE: Record<Priority, { weak: number; strong: number; floor: number } | null> = {
+  [P.ui]: null,
+  [P.texture]: { weak: 0.3, strong: 0.05, floor: 70 },
+  [P.event]: { weak: 0.4, strong: 0.2, floor: 120 },
+  [P.land]: { weak: 0.6, strong: 0.9, floor: 140 },
+  [P.rollover]: { weak: 0.8, strong: 1, floor: 520 },
+};
 
 function span(pattern: Pattern): number {
   if (typeof pattern === 'number') return pattern;

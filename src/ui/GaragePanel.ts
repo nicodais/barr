@@ -1,9 +1,10 @@
 import type { GameSettings } from '../settings/Settings';
 import { saveSettings } from '../settings/Settings';
 import {
-  BODY_OPTIONS,
+  SELECTABLE_BODIES,
   PAINT_OPTIONS,
   WHEEL_OPTIONS,
+  hasFixedLivery,
   type VehicleConfig,
 } from '../vehicle/vehicleConfig';
 import { buildChoice } from './controls';
@@ -25,6 +26,7 @@ import { buildChoice } from './controls';
 export class GaragePanel {
   readonly element: HTMLElement;
   private visible = false;
+  private paintSection!: HTMLElement;
 
   constructor(
     private settings: GameSettings,
@@ -48,7 +50,7 @@ export class GaragePanel {
     bodySection.appendChild(
       buildChoice(
         'Shape',
-        BODY_OPTIONS.map((o) => ({ value: o.id, label: o.label })),
+        SELECTABLE_BODIES.map((o) => ({ value: o.id, label: o.label })),
         () => this.config.body,
         (v) => this.set({ body: v as VehicleConfig['body'] }),
       ),
@@ -56,6 +58,8 @@ export class GaragePanel {
 
     const paintSection = this.section(body, 'Paint');
     paintSection.appendChild(this.buildSwatches());
+    this.paintSection = paintSection;
+    this.syncPaint();
 
     const wheelSection = this.section(body, 'Wheels');
     wheelSection.appendChild(
@@ -131,8 +135,14 @@ export class GaragePanel {
     return row;
   }
 
+  /** A body in its own livery has no paint to choose, so the section goes. */
+  private syncPaint() {
+    this.paintSection.hidden = hasFixedLivery(this.config.body);
+  }
+
   private set(patch: Partial<VehicleConfig>) {
     Object.assign(this.settings.vehicle, patch);
+    this.syncPaint();
     saveSettings(this.settings);
     this.onChange();
   }
@@ -143,6 +153,8 @@ export class GaragePanel {
   }
 
   show() {
+    // The body can also be changed from the menu while this is closed.
+    this.syncPaint();
     this.visible = true;
     this.element.hidden = false;
   }

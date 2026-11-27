@@ -201,6 +201,11 @@ export const AHMED_VEHICLE_LINES: Record<BodyId, string[]> = {
     'Half the people I recover are driving one of those. The other half wish they were.',
     "Old wagon. It'll go anywhere you point it. Eventually.",
   ],
+  suhail: [
+    'That wagon is wearing more badges than my uniform, habibi.',
+    'Suhail. Named for the star — try to stay under it, not level with it.',
+    'Racing stripes on a government wagon. Wallah, I am not writing that report.',
+  ],
   pickup: [
     'That thing weighs more than my station.',
     "A pickup with an empty bed. You're not fooling anyone, habibi.",
